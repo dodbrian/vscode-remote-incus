@@ -1,0 +1,23 @@
+{
+  "name": "remote-incus-spike",
+  "displayName": "Remote - Incus (Spike)",
+  "description": "Phase-0 spike: connect VS Code to an Incus container over exec-stdio (no sshd)",
+  "publisher": "local-spike",
+  "version": "0.0.1",
+  "private": true,
+  "license": "SEE LICENSE IN ../../DESIGN.md",
+  "engines": {
+    "vscode": "^1.140.0"
+  },
+  "extensionKind": [
+    "ui"
+  ],
+  "main": "./extension.js",
+  "enabledApiProposals": [
+    "resolvers"
+  ],
+  "activationEvents": [
+    "onResolveRemoteAuthority:incus-spike"
+  ],
+  "contributes": {}
+}

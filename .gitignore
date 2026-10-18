@@ -1,0 +1,4 @@
+# dev-loop artifacts (not repo content)
+spike/.state/
+*.vsix
+node_modules/
