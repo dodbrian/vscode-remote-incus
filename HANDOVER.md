@@ -16,7 +16,7 @@ with a Docker container".
 2. This file — adds operational context the design doc does not carry:
    environment snapshot, dev loop, debugging traps, and exactly where to resume.
 
-## Current state (as of commit after `cb051c7`)
+## Current state (as of commit `d24e127`)
 
 - Phase 0 (spike) **COMPLETE** — every architectural hypothesis was validated
   in a real VS Code window (see DESIGN.md §8 evidence ledger):
@@ -30,13 +30,16 @@ with a Docker container".
   - VSIX + `enable-proposed-api` in `~/.vscode/argv.json` works on stable.
 - Phase 1 item 1 (tree contract) **COMPLETE** (2026-10-19): `contribViewsRemote`
   tree view verified inside the Remote Explorer on stable 1.142.0 — container key
-  `"remote"`, `group: targets@1` sorts first, no-`remoteName` view always visible,
-  `vscode.newWindow` connect-from-tree worked and re-dialed the resolver ×2
-  (evidence in DESIGN.md §8). Spike ext is at 0.0.2 with the tree + connect +
-  start/stop/refresh commands.
+  `"remote"`, remotes→instances tree with state icons, `vscode.newWindow`
+  connect-from-tree re-dialed the resolver ×2, and the view joins the Remote
+  Explorer's **Switch Remote dropdown** (`remoteName` = authority prefix; taking
+  over the whole viewlet like Dev Containers / Tunnels; auto-selects in windows
+  connected to an `incus-spike` authority). Full evidence in DESIGN.md §8.
+- Spike ext installed at **0.0.3** (tree + connect + start/stop/refresh, switcher
+  form). User sign-off received on all rendered UX.
 - Remaining Phase 1 work: TypeScript + esbuild project structure (next), bootstrap
   module, diagnostics, tests, packaging.
-- Repo: `/path/to/repository`, git `main`.
+- Repo: `/path/to/repository`, git `main`, clean tree.
 
 ## Environment snapshot (verified facts, inc. versions)
 
@@ -57,7 +60,8 @@ with a Docker container".
   `"enable-proposed-api": ["local-spike.remote-incus-spike"]` (verified working
   for the installed VSIX on stable).
 - Spike extension installed in the user's VS Code:
-  `local-spike.remote-incus-spike-0.0.1` (from `spike/remote-incus-spike.vsix`).
+  `local-spike.remote-incus-spike-0.0.3` (from `spike/remote-incus-spike.vsix`;
+  older 0.0.1/0.0.2 dirs may linger in `~/.vscode/extensions/` — inert).
 - Companion container: **`fixture-container`** (images:ubuntu/24.04, RUNNING):
   - VS Code server at `~ubuntu/.vscode-server/bin/6d62b1d5…`, listening on
     `127.0.0.1:<port>` inside, started detached via `bin/code-server …
@@ -109,6 +113,13 @@ or select explicitly; never "first instance".
 - `PendingMigrationError: navigator is now a global in nodejs` appears in
   windows from unrelated extensions — harmless noise, ignore it.
 - System locale is German — expect German CLI error strings.
+- **No CLI screenshot tooling on this host** (GNOME Wayland; no grim/spectacle/
+  scrot). View-rendering verification is user-in-the-loop: deploy, open a fresh
+  local window (`code --new-window`, no flags needed — argv.json grants the
+  proposals), ask the user to look. Log-based signals: no
+  `contribViewsRemote` drop-warning in `~/.config/Code/logs/<session>/window*/
+  exthost/exthost.log`, activation line `onView:<viewId>`, and the spike's own
+  `/tmp/remote-incus-dev/fixture-container/ext.log`.
 
 ## Phase 1 — the work package (from DESIGN.md §12)
 
