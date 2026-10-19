@@ -183,6 +183,24 @@ VS Code CLI/instance lessons:
   always restart to a single instance before debugging resolver flows
 - argv.json for stable lives at `~/.vscode/argv.json` (not `~/.config/Code/User/`)
 
+Remote Explorer tree (`contribViewsRemote`, verified on stable 1.142.0, spike ext
+0.0.2 — view visible, tree rendered, connect-from-tree resolved and dialed ×2):
+- `contributes.views` container key is **`"remote"`** (= viewlet `workbench.view.remote`);
+  without the `contribViewsRemote` proposal the contribution is silently dropped with
+  a warning in the extension-host log (`viewsExtensionPoint.ts` gates on the proposal)
+- a view **without `remoteName` is always visible** (correct shape for the connect
+  entry point, like Remote-SSH's "SSH Targets"); `remoteName` filters a view to
+  windows connected to that authority type (`FilterViewPaneContainer` filter)
+- `group: "targets@1"` sorts the view above the built-in Remotes (Tunnels/SSH) view
+- connect from tree: `vscode.commands.executeCommand('vscode.newWindow',
+  { remoteAuthority, reuseWindow })` — the open-remote-ssh pattern, works for
+  third-party authorities; extension activates via `onView:<viewId>`
+- env fact discovered during verification: on this dev host the **default incus
+  remote is `fixture-remote` (TLS daemon)** and the local unix socket is NOT group-accessible
+  (`incus list local:` → EACCES). All instances incl. `fixture-container` live on
+  `fixture-remote`. Tree remotes must be filtered by `Protocol === 'incus'` (drops the
+  simplestreams `images` remote) and per-remote listing must degrade gracefully.
+
 ## 9. Distribution & licensing constraints
 
 - Extension source: MIT (copies may come from MIT sources: `jeanp413/open-remote-ssh`,
@@ -207,8 +225,7 @@ VS Code CLI/instance lessons:
 ## 11. Open questions (recorded, with leaning)
 
 1. Final product naming/publisher (working title "Remote - Incus") — TBD before OpenVSX.
-2. `contribViewsRemote` tree-view wiring inside Remote Explorer — not yet exercised;
-   verify early in Phase 1 (the spike proved only the resolver contract).
+2. ~~`contribViewsRemote` tree-view wiring~~ **Verified 2026-10-19** (see §8).
 3. Per-connection `--env`/`--cwd` surface for future devcontainer.json support — Phase 3.
 4. Multi-user-in-one-instance semantics (concurrent different-uid attaches) — Phase 2.
 5. Download-URL override setting for fully offline environments (mirror support).

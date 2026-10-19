@@ -16,7 +16,7 @@ with a Docker container".
 2. This file — adds operational context the design doc does not carry:
    environment snapshot, dev loop, debugging traps, and exactly where to resume.
 
-## Current state (as of root commit `6674b8e`)
+## Current state (as of commit after `cb051c7`)
 
 - Phase 0 (spike) **COMPLETE** — every architectural hypothesis was validated
   in a real VS Code window (see DESIGN.md §8 evidence ledger):
@@ -28,14 +28,27 @@ with a Docker container".
   - version mismatch is detected/reported cleanly by core
     ("Client refused: version mismatch").
   - VSIX + `enable-proposed-api` in `~/.vscode/argv.json` works on stable.
-- Phase 1 (real extension) **NOT STARTED** — that is your work package.
-- Repo: `/path/to/repository`, git `main`, root commit
-  `6674b8e` (design doc + verified spike scripts).
+- Phase 1 item 1 (tree contract) **COMPLETE** (2026-10-19): `contribViewsRemote`
+  tree view verified inside the Remote Explorer on stable 1.142.0 — container key
+  `"remote"`, `group: targets@1` sorts first, no-`remoteName` view always visible,
+  `vscode.newWindow` connect-from-tree worked and re-dialed the resolver ×2
+  (evidence in DESIGN.md §8). Spike ext is at 0.0.2 with the tree + connect +
+  start/stop/refresh commands.
+- Remaining Phase 1 work: TypeScript + esbuild project structure (next), bootstrap
+  module, diagnostics, tests, packaging.
+- Repo: `/path/to/repository`, git `main`.
 
 ## Environment snapshot (verified facts, inc. versions)
 
 - **incus 6.0.5** on this host (x86_64). Note: `incus port-forward` needs ≥ 7.3 —
   NOT available here; per-connection exec bridges are the transport (by design).
+- **Default incus remote on this host is `fixture-remote`** (TLS daemon, 192.0.2.10:8443)
+  — plain `incus list` lists fixture-remote instances. The local unix socket is NOT
+  group-accessible (`incus list local:` → permission denied). Tree/extension code
+  must address instances as `<remote>:<name>` and never assume `local:`.
+  `incus list` takes the remote as target argument (`incus list <r>:`), NOT a
+  `--remote` flag; `incus remote list --format json` + filter `Protocol === 'incus'`
+  drops the simplestreams `images` remote.
 - **VS Code stable 1.142.0** (commit `6d62b1d5…`) — auto-updated mid-session
   from 1.141.2; assume weekly auto-updates in the dev loop.
 - `code` = `/home/developer/.local/bin/code` (wrapper adds a Wayland flag, then
@@ -99,15 +112,16 @@ or select explicitly; never "first instance".
 
 ## Phase 1 — the work package (from DESIGN.md §12)
 
-1. **First**: verify the one unexercised contract — `contribViewsRemote` tree
-   view inside the Remote Explorer (spike proved only the resolver). Small
-   spike on top of the current skeleton before committing to structure.
-2. TypeScript + esbuild project; bootstrap module inlined (no script shell-outs);
-   `relay.js` becomes a bundled asset (staged in-instance per install).
+1. ~~Verify the one unexercised contract: `contribViewsRemote` tree view~~
+   **DONE 2026-10-19** — verified on stable 1.142.0 (DESIGN.md §8); spike ext
+   0.0.2 carries the working tree + connect flow.
+2. **NEXT**: TypeScript + esbuild project; bootstrap module inlined (no script
+   shell-outs); `relay.js` becomes a bundled asset (staged in-instance per install).
 3. Tree: remotes → instances from `incus list --format json` / `incus remote list`;
    state icons (running connectable / stopped startable); commands: connect,
    start/stop/restart, kill/uninstall server, reset token, open terminal
-   (escape hatch — no sshd means no user ssh fallback).
+   (escape hatch — no sshd means no user ssh fallback). Tree mechanics are
+   already proven in spike ext 0.0.2 — port to TS, add server-management commands.
 4. Bootstrap module: cached/resumable verified transfer (stdin push is broken;
    path push ~2.1 MB/s → design for interruption), commit-mismatch detection.
 5. Diagnostics + `RemoteAuthorityResolverError` taxonomy (see DESIGN.md §7).
@@ -143,7 +157,8 @@ spike/02-install-server.sh verified install flow
 spike/03-start-server.sh   verified token/start/discovery flow
 spike/relay.js             stdio<->TCP relay (runs on server-bundled node)
 spike/ext/extension.js     working resolver proof (plain JS, hardcoded spike paths)
-spike/ext/package.json     manifest: enabledApiProposals [resolvers], onResolveRemoteAuthority
+spike/ext/package.json     manifest: proposals [resolvers, contribViewsRemote],
+                           views.remote tree, onResolveRemoteAuthority
 spike/redeploy.sh          package+install+relaunch dev loop
 spike/run-dev.sh           open dev window only
 spike/.state/              port/token/commit cache (gitignored)
