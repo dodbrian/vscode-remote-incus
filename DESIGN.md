@@ -296,6 +296,7 @@ Phase-1 progress UX + reuse hardening (2026-10-19, same day, user-driven):
 | dimension | MVP | later |
 |---|---|---|
 | client OS | Linux | macOS, Windows (upstream client builds exist; CLI discovery TBD) |
+| client version | ≥ 1.140 (engine range `^1.140.0`); proposal d.ts verified byte-identical 1.140→1.142; live-verified on 1.142.0 only | proposal-shape change in a future client → extension fix release (runtime guard errors loudly, never silently) |
 | daemon | local unix socket, remote TLS (`--remote`) | restricted remotes/projects |
 | instance arch | x64, arm64 (glibc) | alpine-musl x64 |
 | explicit non-goals | musl-arm64 server (doesn't exist upstream) | — |
