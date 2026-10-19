@@ -1,0 +1,12 @@
+src/**
+node_modules/**
+scripts/**
+spike/**
+dist/**/*.map
+tsconfig.json
+esbuild.js
+redeploy.sh
+.gitignore
+*.vsix
+HANDOVER.md
+DESIGN.md

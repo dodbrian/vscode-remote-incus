@@ -2,3 +2,4 @@
 spike/.state/
 *.vsix
 node_modules/
+dist/

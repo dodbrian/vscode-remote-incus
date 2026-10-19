@@ -1,0 +1,185 @@
+{
+  "name": "remote-incus",
+  "displayName": "Remote - Incus",
+  "description": "Connect to Incus containers as a first-class remote connection type (exec-stdio transport, no sshd).",
+  "publisher": "local-dev",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://example.invalid/local-dev/remote-incus"
+  },
+  "engines": {
+    "vscode": "^1.140.0"
+  },
+  "extensionKind": [
+    "ui"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "main": "./dist/extension.js",
+  "enabledApiProposals": [
+    "resolvers",
+    "contribViewsRemote"
+  ],
+  "activationEvents": [
+    "onResolveRemoteAuthority:incus",
+    "onView:remote-incus.instances"
+  ],
+  "contributes": {
+    "views": {
+      "remote": [
+        {
+          "id": "remote-incus.instances",
+          "name": "Incus",
+          "group": "targets@1",
+          "remoteName": "incus"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "remote-incus.connectToInstance",
+        "title": "Connect",
+        "category": "Remote - Incus",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "remote-incus.startInstance",
+        "title": "Start",
+        "category": "Remote - Incus",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "remote-incus.stopInstance",
+        "title": "Stop",
+        "category": "Remote - Incus",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "remote-incus.restartInstance",
+        "title": "Restart",
+        "category": "Remote - Incus",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "remote-incus.openTerminal",
+        "title": "Open Terminal (exec)",
+        "category": "Remote - Incus",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "remote-incus.killServer",
+        "title": "Kill VS Code Server on Instance",
+        "category": "Remote - Incus"
+      },
+      {
+        "command": "remote-incus.uninstallServer",
+        "title": "Uninstall from Instance",
+        "category": "Remote - Incus"
+      },
+      {
+        "command": "remote-incus.resetToken",
+        "title": "Reset Server & Connection Token",
+        "category": "Remote - Incus"
+      },
+      {
+        "command": "remote-incus.collectDiagnostics",
+        "title": "Collect Diagnostics",
+        "category": "Remote - Incus"
+      },
+      {
+        "command": "remote-incus.refresh",
+        "title": "Refresh",
+        "category": "Remote - Incus",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "remote-incus.refresh",
+          "when": "view == remote-incus.instances",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "remote-incus.connectToInstance",
+          "when": "view == remote-incus.instances && viewItem == instance-running",
+          "group": "inline@1"
+        },
+        {
+          "command": "remote-incus.startInstance",
+          "when": "view == remote-incus.instances && viewItem == instance-stopped",
+          "group": "inline@1"
+        },
+        {
+          "command": "remote-incus.stopInstance",
+          "when": "view == remote-incus.instances && viewItem == instance-running",
+          "group": "inline@2"
+        },
+        {
+          "command": "remote-incus.restartInstance",
+          "when": "view == remote-incus.instances && viewItem == instance-running",
+          "group": "2_incus@1"
+        },
+        {
+          "command": "remote-incus.openTerminal",
+          "when": "view == remote-incus.instances && viewItem == instance-running",
+          "group": "2_incus@2"
+        },
+        {
+          "command": "remote-incus.killServer",
+          "when": "view == remote-incus.instances && viewItem == instance-running",
+          "group": "2_incus@3"
+        },
+        {
+          "command": "remote-incus.resetToken",
+          "when": "view == remote-incus.instances && viewItem == instance-running",
+          "group": "2_incus@4"
+        },
+        {
+          "command": "remote-incus.uninstallServer",
+          "when": "view == remote-incus.instances && viewItem =~ /instance-(running|stopped)/",
+          "group": "2_incus@5"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Remote - Incus",
+      "properties": {
+        "remote-incus.user": {
+          "type": "string",
+          "default": "default",
+          "scope": "application",
+          "description": "User to attach as inside the instance. \"default\" = the instance's primary unprivileged user; \"root\" = explicit root attach; otherwise an exact username or numeric uid.",
+          "pattern": "^(default|root|[a-z_][a-z0-9_-]*$|[0-9]+$)"
+        },
+        "remote-incus.downloadUrlTemplate": {
+          "type": "string",
+          "default": "https://update.code.visualstudio.com/commit:{commit}/server-{flavor}/stable",
+          "scope": "application",
+          "description": "Template for the VS Code server tarball download ({commit}, {flavor}). Override for offline mirrors."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "npx --yes @vscode/vsce@latest package --allow-missing-repository -o remote-incus.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.140.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.5.0"
+  }
+}
