@@ -11,16 +11,19 @@
  *   2. flavor    — in-instance arch/libc probe → server build
  *   3. commit    — client commit (vscode.env.appCommit, CLI fallback);
  *                  server and client must match by commit
- *   4. download  — client-side, cached under globalStorage, sha256 recorded
- *   5. push      — `incus file push` PATH mode; skipped when the remote copy
+ *   4. install?  — if bin/<commit> already holds a complete install (marker
+ *                  or core files), the tarball steps are skipped entirely
+ *   5. download  — client-side, cached under globalStorage, sha256 recorded
+ *   6. push      — `incus file push` PATH mode; skipped when the remote copy
  *                  already matches (sha256 compared before every push)
- *   6. extract   — as the target user into ~/.vscode-server/bin/<commit>
- *   7. relay     — bundled asset staged to ~/.vscode-server/relay.js
- *   8. token     — 0600 token file, mint-if-missing, charset [0-9a-zA-Z0-9]
+ *   7. extract   — as the target user into ~/.vscode-server/bin/<commit>
+ *   8. relay     — bundled asset staged to ~/.vscode-server/relay.js
+ *   9. token     — 0600 token file, mint-if-missing, charset [0-9a-zA-Z0-9]
  *                  (the server silently rejects other characters — DESIGN §4)
- *   9. start     — detached (nohup, survives the exec session); a server
- *                  running under a stale commit is restarted under ours
- *  10. port      — parsed from server.log ("Extension host agent listening
+ *  10. start     — detached (nohup, survives the exec session); a server
+ *                  running under a stale commit — or a ZOMBIE whose install
+ *                  files were wiped — is killed and started fresh
+ *  11. port      — parsed from server.log ("Extension host agent listening
  *                  on <port>"); relays are orphan-swept after fresh starts
  *                  (DESIGN §6) — never on reuse paths (live bridges belong
  *                  to running sessions, and relays self-exit on EOF)
@@ -34,6 +37,7 @@ import { pipeline } from 'stream/promises';
 import * as vscode from 'vscode';
 import { execInInstance, InstanceRef, pushFile, target } from './incusCli';
 import { log } from './logging';
+import { Report } from './progress';
 
 export const VS_SERVER_DIR = '.vscode-server';
 
@@ -158,7 +162,7 @@ export async function resolveClientCommit(): Promise<string> {
 // tarball download (client-side, cached — DESIGN §3 step 2)
 // ---------------------------------------------------------------------------
 
-export async function downloadTarball(context: vscode.ExtensionContext, commit: string, flavor: ServerFlavor): Promise<{ file: string; sha256: string }> {
+export async function downloadTarball(context: vscode.ExtensionContext, commit: string, flavor: ServerFlavor, report?: Report): Promise<{ file: string; sha256: string }> {
   const template = vscode.workspace.getConfiguration('remote-incus').get<string>('downloadUrlTemplate') || DEFAULT_URL_TEMPLATE;
   const url = template.replace('{commit}', commit).replace('{flavor}', flavor);
   const cacheDir = path.join(context.globalStorageUri.fsPath, 'server-cache');
@@ -181,6 +185,7 @@ export async function downloadTarball(context: vscode.ExtensionContext, commit: 
   if (!res.ok || !res.body) {
     throw new Error(`server tarball download failed: HTTP ${res.status} ${res.statusText} for ${url}`);
   }
+  const total = Number(res.headers.get('content-length') ?? 0);
   const partial = `${file}.partial`;
   try {
     let received = 0;
@@ -193,6 +198,12 @@ export async function downloadTarball(context: vscode.ExtensionContext, commit: 
           if (received >= nextMark) {
             nextMark += 64 << 20;
             log(`  … ${(received / 1e6).toFixed(0)} MB`);
+          }
+          if (total) {
+            const pct = (received / total) * 100;
+            // Percent FIRST — collapsed toasts append the message to the title
+            // and truncate from the right; the number must survive that cut.
+            report?.(`${pct.toFixed(0)}% — downloading server`, pct * 0.3); // download phase = 0–30 %
           }
           yield chunk;
         }
@@ -224,35 +235,62 @@ async function sha256File(file: string): Promise<string> {
 // in-instance install steps
 // ---------------------------------------------------------------------------
 
-async function ensureTarballInInstance(ref: InstanceRef, tar: { file: string; sha256: string }, commit: string, flavor: ServerFlavor): Promise<void> {
+async function ensureTarballInInstance(ref: InstanceRef, tar: { file: string; sha256: string }, commit: string, flavor: ServerFlavor, report?: Report): Promise<void> {
   const tmp = `/tmp/vscode-server-${flavor}-${commit}.tar.gz`;
   const probe = await execInInstance(ref, `sha256sum ${sq(tmp)} 2>/dev/null | cut -d' ' -f1 || true`);
   if (probe.trim() === tar.sha256) {
     log(`tarball already in ${target(ref)} (sha256 match) — skipping push`);
+    report?.('server tarball already on instance', 30);
     return;
   }
   log(`pushing server tarball to ${target(ref)}${tmp} (path mode, ${(fs.statSync(tar.file).size / 1e6).toFixed(0)} MB) …`);
-  await pushFile(ref, tar.file, tmp);
+  await pushFile(ref, tar.file, tmp, {
+    onProgress: (p) => report?.(`${p}% — pushing to instance`, 30 + p * 0.6), // push phase = 30–90 %
+  });
   const pushed = await execInInstance(ref, `sha256sum ${sq(tmp)} | cut -d' ' -f1`);
   if (pushed.trim() !== tar.sha256) {
     throw new Error(`tarball corrupted in transit: sha256 ${pushed.trim() || '<none>'} ≠ ${tar.sha256}`);
   }
 }
 
-async function ensureExtracted(ref: InstanceRef, identity: Identity, commit: string, flavor: ServerFlavor): Promise<void> {
-  const installDir = `${identity.home}/${VS_SERVER_DIR}/bin/${commit}`;
-  const tmp = `/tmp/vscode-server-${flavor}-${commit}.tar.gz`;
-  await execInInstance(ref, [
-    `if [ ! -x ${sq(installDir)}/bin/code-server ]; then`,
-    `  mkdir -p ${sq(installDir)}`,
-    `  tar -xzf ${sq(tmp)} -C ${sq(installDir)} --strip-components=1`,
-    `  rm -f ${sq(tmp)}`,
+async function isServerInstalled(ref: InstanceRef, identity: Identity, commit: string): Promise<boolean> {
+  const dir = `${identity.home}/${VS_SERVER_DIR}/bin/${commit}`;
+  const out = await execInInstance(ref, [
+    `if [ -f ${sq(`${dir}/.incus-install-ok`)} ]; then`,
+    `  echo yes`,
+    `elif [ -x ${sq(`${dir}/bin/code-server`)} ] && [ -f ${sq(`${dir}/out/server-main.js`)} ] && [ -x ${sq(`${dir}/node`)} ]; then`,
+    `  echo yes`,
+    `else`,
+    `  echo no`,
     `fi`,
+  ].join('\n'), { uid: identity.uid, home: identity.home });
+  return out.trim() === 'yes';
+}
+
+async function ensureExtracted(ref: InstanceRef, identity: Identity, commit: string, flavor: ServerFlavor, report?: Report): Promise<void> {
+  const dir = `${identity.home}/${VS_SERVER_DIR}/bin/${commit}`;
+  const marker = `${dir}/.incus-install-ok`;
+  report?.('extracting server…', 91);
+  if (await isServerInstalled(ref, identity, commit)) {
+    log(`server install for ${commit.slice(0, 10)}… already present — skipping extract`);
+    // Heal spike-era installs (no marker) so future checks are marker-fast.
+    await execInInstance(ref, `touch ${sq(marker)}`, { uid: identity.uid, home: identity.home });
+    return;
+  }
+  const tmp = `/tmp/vscode-server-${flavor}-${commit}.tar.gz`;
+  // rm first: a previously interrupted extract must not leave debris behind.
+  await execInInstance(ref, [
+    `rm -rf ${sq(dir)}`,
+    `mkdir -p ${sq(dir)}`,
+    `tar -xzf ${sq(tmp)} -C ${sq(dir)} --strip-components=1`,
+    `touch ${sq(marker)}`,
+    `rm -f ${sq(tmp)}`,
   ].join('\n'), { uid: identity.uid, home: identity.home, timeoutMs: 300_000 });
 }
 
 /** Relay is tiny — re-stage on every install so asset updates always land. */
-async function stageRelay(context: vscode.ExtensionContext, ref: InstanceRef, identity: Identity): Promise<void> {
+async function stageRelay(context: vscode.ExtensionContext, ref: InstanceRef, identity: Identity, report?: Report): Promise<void> {
+  report?.('staging relay…', 93);
   const localRelay = path.join(context.asAbsolutePath('.'), 'assets', 'relay.js');
   await pushFile(ref, localRelay, relayPath(identity.home), {
     uid: identity.uid, gid: identity.gid, mode: '600',
@@ -266,7 +304,8 @@ async function stageRelay(context: vscode.ExtensionContext, ref: InstanceRef, id
  * tokens containing anything outside [0-9a-zA-Z_-] (spike finding: it fails
  * only after the health check reports OK, which is brutally confusing).
  */
-async function ensureToken(ref: InstanceRef, identity: Identity): Promise<void> {
+async function ensureToken(ref: InstanceRef, identity: Identity, report?: Report): Promise<void> {
+  report?.('preparing token…', 95);
   const dir = `${identity.home}/${VS_SERVER_DIR}/data/Machine`;
   await execInInstance(ref, [
     `mkdir -p ${sq(dir)}`,
@@ -313,8 +352,9 @@ async function startServer(ref: InstanceRef, identity: Identity, commit: string)
   ].join('\n'), { uid: identity.uid, home: identity.home });
 }
 
-async function discoverPort(ref: InstanceRef, identity: Identity): Promise<number> {
+async function discoverPort(ref: InstanceRef, identity: Identity, report?: Report): Promise<number> {
   const file = logPath(identity.home);
+  report?.('waiting for port…', 97);
   for (let i = 0; i < PORT_POLL_TRIES; i++) {
     const out = await execInInstance(ref, `grep -s "Extension host agent listening on" ${sq(file)} || true`, { uid: identity.uid, home: identity.home });
     const hits = [...out.matchAll(/Extension host agent listening on (\d+)/g)];
@@ -347,45 +387,76 @@ export interface ServerSession {
 
 const inflight = new Map<string, Promise<ServerSession>>();
 
-export async function ensureServerReady(context: vscode.ExtensionContext, ref: InstanceRef): Promise<ServerSession> {
+export async function ensureServerReady(context: vscode.ExtensionContext, ref: InstanceRef, report?: Report): Promise<ServerSession> {
   const key = target(ref);
   const pending = inflight.get(key);
   if (pending) { return pending; }
-  const p = doEnsureServerReady(context, ref).finally(() => inflight.delete(key));
+  const p = doEnsureServerReady(context, ref, report).finally(() => inflight.delete(key));
   inflight.set(key, p);
   return p;
 }
 
-async function doEnsureServerReady(context: vscode.ExtensionContext, ref: InstanceRef): Promise<ServerSession> {
+async function doEnsureServerReady(context: vscode.ExtensionContext, ref: InstanceRef, report?: Report): Promise<ServerSession> {
+  report?.('connecting to instance…');
   const identity = await resolveIdentity(ref);
   const commit = await resolveClientCommit();
   const flavor = await probeFlavor(ref, identity);
-  const tar = await downloadTarball(context, commit, flavor);
-  await ensureTarballInInstance(ref, tar, commit, flavor);
-  await ensureExtracted(ref, identity, commit, flavor);
-  await stageRelay(context, ref, identity);
-  await ensureToken(ref, identity);
+  report?.('checking for an existing server…');
+  if (await isServerInstalled(ref, identity, commit)) {
+    // The most common case: nothing to transfer at all — not even the local
+    // tarball as a sha reference.
+    log(`server install for ${commit.slice(0, 10)}… already present — skipping download/push/extract`);
+    report?.('server already installed', 90);
+  } else {
+    const tar = await downloadTarball(context, commit, flavor, report);
+    await ensureTarballInInstance(ref, tar, commit, flavor, report);
+    await ensureExtracted(ref, identity, commit, flavor, report);
+  }
+  await stageRelay(context, ref, identity, report);
+  await ensureToken(ref, identity, report);
 
   const running = await findRunningServerCommit(ref);
-  const fresh = !running || running !== commit;
-  if (running && running !== commit) {
-    log(`server on ${target(ref)} runs stale commit ${running.slice(0, 10)}… — restarting under ${commit.slice(0, 10)}…`);
-    await killServer(ref);
+  let reuse = false;
+  if (running) {
+    if (running !== commit) {
+      log(`server on ${target(ref)} runs stale commit ${running.slice(0, 10)}… — restarting under ${commit.slice(0, 10)}…`);
+      await killServer(ref);
+    } else {
+      // A live process alone is not a healthy server: a wiped ~/.vscode-server
+      // (recreated instance, manual cleanup) leaves the process running from
+      // memory with its install dir, token file and log GONE — reusing it
+      // means polling a nonexistent log forever (seen live 2026-10-19).
+      // Verify the on-disk state before trusting the reuse.
+      const healthy = (await execInInstance(ref, [
+        `test -x ${sq(`${identity.home}/${VS_SERVER_DIR}/bin/${running}/bin/code-server`)} &&`,
+        `test -f ${sq(logPath(identity.home))} &&`,
+        `test -s ${sq(tokenPath(identity.home))} && echo yes || echo no`,
+      ].join(' '))).trim() === 'yes';
+      if (healthy) {
+        reuse = true;
+      } else {
+        log(`running server on ${target(ref)} lost its install (zombie) — killing and starting fresh`);
+        await killServer(ref);
+      }
+    }
   }
-  if (fresh) {
-    await startServer(ref, identity, commit);
-  } else {
+  if (reuse) {
     log(`server already running under ${commit.slice(0, 10)}… — reusing`);
+  } else {
+    report?.('starting server…', 96);
+    await startServer(ref, identity, commit);
   }
 
-  const port = await discoverPort(ref, identity);
-  if (fresh) {
+  const port = await discoverPort(ref, identity, report);
+  if (!reuse) {
     await sweepOrphanRelays(ref);
   }
+  report?.('reading token…', 99);
   const token = (await execInInstance(ref, `cat ${sq(tokenPath(identity.home))}`, { uid: identity.uid, home: identity.home })).trim();
   if (!token) {
     throw new Error('could not read the connection token from the instance');
   }
+  report?.('ready', 100);
   log(`server ready on ${target(ref)}: commit ${commit.slice(0, 10)}…, 127.0.0.1:${port}, user ${identity.username} (uid ${identity.uid})`);
   return { ref, identity, commit, flavor, port, token };
 }
