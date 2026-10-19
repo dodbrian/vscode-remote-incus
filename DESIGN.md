@@ -234,6 +234,34 @@ resolver + full tree + commands + bootstrap live in a real window):
   the instance allocates a real PTY (verified: prompt, colors, interactive bash
   as the target user). Resize propagation not implemented (rescue-path tradeoff).
 
+Phase-1 progress UX + reuse hardening (2026-10-19, same day, user-driven):
+- **progress toast parity** (Dev Containers/Remote-SSH): notification-location
+  `withProgress` renders its TITLE as markdown — embed a `command:` link there:
+  `[Connecting to <instance> (show log)](command:remote-incus.showLog "…")`
+  (verified in the Dev Containers bundle: `title: Hu` where Hu is exactly that
+  form; Remote-SSH uses the same link form in error toasts). Live detail goes
+  into `progress.report({ message })` under the title.
+- **collapsed toasts truncate title+message as one line from the right** — the
+  percentage must LEAD the message (`89% — pushing to instance`), never trail
+  it (user feedback after the first iteration).
+- **`incus file push` prints its own meter even when piped** ("<n>% (2.0MB/s)",
+  verified over a full 217 MB push): stream-parse it for exact transfer
+  progress; no stat-polling needed (the remote file also grows during push,
+  verified — fallback available).
+- **zombie servers**: a running server whose ~/.vscode-server was wiped keeps
+  running from memory; a process-only reuse check (pgrep commit match) then
+  "reuses" a server with no token file, no log, no install → 60 s port-wait
+  and failure (seen live: "still waiting for port"). Fix: on-disk health check
+  (code-server binary + server.log + token file) before reuse; failure → kill
+  + fresh start. Verified live: "lost its install (zombie) — killing and
+  starting fresh" → connected.
+- **install-first ordering**: `isServerInstalled` (`.incus-install-ok` marker
+  written after a successful extract, OR core files for spike-era installs)
+  runs BEFORE any tarball work — when the install exists, download/push/
+  extract are all skipped (measured: full connect with zero transfer ≈ 16 s).
+  Rationale: the local tarball was previously required just as a sha reference
+  even for fully installed instances.
+
 ## 9. Distribution & licensing constraints
 
 - Extension source: MIT (copies may come from MIT sources: `jeanp413/open-remote-ssh`,
@@ -278,13 +306,18 @@ resolver + full tree + commands + bootstrap live in a real window):
    **DONE 2026-10-19** (cached+sha-verified download, sha-gated idempotent push,
    extract/token/start/port discovery, stale-commit restart, orphan sweep after
    fresh starts; "resumable" = interruption-safe re-entry, not byte-range resume —
-   `incus file push` has no resume on 6.0.5).
-4. Diagnostics: output channel, per-bridge structured logs, "collect diagnostics"
+   `incus file push` has no resume on 6.0.5). Reuse hardened same day: on-disk
+   health check before reuse (zombie detection), install-first ordering (§8).
+4. ~~Connection progress UX (user-requested 2026-10-19): toast with progress bar +
+   "(show log)" link during download/push, like Dev Containers/Remote-SSH.~~
+   **DONE 2026-10-19** — title-embedded command link, real download/push
+   percentages, percent-first messages (see §8).
+5. Diagnostics: output channel, per-bridge structured logs, "collect diagnostics"
    command; sensible `RemoteAuthorityResolverError` usage. *(output channel +
    per-bridge logs + collect-diagnostics exist; error-taxonomy refinement open)*
-5. Tests: mechanics harness (install/start/dial against `fixture-container`), resolver
+6. Tests: mechanics harness (install/start/dial against `fixture-container`), resolver
    contract test on Insiders + stable, matrix smoke on x64/arm64 Ubuntu/Debian images.
-6. Packaging pipeline: CI-built VSIX + OpenVSX publish + README with the argv.json step.
+7. Packaging pipeline: CI-built VSIX + OpenVSX publish + README with the argv.json step.
 
 ## 13. Spike artifact inventory (`spike/`)
 

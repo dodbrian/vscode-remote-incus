@@ -47,6 +47,19 @@ with a Docker container".
   (core waited 132 s, no timeout); reconnect ≈ 17 s (cache hit, sha match,
   server reuse, 2 bridges). Connect-from-tree pre-runs `ensureServerReady`
   so resolve stays fast.
+- **Progress toast** (user-requested, verified): connection/setup runs under a
+  notification toast with a progress bar; the title embeds a clickable
+  "(show log)" link (registered `remote-incus.showLog` command) opening the
+  output channel; download % (content-length-based) and push % (parsed from
+  the `incus file push` CLI meter) stream into the message line, percent-first
+  so the number survives collapsed-toast truncation (DESIGN §8).
+- **Reuse hardening** (verified live): a running server is only reused when
+  its on-disk state is intact (code-server binary + server.log + token file);
+  a "zombie" (process alive after its install was wiped, e.g. recreated
+  instance) is killed and started fresh instead of 60 s port-wait + failure.
+  Install-first ordering: when `bin/<commit>` is complete (`.incus-install-ok`
+  marker or core files), download/push/extract are skipped entirely —
+  measured ≈ 16 s connect with zero transfer.
 - Remaining Phase-1 work (DESIGN §12): item 4 diagnostics refinement
   (`RemoteAuthorityResolverError` taxonomy), item 5 tests (mechanics harness +
   matrix smoke), item 6 packaging pipeline (CI VSIX + OpenVSX + README).
@@ -108,6 +121,14 @@ or select explicitly; never "first instance".
   `"capabilities": { "untrustedWorkspaces": { "supported": true } }` in
   package.json (Remote-SSH does the same). Without it, only trusted workspaces
   show the tree.
+- **Collapsed progress toasts truncate title+message as one line** — put the
+  percentage at the START of progress messages (user feedback, first try
+  appended it and the number was cut off).
+- **Zombie servers**: deleting ~/.vscode-server while the server runs leaves
+  a live process with no install/token/log — a process-only reuse check
+  "reuses" it and hangs in port-wait for 60 s. The on-disk health check in
+  `src/bootstrap.ts` handles it (kill + fresh start); don't remove that check
+  to "simplify" the reuse path.
 - **Authority separator is `:`, not `/`**: `vscode-remote://` URIs end the
   authority at the first slash; `incus+<remote>/<instance>` would hide the
   instance from the resolver. Use `incus+<remote>:<instance>`.
@@ -181,6 +202,7 @@ src/
   tree.ts                  Remote Explorer tree (remotes → instances)
   commands.ts              tree commands (connect/start/stop/kill/uninstall/…)
   terminal.ts              escape-hatch exec terminal (script-PTY)
+  progress.ts              connection progress toast (log-link title, reports)
   logging.ts               output channel (+ REMOTE_INCUS_DEBUG_LOG mirror)
   types/                   proposal d.ts pinned to vscode 1.142.0
 assets/relay.js            bundled relay (staged in-instance per install)
