@@ -208,6 +208,32 @@ Remote Explorer tree (`contribViewsRemote`, verified on stable 1.142.0, spike ex
   `fixture-remote`. Tree remotes must be filtered by `Protocol === 'incus'` (drops the
   simplestreams `images` remote) and per-remote listing must degrade gracefully.
 
+Phase-1 extension (TypeScript + esbuild, verified on stable 1.142.0, 2026-10-19 —
+resolver + full tree + commands + bootstrap live in a real window):
+- authority is `incus+<remote>:<instance>` — the separator must be `:` (not `/`):
+  the authority component of a `vscode-remote://` URI ends at the first slash,
+  so a slash-embedded instance would vanish from the authority the resolver sees
+- `vscode.env.appCommit` (resolvers proposal) yields the client commit directly —
+  no CLI parsing needed; `code --version` line-2 parse kept as fallback
+- first resolve ran the whole install inline (download 217 MB ≈ 6 s client-side;
+  path-push ≈ 117 s; extract) and **core waited 132 s without a resolve timeout**
+  ("returned managed authority"). Still, connect-from-tree pre-runs
+  `ensureServerReady` under progress UI (§7 pre-flight slot) so resolve stays fast.
+- idempotent re-resolve measured ≈ 17 s: tarball cache hit (sha re-verified),
+  remote sha match → push skipped, running server under matching commit reused,
+  port rediscovered from server.log, 2 bridges dialed
+- **untrusted-workspace trap**: a window on a never-trusted remote folder starts
+  in Restricted Mode; the extension is "disabled because the current workspace is
+  not trusted" and its **views contribution is dropped** → `registerTreeDataProvider`
+  fires the toast "No view is registered with id: …" — while the **resolver still
+  activates** (core special-cases resolver activation; the connection itself works).
+  Fix: manifest `capabilities.untrustedWorkspaces.supported: true` — exactly what
+  Remote-SSH and ms-vscode.remote-explorer declare. With it, Restricted Mode
+  behaves like Remote-SSH (tree + connect available pre-trust); verified working.
+- escape-hatch terminal: Pseudoterminal over pipes + util-linux `script -qec` in
+  the instance allocates a real PTY (verified: prompt, colors, interactive bash
+  as the target user). Resize propagation not implemented (rescue-path tradeoff).
+
 ## 9. Distribution & licensing constraints
 
 - Extension source: MIT (copies may come from MIT sources: `jeanp413/open-remote-ssh`,
@@ -239,15 +265,23 @@ Remote Explorer tree (`contribViewsRemote`, verified on stable 1.142.0, spike ex
 
 ## 12. Phase-1 plan (next work package)
 
-1. TypeScript + esbuild project; extension skeleton from spike (inline bootstrap, no
-   script shell-outs; relay.js as bundled asset).
-2. Remote Explorer tree view (`contribViewsRemote`): remotes → instances (state icons:
+1. ~~TypeScript + esbuild project; extension skeleton from spike (inline bootstrap, no
+   script shell-outs; relay.js as bundled asset).~~ **DONE 2026-10-19** — repo-root
+   project (`src/`, esbuild bundle, relay as `assets/relay.js`); verified on stable.
+2. ~~Remote Explorer tree view (`contribViewsRemote`): remotes → instances (state icons:
    running connectable / stopped startable), commands: connect, start, stop, restart,
-   kill server, uninstall server, reset token, open terminal.
-3. Bootstrap module: client-side cached download + resumable verified push + extract +
-   token + start + port discovery (idempotent; safe against commit mismatch).
+   kill server, uninstall server, reset token, open terminal.~~ **DONE 2026-10-19** —
+   user-verified on stable incl. switcher form, graceful per-remote degradation,
+   and the untrusted-workspace capability (§8).
+3. ~~Bootstrap module: client-side cached download + resumable verified push + extract +
+   token + start + port discovery (idempotent; safe against commit mismatch).~~
+   **DONE 2026-10-19** (cached+sha-verified download, sha-gated idempotent push,
+   extract/token/start/port discovery, stale-commit restart, orphan sweep after
+   fresh starts; "resumable" = interruption-safe re-entry, not byte-range resume —
+   `incus file push` has no resume on 6.0.5).
 4. Diagnostics: output channel, per-bridge structured logs, "collect diagnostics"
-   command; sensible `RemoteAuthorityResolverError` usage.
+   command; sensible `RemoteAuthorityResolverError` usage. *(output channel +
+   per-bridge logs + collect-diagnostics exist; error-taxonomy refinement open)*
 5. Tests: mechanics harness (install/start/dial against `fixture-container`), resolver
    contract test on Insiders + stable, matrix smoke on x64/arm64 Ubuntu/Debian images.
 6. Packaging pipeline: CI-built VSIX + OpenVSX publish + README with the argv.json step.
