@@ -158,6 +158,19 @@ export async function resolveClientCommit(): Promise<string> {
   throw new Error('could not determine the local VS Code commit — server and client must match by commit');
 }
 
+/** Delete client-side cache entries for other commits (regenerable). */
+async function pruneServerCache(cacheDir: string, keepCommit: string): Promise<void> {
+  try {
+    for (const name of await fs.promises.readdir(cacheDir)) {
+      if (name.startsWith('vscode-server-') && !name.includes(keepCommit)) {
+        await fs.promises.rm(path.join(cacheDir, name), { force: true });
+      }
+    }
+  } catch (err) {
+    log(`cache prune skipped: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // tarball download (client-side, cached — DESIGN §3 step 2)
 // ---------------------------------------------------------------------------
@@ -329,9 +342,13 @@ async function ensureToken(ref: InstanceRef, identity: Identity, report?: Report
 async function findRunningServerCommit(ref: InstanceRef): Promise<string | undefined> {
   // Bracketed pattern: `pkill`/`pgrep -f` match their own invoking cmdline —
   // the bash -c payload must never contain the plain name (spike finding).
+  // The regex demands EXACTLY 40 hex chars in a bin/<…>/ path — malformed
+  // commit dirs can never be mistaken for a server version (verified).
   const out = await execInInstance(ref, `pgrep -af 'serv[e]r-main\\.js' || true`);
-  const hit = out.match(/bin\/([0-9a-f]{40})\//);
-  return hit ? hit[1].toLowerCase() : undefined;
+  const commits = [...out.matchAll(/bin\/([0-9a-f]{40})\//g)].map((m) => m[1].toLowerCase());
+  const unique = [...new Set(commits)];
+  log(`running server check: ${unique.length === 0 ? 'none' : `commit ${unique.join(', ')}${commits.length > 1 ? ` (${commits.length} processes)` : ''}`}`);
+  return unique[0];
 }
 
 export async function killServer(ref: InstanceRef): Promise<void> {
@@ -372,6 +389,25 @@ async function sweepOrphanRelays(ref: InstanceRef): Promise<void> {
   await execInInstance(ref, `pkill -f '\\.vscode-serve[r]/relay\\.js' 2>/dev/null || true`);
 }
 
+/**
+ * Keep only the running commit's install dir. Old-commit dirs are regenerable
+ * (the tarball cache rebuilds them) and ~600 MB each — without this, every
+ * client auto-update would accumulate one. Safe by this point: killServer has
+ * already taken down any other commit's server (a window connected to it
+ * reconnects through core's re-resolve into the new server).
+ */
+async function pruneOldInstalls(ref: InstanceRef, identity: Identity, commit: string): Promise<void> {
+  const binRoot = `${identity.home}/${VS_SERVER_DIR}/bin`;
+  await execInInstance(ref, [
+    `cd ${sq(binRoot)} 2>/dev/null || exit 0`,
+    'for d in */; do',
+    '  d=${d%/}',
+    `  [ "$d" = ${sq(commit)} ] && continue`,
+    '  rm -rf "$d"',
+    'done',
+  ].join('\n'), { uid: identity.uid, home: identity.home });
+}
+
 // ---------------------------------------------------------------------------
 // orchestration (concurrency-safe per instance)
 // ---------------------------------------------------------------------------
@@ -400,6 +436,7 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
   report?.('connecting to instance…');
   const identity = await resolveIdentity(ref);
   const commit = await resolveClientCommit();
+  await pruneServerCache(path.join(context.globalStorageUri.fsPath, 'server-cache'), commit);
   const flavor = await probeFlavor(ref, identity);
   report?.('checking for an existing server…');
   if (await isServerInstalled(ref, identity, commit)) {
@@ -456,6 +493,7 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
   if (!token) {
     throw new Error('could not read the connection token from the instance');
   }
+  await pruneOldInstalls(ref, identity, commit);
   report?.('ready', 100);
   log(`server ready on ${target(ref)}: commit ${commit.slice(0, 10)}…, 127.0.0.1:${port}, user ${identity.username} (uid ${identity.uid})`);
   return { ref, identity, commit, flavor, port, token };
