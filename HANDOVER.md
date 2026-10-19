@@ -121,7 +121,9 @@ or select explicitly; never "first instance".
    state icons (running connectable / stopped startable); commands: connect,
    start/stop/restart, kill/uninstall server, reset token, open terminal
    (escape hatch — no sshd means no user ssh fallback). Tree mechanics are
-   already proven in spike ext 0.0.2 — port to TS, add server-management commands.
+   already proven in spike ext 0.0.3 (switcher form: `remoteName` = authority
+   prefix; the view owns the whole viewlet when selected) — port to TS, add
+   server-management commands.
 4. Bootstrap module: cached/resumable verified transfer (stdin push is broken;
    path push ~2.1 MB/s → design for interruption), commit-mismatch detection.
 5. Diagnostics + `RemoteAuthorityResolverError` taxonomy (see DESIGN.md §7).

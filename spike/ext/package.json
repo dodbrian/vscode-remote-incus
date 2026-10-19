@@ -3,7 +3,7 @@
   "displayName": "Remote - Incus (Spike)",
   "description": "Phase-0 spike: connect VS Code to an Incus container over exec-stdio (no sshd)",
   "publisher": "local-spike",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "license": "SEE LICENSE IN ../../DESIGN.md",
   "engines": {
@@ -27,7 +27,8 @@
         {
           "id": "remote-incus-spike.instances",
           "name": "Incus (Spike)",
-          "group": "targets@1"
+          "group": "targets@1",
+          "remoteName": "incus-spike"
         }
       ]
     },

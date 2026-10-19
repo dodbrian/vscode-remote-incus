@@ -184,14 +184,21 @@ VS Code CLI/instance lessons:
 - argv.json for stable lives at `~/.vscode/argv.json` (not `~/.config/Code/User/`)
 
 Remote Explorer tree (`contribViewsRemote`, verified on stable 1.142.0, spike ext
-0.0.2 — view visible, tree rendered, connect-from-tree resolved and dialed ×2):
+0.0.2/0.0.3 — tree rendered, connect-from-tree resolved and dialed ×2):
 - `contributes.views` container key is **`"remote"`** (= viewlet `workbench.view.remote`);
   without the `contribViewsRemote` proposal the contribution is silently dropped with
   a warning in the extension-host log (`viewsExtensionPoint.ts` gates on the proposal)
-- a view **without `remoteName` is always visible** (correct shape for the connect
-  entry point, like Remote-SSH's "SSH Targets"); `remoteName` filters a view to
-  windows connected to that authority type (`FilterViewPaneContainer` filter)
-- `group: "targets@1"` sorts the view above the built-in Remotes (Tunnels/SSH) view
+- a view **without `remoteName`** renders as an always-visible stacked section
+  (0.0.2 behavior); a view **with `remoteName`** joins the Remote Explorer's
+  "Switch Remote" dropdown (`SwitchRemoteViewItem`, explorerViewItems.ts):
+  dropdown label = view `name`, selection key = `remoteName`; the selected view
+  takes over the whole viewlet; choice persists per workspace
+  (`remote.explorerType` storage); auto-selects in windows whose authority
+  prefix (`remoteAuthority.split('+')[0]`) equals `remoteName`.
+  **Decision (user, 2026-10-19): Incus uses the switcher form** — same UX slot
+  as Dev Containers / Remotes (Tunnels/SSH); verified with 0.0.3 (third dropdown
+  entry, full-viewlet takeover, auto-select in the connected window)
+- `group: "targets@N"` is required for switcher participation (and sorts views)
 - connect from tree: `vscode.commands.executeCommand('vscode.newWindow',
   { remoteAuthority, reuseWindow })` — the open-remote-ssh pattern, works for
   third-party authorities; extension activates via `onView:<viewId>`
