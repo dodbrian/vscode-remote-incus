@@ -11,6 +11,7 @@ import { ensureServerReady } from './bootstrap';
 import { openBridge } from './bridge';
 import { getDefaultRemote, getInstanceStatus, InstanceRef, startInstance } from './incusCli';
 import { firstLine, log } from './logging';
+import { withProgressReport } from './progress';
 
 export class IncusAuthorityResolver implements vscode.RemoteAuthorityResolver {
   constructor(private readonly context: vscode.ExtensionContext) {
@@ -22,27 +23,34 @@ export class IncusAuthorityResolver implements vscode.RemoteAuthorityResolver {
         + 'Enable it once via ~/.vscode/argv.json: "enable-proposed-api": ["local-dev.remote-incus"]');
     }
     const parsed = parseAuthority(authority);
-    const remote = parsed.remote ?? (await getDefaultRemote());
-    const ref: InstanceRef = { remote, instance: parsed.instance };
-    log(`resolve(${authority}) → instance ${remote}:${parsed.instance}`);
+    // Progress toast with a clickable "(show log)" link — the Dev Containers /
+    // Remote-SSH parity UX (DESIGN §7); the slow first bootstrap (download,
+    // push, extract) must never be a silent spinner.
+    return await withProgressReport(`Connecting to ${parsed.instance}`, async (report) => {
+      const remote = parsed.remote ?? (await getDefaultRemote());
+      const ref: InstanceRef = { remote, instance: parsed.instance };
+      log(`resolve(${authority}) → instance ${remote}:${parsed.instance}`);
 
-    const status = await getInstanceStatus(ref);
-    if (status === undefined) {
-      throw new Error(`instance "${remote}:${parsed.instance}" not found (deleted or renamed) — refresh the Remote Explorer`);
-    }
-    if (status !== 'Running') {
-      log(`instance is ${status} — starting …`);
-      await startInstance(ref);
-      if ((await getInstanceStatus(ref)) !== 'Running') {
-        // Controllable wait → core re-resolves (DESIGN §6).
-        throw vscode.RemoteAuthorityResolverError.TemporarilyNotAvailable(`instance ${remote}:${parsed.instance} is still starting — retrying`);
+      report('checking instance state…');
+      const status = await getInstanceStatus(ref);
+      if (status === undefined) {
+        throw new Error(`instance "${remote}:${parsed.instance}" not found (deleted or renamed) — refresh the Remote Explorer`);
       }
-    }
+      if (status !== 'Running') {
+        report(`starting instance…`);
+        log(`instance is ${status} — starting …`);
+        await startInstance(ref);
+        if ((await getInstanceStatus(ref)) !== 'Running') {
+          // Controllable wait → core re-resolves (DESIGN §6).
+          throw vscode.RemoteAuthorityResolverError.TemporarilyNotAvailable(`instance ${remote}:${parsed.instance} is still starting — retrying`);
+        }
+      }
 
-    const session = await ensureServerReady(this.context, ref);
-    log(`resolved ${authority}: commit ${session.commit.slice(0, 10)}…, port ${session.port}, `
-      + `user ${session.identity.username} (uid ${session.identity.uid})`);
-    return new vscode.ManagedResolvedAuthority(() => openBridge(session), session.token);
+      const session = await ensureServerReady(this.context, ref, report);
+      log(`resolved ${authority}: commit ${session.commit.slice(0, 10)}…, port ${session.port}, `
+        + `user ${session.identity.username} (uid ${session.identity.uid})`);
+      return new vscode.ManagedResolvedAuthority(() => openBridge(session), session.token);
+    });
   }
 }
 

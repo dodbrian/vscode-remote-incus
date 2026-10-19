@@ -73,16 +73,52 @@ export interface PushOptions {
   uid?: number;
   gid?: number;
   mode?: string;
+  /** reports 0–100, parsed from the CLI's own progress meter */
+  onProgress?: (percent: number) => void;
 }
 
-/** Path-mode file push (stdin mode is broken on incus 6.0.5 — never use it). */
-export async function pushFile(ref: InstanceRef, localPath: string, remotePath: string, opts: PushOptions = {}): Promise<void> {
+/**
+ * Path-mode file push (stdin mode is broken on incus 6.0.5 — never use it).
+ * The CLI prints a "<n>% (<speed>)" meter even when piped; it is streamed and
+ * parsed so the UI gets real transfer progress.
+ */
+export function pushFile(ref: InstanceRef, localPath: string, remotePath: string, opts: PushOptions = {}): Promise<void> {
   const args = ['file', 'push', localPath, `${target(ref)}${remotePath}`];
   if (opts.uid !== undefined) { args.push('--uid', String(opts.uid)); }
   if (opts.gid !== undefined) { args.push('--gid', String(opts.gid)); }
   if (opts.mode) { args.push('--mode', opts.mode); }
   // 222 MB at the ~2.1 MB/s websocket ceiling ≈ 110 s (spike); generous ceiling.
-  await incus(args, { timeoutMs: 15 * 60_000 });
+  return new Promise((resolve, reject) => {
+    const child = cp.spawn('incus', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    let last = 0;
+    const onData = (d: Buffer): void => {
+      output += d.toString();
+      if (output.length > 128 * 1024) { output = output.slice(-64 * 1024); } // the meter rewrites one line
+      for (const m of d.toString().matchAll(/(\d+)%/g)) {
+        last = Number(m[1]);
+      }
+      opts.onProgress?.(last);
+    };
+    child.stdout?.on('data', onData);
+    child.stderr?.on('data', onData);
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new IncusError('incus file push timed out after 15 min', args));
+    }, 15 * 60_000);
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new IncusError(`incus file push failed (exit ${code}): ${output.split('\n').pop()?.trim() ?? ''}`, args, output));
+      }
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------

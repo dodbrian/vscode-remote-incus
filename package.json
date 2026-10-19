@@ -93,6 +93,11 @@
         "category": "Remote - Incus"
       },
       {
+        "command": "remote-incus.showLog",
+        "title": "Show Log",
+        "category": "Remote - Incus"
+      },
+      {
         "command": "remote-incus.refresh",
         "title": "Refresh",
         "category": "Remote - Incus",

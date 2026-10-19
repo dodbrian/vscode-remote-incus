@@ -8,8 +8,14 @@ import { formatAuthority } from './authority';
 import { ensureServerReady, Identity, killServer, resetToken, resolveIdentity, uninstallServer } from './bootstrap';
 import { InstanceRef, restartInstance, startInstance, stopInstance, target } from './incusCli';
 import { firstLine, log, showLog } from './logging';
+import { withProgressReport } from './progress';
 import { openExecTerminal } from './terminal';
 import { InstanceNode, InstancesTree } from './tree';
+
+/** Error toast with the same "show log" affordance the progress toast carries. */
+function showErrorWithLog(err: unknown): void {
+  void vscode.window.showErrorMessage(`Remote - Incus: ${firstLine(err)} ([show log](command:remote-incus.showLog))`);
+}
 
 export function registerCommands(context: vscode.ExtensionContext, tree: InstancesTree): void {
   const reg = (id: string, fn: (node?: InstanceNode) => unknown): void => {
@@ -17,6 +23,7 @@ export function registerCommands(context: vscode.ExtensionContext, tree: Instanc
   };
 
   reg('remote-incus.refresh', () => tree.refresh());
+  reg('remote-incus.showLog', () => showLog(false));
   reg('remote-incus.connectToInstance', (node) => node && connectToInstance(context, node, tree));
   reg('remote-incus.startInstance', (node) => node && withRef(node, tree, (ref) => withProgress(`Starting ${ref.instance} …`, () => startInstance(ref))));
   reg('remote-incus.stopInstance', (node) => node && withRef(node, tree, (ref) => withProgress(`Stopping ${ref.instance} …`, () => stopInstance(ref))));
@@ -41,7 +48,7 @@ async function withRef(node: InstanceNode, tree: InstancesTree, fn: (ref: Instan
     tree.refresh();
   } catch (err) {
     log(`command failed: ${firstLine(err)}`);
-    void vscode.window.showErrorMessage(`Remote - Incus: ${firstLine(err)}`);
+    showErrorWithLog(err);
   }
 }
 
@@ -55,8 +62,9 @@ async function connectToInstance(context: vscode.ExtensionContext, node: Instanc
     }
     // Prepare the server HERE with progress UI (DESIGN §7 pre-flight slot), so
     // the window's resolve() itself is fast — the first install (222 MB push)
-    // must not race core's resolve handling.
-    await withProgress(`Preparing VS Code server on ${ref.instance} …`, () => ensureServerReady(context, ref));
+    // must not race core's resolve handling. Toast title carries the
+    // "(show log)" link; per-step percentages stream into the message line.
+    await withProgressReport(`Preparing ${ref.instance}`, (report) => ensureServerReady(context, ref, report));
     log(`connect: opening a new window on authority ${formatAuthority(ref)}`);
     await vscode.commands.executeCommand('vscode.newWindow', {
       remoteAuthority: formatAuthority(ref),
@@ -64,7 +72,7 @@ async function connectToInstance(context: vscode.ExtensionContext, node: Instanc
     });
   } catch (err) {
     log(`connect failed: ${firstLine(err)}`);
-    void vscode.window.showErrorMessage(`Remote - Incus: ${firstLine(err)}`);
+    showErrorWithLog(err);
   }
 }
 
@@ -74,7 +82,7 @@ async function killServerCommand(node: InstanceNode, tree: InstancesTree): Promi
     tree.refresh();
   } catch (err) {
     log(`kill server failed: ${firstLine(err)}`);
-    void vscode.window.showErrorMessage(`Remote - Incus: ${firstLine(err)}`);
+    showErrorWithLog(err);
   }
 }
 
@@ -102,7 +110,7 @@ async function resetTokenCommand(context: vscode.ExtensionContext, node: Instanc
     tree.refresh();
   } catch (err) {
     log(`reset token failed: ${firstLine(err)}`);
-    void vscode.window.showErrorMessage(`Remote - Incus: ${firstLine(err)}`);
+    showErrorWithLog(err);
   }
 }
 
