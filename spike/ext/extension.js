@@ -10,6 +10,11 @@
  *
  * Server bootstrap reuses the spike scripts (02-install / 03-start) — they are
  * already verified. This file is throwaway spike code, NOT the Phase-1 design.
+ *
+ * 0.0.2 addition: `contribViewsRemote` tree view inside the Remote Explorer —
+ * the one Phase-0 contract that was never exercised. Verifies: view container
+ * key "remote", tree rendering (remotes -> instances), state icons, view/title
+ * + view/item/context menus, and connect-from-tree via `vscode.newWindow`.
  */
 'use strict';
 
@@ -38,6 +43,7 @@ const SPIKE_LOG = '/tmp/remote-incus-dev/fixture-container/ext.log';
 
 // --- logging -----------------------------------------------------------------
 let channel;
+let tree;
 function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}`;
   try { fs.appendFileSync(SPIKE_LOG, line + '\n'); } catch { /* ignore */ }
@@ -176,6 +182,116 @@ class IncusSpikeAuthorityResolver {
   }
 }
 
+// --- remote explorer tree (contribViewsRemote) --------------------------------
+//
+// Contract notes (verified against vscode source, viewsExtensionPoint.ts):
+// - `contributes.views` key must be "remote" (= Remote Explorer viewlet
+//   `workbench.view.remote`); without the contribViewsRemote proposal the
+//   contribution is dropped with a warning in the extension host log.
+// - A view WITHOUT `remoteName` is always visible (the connect entry point,
+//   like Remote-SSH's "SSH Targets"); with `remoteName` it only shows while
+//   connected to that authority type.
+// - `group: "targets@N"` sorts the view to the top of the viewlet.
+class IncusTreeDataProvider {
+  constructor() {
+    this._onDidChangeTreeData = new vscode.EventEmitter();
+    this.onDidChangeTreeData = this._onDidChangeTreeData.event;
+  }
+
+  refresh() { this._onDidChangeTreeData.fire(); }
+
+  async getChildren(element) {
+    try {
+      if (!element) return this.listRemotes();
+      return this.listInstances(element.remote);
+    } catch (err) {
+      log(`tree getChildren failed: ${err.message}`);
+      return [node(`error: ${err.message}`, '$(error)')];
+    }
+  }
+
+  getTreeItem(node) { return node; }
+
+  async listRemotes() {
+    const remotes = JSON.parse(await inc(['remote', 'list', '--format', 'json']));
+    // MVP scope (DESIGN §10): instance daemons only — protocol "incus", i.e. not
+    // simplestreams/public remotes like "images". Environment note: on this dev
+    // host the default remote is a TLS daemon ("fixture-remote") and the local unix
+    // socket is NOT group-accessible — so no URL filtering; per-remote listing
+    // errors surface as leaf nodes (DESIGN §7: daemon is the source of truth).
+    return Object.entries(remotes)
+      .filter(([, r]) => r.Protocol === 'incus')
+      .map(([name]) => {
+        const item = new vscode.TreeItem(name, vscode.TreeItemCollapsibleState.Collapsed);
+        item.contextValue = 'remote';
+        item.iconPath = new vscode.ThemeIcon('remote');
+        item.remote = name;
+        return item;
+      });
+  }
+
+  async listInstances(remoteName) {
+    let instances;
+    try {
+      instances = JSON.parse(await inc(['list', `${remoteName}:`, '--format', 'json']));
+    } catch (err) {
+      return [node(`unavailable: ${err.message.split('\n')[0]}`, '$(warning)')];
+    }
+    return instances.map(i => {
+      const running = i.status === 'Running';
+      const item = new vscode.TreeItem(i.name, vscode.TreeItemCollapsibleState.None);
+      item.contextValue = running ? 'instance-running' : 'instance-stopped';
+      item.iconPath = new vscode.ThemeIcon(running ? 'vm-running' : 'vm-outline');
+      item.description = i.status;
+      item.tooltip = new vscode.MarkdownString(
+        `**${i.name}** (${remoteName})\n\n- state: \`${i.status}\``
+        + (i.config && i.config['image.os'] ? `\n- image OS: ${i.config['image.os']}` : ''));
+      item.command = {
+        command: 'remote-incus-spike.connectToInstance',
+        title: 'Connect',
+        arguments: [item],
+      };
+      item.remote = remoteName;
+      item.instance = i.name;
+      return item;
+    });
+  }
+}
+
+function node(label, icon) {
+  const n = new vscode.TreeItem(label);
+  n.iconPath = new vscode.ThemeIcon(icon);
+  return n;
+}
+
+// Connect: open a NEW window on `incus-spike+<instance>`. Same API surface
+// Remote-SSH/open-remote-ssh use (vscode.newWindow with remoteAuthority).
+// Stopped instances are started first (minimal "Start & connect" pre-flight).
+async function connectToInstance(node) {
+  const instance = node.instance;
+  if (!instance) return;
+  if (node.contextValue === 'instance-stopped') {
+    await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: `Starting ${instance} …` },
+      () => inc(['start', `${node.remote}:${instance}`]));
+    tree.refresh();
+  }
+  log(`connectToInstance: opening window on incus-spike+${instance}`);
+  await vscode.commands.executeCommand('vscode.newWindow',
+    { remoteAuthority: `incus-spike+${instance}`, reuseWindow: false });
+}
+
+// Start/stop: proof of arg-passing + tree refresh from view/item/context menus.
+// Instances are addressed ONLY by the node the user clicked — never positional.
+async function setInstanceState(op, node) {
+  const instance = node && node.instance;
+  if (!instance) return;
+  await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: `${op[0].toUpperCase()}${op.slice(1)} ${instance} …` },
+    () => inc([op, `${node.remote}:${instance}`]));
+  tree.refresh();
+}
+
 function activate(context) {
   channel = vscode.window.createOutputChannel('Remote - Incus (Spike)');
   context.subscriptions.push(channel);
@@ -187,6 +303,21 @@ function activate(context) {
   context.subscriptions.push(
     vscode.workspace.registerRemoteAuthorityResolver('incus-spike', resolver)
   );
+
+  // --- remote explorer tree ---
+  if (!vscode.window.registerTreeDataProvider) {
+    log('registerTreeDataProvider missing — impossible; aborting tree spike');
+    return;
+  }
+  tree = new IncusTreeDataProvider();
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('remote-incus-spike.instances', tree),
+    vscode.commands.registerCommand('remote-incus-spike.connectToInstance', connectToInstance),
+    vscode.commands.registerCommand('remote-incus-spike.startInstance', setInstanceState.bind(null, 'start')),
+    vscode.commands.registerCommand('remote-incus-spike.stopInstance', setInstanceState.bind(null, 'stop')),
+    vscode.commands.registerCommand('remote-incus-spike.refresh', () => tree.refresh()),
+  );
+  log('tree view registered (remote-incus-spike.instances)');
 }
 
 function deactivate() {}
