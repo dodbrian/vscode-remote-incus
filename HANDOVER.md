@@ -60,6 +60,13 @@ with a Docker container".
   Install-first ordering: when `bin/<commit>` is complete (`.incus-install-ok`
   marker or core files), download/push/extract are skipped entirely —
   measured ≈ 16 s connect with zero transfer.
+- **Client auto-update handling** (verified live): commit re-read per resolve;
+  new commit → install alongside → stale-commit server killed → fresh start
+  under the new commit (simulated stale server test); token sticky. Old
+  in-instance commit dirs and old client cache entries are pruned
+  automatically. `enable-proposed-api` grants are per extension id and
+  survive updates; a proposal-shape change in a future client is the
+  residual risk (needs an extension fix release).
 - Remaining Phase-1 work (DESIGN §12): item 4 diagnostics refinement
   (`RemoteAuthorityResolverError` taxonomy), item 5 tests (mechanics harness +
   matrix smoke), item 6 packaging pipeline (CI VSIX + OpenVSX + README).

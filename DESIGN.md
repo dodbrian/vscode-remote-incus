@@ -261,6 +261,24 @@ Phase-1 progress UX + reuse hardening (2026-10-19, same day, user-driven):
   extract are all skipped (measured: full connect with zero transfer ≈ 16 s).
   Rationale: the local tarball was previously required just as a sha reference
   even for fully installed instances.
+- **version drift / client auto-update** (user question, verified live
+  2026-10-19): the client commit is read fresh at EVERY resolve
+  (`vscode.env.appCommit`) — nothing is pinned to a client version inside the
+  extension (`engines.vscode` is a range; proposal d.ts is dev-time only).
+  On a client update the resolver computes the new commit, finds no matching
+  install, fetches/installs the new commit alongside, detects the running
+  server as a **stale commit → kills it → starts fresh under the new commit**
+  (verified with a simulated stale server: "runs stale commit 0123456789… —
+  restarting under 6d62b1d5da…" → ready → bridges dialed). The connection
+  token file is sticky, so reconnect needs no re-auth. Superseded state is
+  pruned automatically afterwards: in-instance `bin/<other-commit>` dirs
+  (~600 MB extracted per version) and client-side cache tarballs for other
+  commits. Probe hardening: commit extraction requires EXACTLY 40 hex chars
+  in a `bin/<…>/` cmdline path — a 42-hex fake dir/process was ignored (tested).
+  Residual risks on updates are proposal-shape changes (`resolvers` /
+  `contribViewsRemote` are unstable across releases — a core change would need
+  an extension fix release); `enable-proposed-api` grants survive updates
+  (keyed by extension id, not version).
 
 ## 9. Distribution & licensing constraints
 
