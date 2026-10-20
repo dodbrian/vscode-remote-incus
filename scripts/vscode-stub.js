@@ -9,7 +9,9 @@ exports.EventEmitter = class {
   fire = () => undefined;
   dispose = () => undefined;
 };
-exports.window = {};
+exports.window = {
+  createOutputChannel: () => ({ appendLine: () => undefined, show: () => undefined }),
+};
 exports.commands = {};
 exports.TreeItem = class {
   constructor() { /* noop */ }
