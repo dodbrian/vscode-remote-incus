@@ -100,7 +100,8 @@ fresh-install harness), `52c3e50` (DESIGN §14 version-compat sketch).
       by scripts/fresh-install-test.ts against a throwaway 24.04 instance
       (download → user-push ≈ 1 s on the local unix socket vs 2.1 MB/s
       TLS on fixture-remote → extract → marker → tmp cleaned → 0600 files →
-      port → session). NOT yet re-verified by the user in a real window.
+      port → session), then user-verified in a real window on another
+      fresh instance.
     - CLI 7.x list-filter regression ("instance not found" on a healthy
       instance) — universal form + exact-name find; verified via the
       harness + a real resolve.
@@ -179,6 +180,10 @@ select explicitly; never "first instance".
   node /tmp/remote-incus-dev/smoke.js` (authority round-trips + read-only daemon probes).
 - Chain deploy steps with `&&`, not `;` — a `;` chain once relaunched a
   window with STALE code after a failed typecheck (cost: confusing session).
+- **Committing + harness-verifying is NOT deployment** — the running windows
+  only pick up src changes via `./redeploy.sh` (cost one user-visible round:
+  a committed, harness-verified fix was still un-deployed and the user
+  re-hit the bug).
 - Server commit = local client commit: `vscode.env.appCommit` (resolvers
   proposal), fallback `code --version` line 2. Do NOT parse
   `update.code.visualstudio.com/api/commits/...` (returns a JSON array).
