@@ -17,12 +17,16 @@ with a Docker container".
 2. This file — operational context: environment snapshot, dev loop,
    debugging traps, and exactly where to resume.
 
-## Current state (session end 2026-10-20, main, clean tree)
+## Current state (session end 2026-10-20 late evening, main, clean tree)
 
-Deltas this session, on top of `0dcb016` (previous handover): `5f64f05`
-(tree connect affordances at Remote-SSH parity + single-flow connect),
-`0e61725` (exec failures diagnosable + non-fatal prune), `d95120d`
-(relaunch waits for clean exit). All user-verified on stable 1.142.0.
+Deltas on top of `0dcb016` (previous handover), all verified on stable
+1.142.0: `5f64f05` (tree connect affordances at Remote-SSH parity +
+single-flow connect), `0e61725` (exec failures diagnosable + non-fatal
+prune), `d95120d` (relaunch waits for clean exit), `128621b` (signal-
+support pre-flight — Ubuntu 25.04+/packaging AppArmor trap),
+`41b8712` (push tarball as the target user — sticky-/tmp fix),
+`67167ea` (CLI 7.x list-filter regression), `80ef6be` (windowless
+fresh-install harness), `52c3e50` (DESIGN §14 version-compat sketch).
 
 - Phase 0 (spike) **COMPLETE** — all hypotheses validated in real windows
   (DESIGN §8). Spike extension uninstalled from the user's VS Code; source
@@ -86,25 +90,56 @@ Deltas this session, on top of `0dcb016` (previous handover): `5f64f05`
   - one transient exec failure seen once (prune step, ~10 s then nonzero)
     — unreproducible standalone or with 2 live bridges (daemon/link hiccup,
     suspected); it aborted the connect then — now non-fatal and diagnosable.
+  - 2026-10-20 evening (after the user reinstalled the local daemon from
+    the zabbly repo — CLI/daemon 6.0.5→7.5.1): connect to a fresh local
+    instance verified by the user (single flow, stable terminal) on the
+    signal-probe build. THEN the user's first FULLY-FRESH install exposed
+    two more defects, both fixed and verified:
+    - sticky-/tmp: root-pushed tarball undeletable by the extract user
+      (EPERM) — fixed by pushing as the target user; verified END-TO-END
+      by scripts/fresh-install-test.ts against a throwaway 24.04 instance
+      (download → user-push ≈ 1 s on the local unix socket vs 2.1 MB/s
+      TLS on fixture-remote → extract → marker → tmp cleaned → 0600 files →
+      port → session). NOT yet re-verified by the user in a real window.
+    - CLI 7.x list-filter regression ("instance not found" on a healthy
+      instance) — universal form + exact-name find; verified via the
+      harness + a real resolve.
+  - the death-loop investigation itself (ptyHost terminated unexpectedly /
+    kill EACCES / restarting terminals) is documented in DESIGN §8 with
+    the audit-log root cause and the zabbly fix (see the environment
+    snapshot above).
 - Remaining Phase-1 work (DESIGN §12): item 5 diagnostics refinement —
-  error-surfacing DONE 2026-10-20 (IncusError leads with cause; full detail
-  in log; prune non-fatal), remaining = `RemoteAuthorityResolverError`
-  taxonomy polish for the §7 table; item 6 tests (mechanics harness + resolver
-  contract + x64/arm64 matrix smoke); item 7 packaging (CI VSIX + OpenVSX +
-  README). Naming decision (§11.1) before OpenVSX.
+  error-surfacing + signal pre-flight DONE 2026-10-20 (IncusError leads
+  with cause; full detail in log; prune non-fatal; kill-probe refuses
+  signal-blocked instances), remaining = `RemoteAuthorityResolverError`
+  taxonomy polish for the §7 table; item 6 tests — the windowless
+  fresh-install harness (§12.6 mechanics base) landed, full mechanics/
+  contract/matrix suites open; item 7 packaging (CI VSIX + OpenVSX +
+  README). Naming decision (§11.1) before OpenVSX. Item 8 (§14 version
+  compat layer) planned, not implemented.
 - Repo: `/path/to/repository`, git `main`.
 
-## Environment snapshot (verified facts)
+## Environment snapshot (verified facts — updated 2026-10-20 evening)
 
-- **incus 6.0.5** on this host (x86_64). `incus port-forward` needs ≥ 7.3 —
-  NOT available; per-connection exec bridges are the transport (by design).
-- **Default incus remote is `fixture-remote`** (TLS daemon, 192.0.2.10:8443); the
-  local unix socket is NOT group-accessible (`incus list local:` → EACCES —
-  shown as a graceful "unavailable" leaf by design). Address instances as
-  `<remote>:<name>`; `incus remote get-default` resolves the default at runtime.
+- **incus 7.5.1 client + server on this host** (zabbly repo since the
+  2026-10-20 evening reinstall; was Ubuntu-archive 6.0.5). The local unix
+  socket IS group-accessible now (user `<local-user>` joined the `incus` group —
+  the old EACCES note is obsolete). `incus port-forward` is available
+  (≥ 7.3) but NOT used — exec-stdio bridges stay the transport (frozen).
+- **Incus version/packaging trap**: Ubuntu-archive incus debs on Ubuntu
+  25.04+ hosts deny every in-container signal (AppArmor hardening +
+  missing compat sysctl — Launchpad #2109394); the extension pre-flights
+  this (`probeSignalSupport`) and design sketch §14 plans the general
+  version-compat layer. See §8 for the full evidence.
+- **The default incus remote is still `fixture-remote`** — which is now known to be
+  a 2-member CLUSTER: member `fixture-remote` (192.0.2.10, Ubuntu 24.04/kernel
+  6.8) and member `member-b` (192.0.2.11, Tailscale, kernel 7.0.0-38).
+  `fixture-container` runs on member `member-b`. Address instances as
+  `<remote>:<name>`; never assume a member.
 - **VS Code stable 1.142.0** (commit `6d62b1d5…`), weekly auto-updates.
 - Node v24.21.0 / npm 11.19.0; esbuild + tsc + @vscode/vsce devDependencies.
-- Companion container: **`fixture-container`** (images:ubuntu/24.04, RUNNING):
+- Companion container: **`fixture-container`** (cluster member `member-b`, Ubuntu
+  24.04, RUNNING):
   - `~ubuntu/.vscode-server` holds the 1.142.0 install (commit dir +
     `.incus-install-ok` marker), the staged relay at
     `~ubuntu/.vscode-server/relay.js`, the 0600 token at
@@ -118,6 +153,11 @@ Deltas this session, on top of `0dcb016` (previous handover): `5f64f05`
 - Client-side tarball cache:
   `~/.config/Code/User/globalStorage/local-dev.remote-incus/server-cache/`
   (217 MB tarball + sha sidecar for the current commit).
+- Local test instance: **`previous-local-fixture`** (user-created 2026-10-20 evening
+  on the local daemon, Ubuntu 26.04 "resolute" daily image 20261018,
+  RUNNING, no VS Code server connected yet — the reinstall wiped
+  `previous-fixture-a`, `previous-fixture-b`, and the throwaway
+  `signal-fixture`).
 
 ## ISOLATION RULE (important)
 
@@ -189,6 +229,11 @@ select explicitly; never "first instance".
 - CLI flags only apply to NEW windows; restart to a single fresh instance
   when debugging resolver flows (`ls -l /proc/[0-9]*/exe | grep -c 'code/code'`).
 - Direct `incus exec` args expand `~` on the CLIENT — pass absolute paths.
+- **CLI 7.x rejects the glued `incus list <remote>:<name>` filter** (empty
+  result set + "did you forget a space" warning; CLI 6.x matched) — the
+  resolver pre-flight then misreads a healthy instance as deleted. Always
+  pass the remote and the instance filter as separate arguments and
+  exact-match the result (general rule for the version-compat layer, §14).
 - `PendingMigrationError: navigator is now a global in nodejs` from unrelated
   extensions — harmless noise.
 - System locale is German — expect German OS/CLI error strings (incus daemon
