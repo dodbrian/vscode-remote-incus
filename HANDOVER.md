@@ -17,7 +17,12 @@ with a Docker container".
 2. This file — operational context: environment snapshot, dev loop,
    debugging traps, and exactly where to resume.
 
-## Current state (session end 2026-10-19/20, main @ `3f96859`, clean tree)
+## Current state (session end 2026-10-20, main, clean tree)
+
+Deltas this session, on top of `0dcb016` (previous handover): `5f64f05`
+(tree connect affordances at Remote-SSH parity + single-flow connect),
+`0e61725` (exec failures diagnosable + non-fatal prune), `d95120d`
+(relaunch waits for clean exit). All user-verified on stable 1.142.0.
 
 - Phase 0 (spike) **COMPLETE** — all hypotheses validated in real windows
   (DESIGN §8). Spike extension uninstalled from the user's VS Code; source
@@ -32,6 +37,13 @@ with a Docker container".
      "unavailable:" leaves; commands: connect, start, stop, restart,
      kill server, uninstall server, reset token, open terminal (exec),
      collect diagnostics, refresh. User signed off on rendered UX.
+     Connect affordances now at REMOTE-SSH PARITY (2026-10-20, user-verified):
+     click / `$(arrow-right)` hover icon = connect in the CURRENT window,
+     `$(empty-window)` = connect in a NEW window (titles verbatim from the
+     official Remote Explorer 0.5.0 manifest); row click on a stopped
+     instance = start & connect (started by the resolve); Start/Stop live in
+     the context menu (two hover icons only, like SSH hosts); connect
+     commands hidden from the command palette.
   3. Bootstrap module (`src/bootstrap.ts`) — client-side cached download
      (globalStorage, sha256 sidecar), sha-gated path-mode push, idempotent
      extract as target user (`.incus-install-ok` marker), sticky 0600 token,
@@ -44,6 +56,10 @@ with a Docker container".
      content-length, push % parsed from the `incus file push` CLI meter
      (it prints even when piped); percent-first messages (collapsed-toast
      truncation cuts from the right). Error toasts carry the same link.
+     **Single flow** (2026-10-20): the toast belongs to the RESOLVE now —
+     the tree-connect command only delegates to `vscode.newWindow`; the
+     whole bootstrap runs exactly once inside the post-reload resolve
+     (core restarts the ext host ≤ 1 s after the command).
 - Working extension id: **`local-dev.remote-incus` v0.1.0** (placeholder
   publisher — naming is DESIGN §11.1, decide before OpenVSX). Installed in
   the user's VS Code; `~/.vscode/argv.json` grants it the proposals (spike id
@@ -60,10 +76,22 @@ with a Docker container".
   - stale-commit restart: simulated old-commit server (fake dir + `exec -a`
     cmdline with a true 40-hex id) → "runs stale commit 0123456789… —
     restarting under 6d62b1d5da…" → fresh server, old dir pruned, connected.
-- Remaining Phase-1 work (DESIGN §12): item 5 diagnostics refinement
-  (`RemoteAuthorityResolverError` taxonomy polish), item 6 tests (mechanics
-  harness + resolver contract + x64/arm64 matrix smoke), item 7 packaging
-  (CI VSIX + OpenVSX + README). Naming decision (§11.1) before publishing.
+  - 2026-10-20 session: both hover icons + tooltips + context-menu order
+    verified by the user; click → current window, `$(empty-window)` → new
+    window; SINGLE flow per click (click → ext-host restart ≤ 1 s → one
+    resolve flow ≈ 16-20 s → bridges); stopped-instance click starts and
+    connects through the resolve pre-flight; stopped instance's automatic
+    re-resolve loop also verified (instance stop mid-session → bridges die
+    → core re-resolves → "starting …" → fresh server, new port picked up).
+  - one transient exec failure seen once (prune step, ~10 s then nonzero)
+    — unreproducible standalone or with 2 live bridges (daemon/link hiccup,
+    suspected); it aborted the connect then — now non-fatal and diagnosable.
+- Remaining Phase-1 work (DESIGN §12): item 5 diagnostics refinement —
+  error-surfacing DONE 2026-10-20 (IncusError leads with cause; full detail
+  in log; prune non-fatal), remaining = `RemoteAuthorityResolverError`
+  taxonomy polish for the §7 table; item 6 tests (mechanics harness + resolver
+  contract + x64/arm64 matrix smoke); item 7 packaging (CI VSIX + OpenVSX +
+  README). Naming decision (§11.1) before OpenVSX.
 - Repo: `/path/to/repository`, git `main`.
 
 ## Environment snapshot (verified facts)
@@ -141,6 +169,21 @@ select explicitly; never "first instance".
   ignored it, which looked like an extension bug. (Fixture lesson: count your
   fake ids.) Useful simulation trick that DID work:
   `bash -c 'exec -a "<fake cmdline>" sleep 600'` inside `incus exec`.
+- **core restarts the extension host within ~1 s of `vscode.newWindow`** and
+  fresh-resolves the authority there; bridges are ext-host-owned and never
+  survive a reload. Consequence: bootstrap work pre-run in the connect
+  command runs TWICE (log-verified ~18 s + ~23 s) — the connect command now
+  only delegates; never re-add a pre-flight (DESIGN §8, 2026-10-20).
+- **Error line 1 must lead with the CAUSE (stderr/status), never the command**:
+  toasts and `firstLine()` cut at the first `\n`; a multi-line command joined
+  into line 1 hid the stderr everywhere (cost one undiagnosable failure).
+  `IncusError` now reads `incus <target> --<inline script> failed (exit N /
+  timed out): <stderr line 1>`; catches log the FULL message, toasts take
+  `firstLine()`.
+- **"Another instance of Code is running but not responding" modal**: relaunch
+  raced a half-dead pkilled instance; Code processes can ignore SIGTERM
+  entirely (one needed `kill -9`). `redeploy.sh` now polls `/proc/*/exe`
+  until no code process remains before launching — keep that loop.
 - **Collapsed progress toasts truncate title+message as one line** — put the
   percentage at the START of progress messages.
 - CLI flags only apply to NEW windows; restart to a single fresh instance
@@ -169,9 +212,10 @@ select explicitly; never "first instance".
 ## Phase 1 — remaining work (DESIGN §12)
 
 1. ~~Project / tree+commands / bootstrap / progress UX~~ **DONE 2026-10-19**.
-2. Diagnostics refinement (§12.5): per-bridge structured logs exist; polish
-   `RemoteAuthorityResolverError` usage for the §7 taxonomy (deleted instance
-   → NotAvailable unresolvable, starting → TemporarilyNotAvailable, …).
+2. Diagnostics refinement (§12.5): error-surfacing done 2026-10-20 (IncusError
+   leads with stderr/exit status, catches log full detail, prune non-fatal);
+   open: `RemoteAuthorityResolverError` usage for the §7 taxonomy (deleted
+   instance → NotAvailable unresolvable, starting → TemporarilyNotAvailable, …).
 3. Tests (§12.6): mechanics harness against `fixture-container`; resolver contract
    on stable; matrix smoke x64/arm64 (Ubuntu/Debian) — mind the ISOLATION RULE.
 4. Packaging (§12.7): CI-built VSIX + OpenVSX publish + README argv step
