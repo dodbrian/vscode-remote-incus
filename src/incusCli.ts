@@ -185,8 +185,15 @@ export async function listInstances(remote: string): Promise<InstanceInfo[]> {
 
 /** Undefined ⇒ the instance does not exist (deleted/renamed). */
 export async function getInstanceStatus(ref: InstanceRef): Promise<string | undefined> {
-  const raw = JSON.parse(await incus(['list', target(ref), '--format', 'json'])) as Record<string, unknown>[];
-  return raw[0] ? String(raw[0].status) : undefined;
+  // Remote and instance filter must be SEPARATE arguments: CLI 7.x returns no
+  // matches for the glued `<remote>:<name>` filter (warning: "did you forget
+  // a space"; regressed the resolver pre-flight on 2026-10-20 after the
+  // zabbly CLI update), while CLI 6.x and 7.x both accept the space form.
+  // Exact-name match afterwards: the positional filter is fuzzy, and another
+  // instance must never be mistaken for this one (isolation rule).
+  const raw = JSON.parse(await incus(['list', `${ref.remote}:`, ref.instance, '--format', 'json'])) as Record<string, unknown>[];
+  const hit = raw.find((i) => String(i.name) === ref.instance);
+  return hit ? String(hit.status) : undefined;
 }
 
 export async function startInstance(ref: InstanceRef): Promise<void> {
