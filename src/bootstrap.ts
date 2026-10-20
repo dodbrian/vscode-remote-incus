@@ -8,6 +8,9 @@
  *
  *   1. identity  — primary unprivileged user (getent inside the instance);
  *                  root attach is opt-in via `remote-incus.user` (DESIGN §5)
+ *   1b. signals  — kill(2) must work inside; the server's children run a
+ *                  kill(parentPid, 0) liveness check and self-terminate
+ *                  otherwise (Ubuntu 25.04+ AppArmor hardening trap)
  *   2. flavor    — in-instance arch/libc probe → server build
  *   3. commit    — client commit (vscode.env.appCommit, CLI fallback);
  *                  server and client must match by commit
@@ -115,6 +118,33 @@ async function doResolveIdentity(ref: InstanceRef, override: string): Promise<Id
   }
   log(`no unprivileged user in ${target(ref)} — attaching as root (unexpected for system containers)`);
   return { uid: 0, gid: 0, username: 'root', home: '/root' };
+}
+
+// ---------------------------------------------------------------------------
+// instance environment probes
+// ---------------------------------------------------------------------------
+
+/**
+ * The VS Code server's child processes (extension host, pty host, file
+ * watcher) poll their parent's liveness with `kill(parentPid, 0)` and treat
+ * ANY error as "parent is gone" — no env/flag disables it (upstream source
+ * verified 2026-10-20). On Ubuntu 25.04+ hosts with
+ * `kernel.apparmor_restrict_unprivileged_unconfined=1` and an Incus daemon
+ * lacking the compat sysctl (Ubuntu-archive packages; Zabbly ships it), the
+ * kernel denies EVERY in-container signal — EACCES even for root — and every
+ * server child self-terminates within seconds (Launchpad #2109394; seen live
+ * 2026-10-20: a death loop of ptyHost/exthost restarts masquerading as a
+ * terminal bug). Probe before anything else and refuse loudly.
+ */
+async function probeSignalSupport(ref: InstanceRef, identity: Identity): Promise<void> {
+  const out = await execInInstance(ref, 'kill -0 $$ && echo yes || echo no', { uid: identity.uid, home: identity.home });
+  if (out.trim() === 'yes') { return; }
+  throw new Error([
+    `signal syscalls are blocked inside this instance (kill -0 self denied for uid ${identity.uid})`,
+    `the VS Code server's child processes (extension host, pty host) cannot survive here`,
+    `known cause: Ubuntu 25.04+ AppArmor hardening (kernel.apparmor_restrict_unprivileged_unconfined=1) combined with an Incus daemon missing the compat sysctl — Ubuntu-archive packages lack it`,
+    `fix: install Incus from the Zabbly repo (ships /etc/sysctl.d/50-incus.conf), or set that sysctl to 0 on the host and restart the instance (Launchpad #2109394)`,
+  ].join('\n'));
 }
 
 // ---------------------------------------------------------------------------
@@ -435,6 +465,10 @@ export async function ensureServerReady(context: vscode.ExtensionContext, ref: I
 async function doEnsureServerReady(context: vscode.ExtensionContext, ref: InstanceRef, report?: Report): Promise<ServerSession> {
   report?.('connecting to instance…');
   const identity = await resolveIdentity(ref);
+  // Fail fast on instances where signals are blocked — BEFORE any transfer
+  // work and on every path (a death-looping server still "runs", so the
+  // reuse path must be covered too).
+  await probeSignalSupport(ref, identity);
   const commit = await resolveClientCommit();
   await pruneServerCache(path.join(context.globalStorageUri.fsPath, 'server-cache'), commit);
   const flavor = await probeFlavor(ref, identity);
