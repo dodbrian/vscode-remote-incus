@@ -312,6 +312,58 @@ Phase-1 single-flow connect (user-driven 2026-10-20, log evidence):
   instance is started by the resolve pre-flight. `tree.refresh()` after the
   command repairs this window's state icons.
 
+Incus version & packaging findings (2026-10-20 evening — the user fully
+reinstalled the local daemon from the zabbly repo, CLI 6.0.5→7.5.1; planned
+compat layer in §14):
+- `incus list <remote>:<name>` (glued positional filter): CLI 6.0.5 matched;
+  CLI 7.5.1 returns NOTHING (hint: "did you forget a space") — the resolver
+  pre-flight then misread the healthy instance as deleted ("instance
+  fixture-remote:fixture-container not found" error toast). Universal form
+  `incus list <remote>: <name>` (separate args) verified on BOTH CLIs;
+  `getInstanceStatus` now uses it plus an exact-name `find` (the positional
+  filter is fuzzy — another instance must never be picked, isolation rule).
+  Operational subcommands (exec/file/start/stop/restart) still accept
+  `<remote>:<name>` on both — only `list`'s filter changed.
+- the OLD local daemon 6.0.5 (Ubuntu-archive deb) on a Ubuntu 26.04 host
+  denied EVERY in-container signal — EACCES even for root (`kill -0 $$`
+  failed), breaking systemd's own service management inside the container.
+  Root cause: Ubuntu 25.04+ AppArmor hardening
+  (`kernel.apparmor_restrict_unprivileged_unconfined=1`) + the Ubuntu
+  packaging missing the compat sysctl the zabbly packaging ships
+  (`/etc/sysctl.d/50-incus.conf`; Launchpad #2109394). The host audit log
+  captured `apparmor="DENIED" operation="signal"` with the STACKED peer
+  label `incus-<name>//&unconfined` — the generated profile's
+  `signal peer=@{profile_name}` rule doesn't match stacked peers.
+- VS Code server children (ext host, pty host, file watcher) poll their
+  parent with `kill(parentPid, 0)` and treat ANY error as "parent gone"
+  (upstream source verified: extensionHostProcess.ts + bootstrap-fork.ts +
+  native-watchdog — NO flag/env disables it) → the observed death loop:
+  `ptyHost terminated unexpectedly with code 0` every ~5 s, terminals
+  restarting ("connection to the shell process was lost").
+- fix applied: zabbly incus 7.5.1 host-side (sysctl file present, value 0);
+  the kill probe re-verified OK on the same Ubuntu 26.04 image that
+  previously death-looped.
+- kernel RULED OUT as the differentiator: the identical kernel build
+  7.0.0-38-generic runs on the broken local host AND on the working fixture-remote
+  cluster member member-b.
+- new pre-flight `probeSignalSupport` (bootstrap.ts): one exec
+  (`kill -0 $$` as the target user) BEFORE any transfer/start work and on
+  every ensure path (a death-looping server still "runs" — the reuse path
+  must be covered); failure refuses loudly with the remediation text.
+- **sticky-/tmp trap in the extract flow** (found by the user's first
+  fully-fresh install on `firm-buffalo`, 2026-10-20 evening): the tarball
+  push ran as ROOT (`/tmp/vscode-server-….tar.gz`, root:root) while
+  `ensureExtracted` runs as the target user — its final `rm -f` in sticky
+  /tmp (1777) fails EPERM and aborts an otherwise complete extract (the
+  marker was already written; fixture-remote never hit it because its install was
+  spike-era — the extract path had never been exercised end-to-end).
+  Fix: push AS THE TARGET USER (`--uid/--gid`); verified end-to-end by the
+  new windowless harness `scripts/fresh-install-test.ts` against a
+  throwaway 24.04 instance (download → user-push → extract → marker →
+  tmp cleaned → relay/token 0600 → port → session). Measured on the local
+  daemon: 217 MB push ≈ 1 s (~200 MB/s unix socket) vs fixture-remote's 2.1 MB/s
+  TLS websocket ceiling.
+
 ## 9. Distribution & licensing constraints
 
 - Extension source: MIT (copies may come from MIT sources: `jeanp413/open-remote-ssh`,
@@ -330,9 +382,10 @@ Phase-1 single-flow connect (user-driven 2026-10-20, log evidence):
 | client OS | Linux | macOS, Windows (upstream client builds exist; CLI discovery TBD) |
 | client version | ≥ 1.140 (engine range `^1.140.0`); proposal d.ts verified byte-identical 1.140→1.142; live-verified on 1.142.0 only | proposal-shape change in a future client → extension fix release (runtime guard errors loudly, never silently) |
 | daemon | local unix socket, remote TLS (`--remote`) | restricted remotes/projects |
+| Incus CLI (client) | ≥ 6.0 — verified on 6.0.5 and 7.5.1 (list-filter quirk: §14) | — |
+| Incus server / packaging | ≥ 6.0 — verified 6.0.5 (Ubuntu deb) and 7.5.1 (zabbly); packaging variant changes behavior (§14) | port-forward on ≥ 7.3 |
 | instance arch | x64, arm64 (glibc) | alpine-musl x64 |
 | explicit non-goals | musl-arm64 server (doesn't exist upstream) | — |
-| Incus version | ≥ 6.0 (flags verified on 6.0.5) | port-forward on ≥ 7.3 |
 
 ## 11. Open questions (recorded, with leaning)
 
@@ -369,6 +422,8 @@ Phase-1 single-flow connect (user-driven 2026-10-20, log evidence):
 6. Tests: mechanics harness (install/start/dial against `fixture-container`), resolver
    contract test on Insiders + stable, matrix smoke on x64/arm64 Ubuntu/Debian images.
 7. Packaging pipeline: CI-built VSIX + OpenVSX publish + README with the argv.json step.
+8. Incus version-compat layer (design sketch §14 — NOT yet implemented):
+   version probe, behavioral adapter table, per-member/per-instance feature gates.
 
 ## 13. Spike artifact inventory (`spike/`)
 
@@ -381,3 +436,47 @@ Phase-1 single-flow connect (user-driven 2026-10-20, log evidence):
 | `ext/` (extension.js, package.json, VSIX) | resolver proof | becomes Phase-1 skeleton |
 | `redeploy.sh` | dev loop helper | keep while Phase 1 iterates |
 | `.state/` | port/token/commit cache | dev-loop artifact |
+
+## 14. Incus version & packaging compatibility (design sketch — NOT yet implemented)
+
+Trigger (2026-10-20): the user's full reinstall of the local daemon from the
+zabbly repo bumped the CLI 6.0.5→7.5.1 and broke two assumptions in one go
+(§8). Version and PACKAGING differences must become explicit and versioned,
+not rediscovered.
+
+### 14.1 Verified version-dependent behaviors
+
+| surface | CLI 6.0.5 | CLI 7.5.1 | universal form |
+|---|---|---|---|
+| `incus list <remote>:<name>` glued filter | matches | no matches ("did you forget a space") | `incus list <remote>: <name>` — verified both; add exact-name find |
+| `incus <op> <remote>:<name>` (exec/file/start/stop/restart) | ok | ok | — |
+
+| host stack | in-container signals | cause |
+|---|---|---|
+| Ubuntu-archive incus deb 6.0.5-8, Ubuntu 26.04 host | ALL denied, EACCES incl. root | Ubuntu 25.04+ hardening `kernel.apparmor_restrict_unprivileged_unconfined=1`; Ubuntu packaging lacks the compat sysctl (Launchpad #2109394) |
+| zabbly incus 7.5.1, kernel 7.0.0-38 (client-host; also member member-b) | fine | zabbly ships `/etc/sysctl.d/50-incus.conf` (= 0) |
+
+Gotcha: server version ≠ instance behavior — `fixture-remote` is a CLUSTER (member
+`fixture-remote`: Ubuntu 24.04/kernel 6.8; member `member-b`: kernel 7.0.0-38); what an
+instance sees depends on the member hosting it (`location`), so probes and
+compat decisions must be per-instance (or per-location), never per-remote.
+
+### 14.2 Design direction (§12 item 8)
+
+1. **Version probe** at activation and re-probed on remote errors: client
+   version + server version per remote; for clusters, per member. Stored as
+   structured `IncusVersionInfo`, cached per session.
+2. **Behavioral adapter table in code** (§14.1 shape), keyed by detected
+   version(s); CLI calls go through named adapters
+   (`listInstanceStatus`, `listRemoteInstances`, …) instead of raw strings.
+   Baseline rule: ALWAYS prefer a universal form; version-gate only when no
+   universal form exists.
+3. **Feature gates by server version**: `incus port-forward` ≥ 7.3 (now
+   REACHABLE — both daemons at 7.5.1; re-evaluates the §2 phase-2 transport
+   note), proxy-device hotplug, project scoping, etc.
+4. **Pre-flight guards** per instance (signal-support probe implemented
+   2026-10-20; check-requirements.sh planned §3; future: probe host OS +
+   packaging variant and warn on known-bad combos).
+5. **Error taxonomy**: changed CLI semantics (empty match sets, new warnings)
+   must map to precise, actionable resolver errors — never silently degrade
+   into "not found" (the 2026-10-20 regression did exactly that).
