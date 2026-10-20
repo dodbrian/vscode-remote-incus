@@ -36,7 +36,7 @@ import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import * as vscode from 'vscode';
 import { execInInstance, InstanceRef, pushFile, target } from './incusCli';
-import { log } from './logging';
+import { firstLine, log } from './logging';
 import { Report } from './progress';
 
 export const VS_SERVER_DIR = '.vscode-server';
@@ -493,7 +493,15 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
   if (!token) {
     throw new Error('could not read the connection token from the instance');
   }
-  await pruneOldInstalls(ref, identity, commit);
+  // Prune is pure hygiene (superseded ~600 MB install dirs); the connection's
+  // correctness does not depend on it, so a transient exec hiccup (seen live
+  // 2026-10-20: prune exec failed once while the connection itself was ready)
+  // is logged and ignored instead of failing a fully-ready connect.
+  try {
+    await pruneOldInstalls(ref, identity, commit);
+  } catch (err: unknown) {
+    log(`install prune skipped: ${firstLine(err)}`);
+  }
   report?.('ready', 100);
   log(`server ready on ${target(ref)}: commit ${commit.slice(0, 10)}…, 127.0.0.1:${port}, user ${identity.username} (uid ${identity.uid})`);
   return { ref, identity, commit, flavor, port, token };

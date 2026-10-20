@@ -26,12 +26,24 @@ export function incus(args: string[], opts: IncusRunOptions = {}): Promise<strin
   return new Promise((resolve, reject) => {
     cp.execFile('incus', args, { timeout: opts.timeoutMs ?? 30_000, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
-        reject(new IncusError(`incus ${args.join(' ')} failed: ${(stderr || err.message).trim()}`, args, stderr));
+        // Line 1 must lead with the WHY (stderr / exit status), never the full
+        // command: error toasts and firstLine() truncation cut line 2+, and a
+        // multi-line script joined into the command text would swallow them.
+        const why = err.killed ? 'timed out' : `exit ${err.code ?? '?'}: ${(stderr || err.message).trim()}`;
+        reject(new IncusError(`incus ${describe(args)} failed (${why})`, args, stderr));
       } else {
         resolve(stdout);
       }
     });
   });
+}
+
+/** Compact command preview for messages — full args stay on the error object. */
+function describe(args: string[]): string {
+  const c = args.indexOf('-c');
+  return args[0] === 'exec' && c > 0
+    ? `${args.slice(0, c).join(' ')} --<inline script>`
+    : args.join(' ');
 }
 
 /** Spawn `incus` with piped stdio (used for the long-lived exec bridges). */
