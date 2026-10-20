@@ -33,13 +33,20 @@ export class InstanceNode extends vscode.TreeItem {
     const running = inst.status === 'Running';
     this.contextValue = running ? 'instance-running' : 'instance-stopped';
     this.iconPath = new vscode.ThemeIcon(running ? 'vm-running' : 'vm-outline');
-    this.description = inst.status;
+    if (running) {
+      this.description = inst.status;
+    } else {
+      // Click still connects: the connect command starts a stopped instance
+      // first (Start & Connect, DESIGN §7).
+      this.description = `${inst.status} — click to start & connect`;
+    }
     this.tooltip = new vscode.MarkdownString(
       `**${inst.name}** (${remote})\n\n- state: \`${inst.status}\``
       + (inst.os ? `\n- image OS: ${inst.os}${inst.release ? ` ${inst.release}` : ''}` : ''));
-    if (running) {
-      this.command = { command: 'remote-incus.connectToInstance', title: 'Connect', arguments: [this] };
-    }
+    // Click = connect in the current window, both states (Remote-SSH parity:
+    // connect commands also sit in the context menu / hover icons, and
+    // "Connect in New Window..." is a separate command).
+    this.command = { command: 'remote-incus.connectToInstance', title: 'Connect', arguments: [this] };
   }
 }
 

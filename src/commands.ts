@@ -5,16 +5,20 @@
  */
 import * as vscode from 'vscode';
 import { formatAuthority } from './authority';
-import { ensureServerReady, Identity, killServer, resetToken, resolveIdentity, uninstallServer } from './bootstrap';
+import { Identity, killServer, resetToken, resolveIdentity, uninstallServer } from './bootstrap';
 import { InstanceRef, restartInstance, startInstance, stopInstance, target } from './incusCli';
 import { firstLine, log, showLog } from './logging';
-import { withProgressReport } from './progress';
 import { openExecTerminal } from './terminal';
 import { InstanceNode, InstancesTree } from './tree';
 
 /** Error toast with the same "show log" affordance the progress toast carries. */
 function showErrorWithLog(err: unknown): void {
   void vscode.window.showErrorMessage(`Remote - Incus: ${firstLine(err)} ([show log](command:remote-incus.showLog))`);
+}
+
+/** Full multi-line error text for the log; toasts take firstLine() instead. */
+function fullMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 export function registerCommands(context: vscode.ExtensionContext, tree: InstancesTree): void {
@@ -24,7 +28,8 @@ export function registerCommands(context: vscode.ExtensionContext, tree: Instanc
 
   reg('remote-incus.refresh', () => tree.refresh());
   reg('remote-incus.showLog', () => showLog(false));
-  reg('remote-incus.connectToInstance', (node) => node && connectToInstance(context, node, tree));
+  reg('remote-incus.connectToInstance', (node) => node && connectToInstance(node, tree, false));
+  reg('remote-incus.connectToInstanceInNewWindow', (node) => node && connectToInstance(node, tree, true));
   reg('remote-incus.startInstance', (node) => node && withRef(node, tree, (ref) => withProgress(`Starting ${ref.instance} …`, () => startInstance(ref))));
   reg('remote-incus.stopInstance', (node) => node && withRef(node, tree, (ref) => withProgress(`Stopping ${ref.instance} …`, () => stopInstance(ref))));
   reg('remote-incus.restartInstance', (node) => node && withRef(node, tree, (ref) => withProgress(`Restarting ${ref.instance} …`, () => restartInstance(ref))));
@@ -47,31 +52,33 @@ async function withRef(node: InstanceNode, tree: InstancesTree, fn: (ref: Instan
     await fn(ref, identity);
     tree.refresh();
   } catch (err) {
-    log(`command failed: ${firstLine(err)}`);
+    log(`command failed: ${fullMessage(err)}`);
     showErrorWithLog(err);
   }
 }
 
-async function connectToInstance(context: vscode.ExtensionContext, node: InstanceNode, tree: InstancesTree): Promise<void> {
+/**
+ * Single-flow connect: opening the window IS the connection. Core restarts
+ * the extension host within ~1 s of vscode.newWindow and runs a fresh
+ * resolver.resolve() there (bridges are ext-host-owned and never survive the
+ * reload — evidence 2026-10-20), so pre-running ensureServerReady in this
+ * command duplicated the entire bootstrap (~18 s ×2, two toasts). The whole
+ * flow now runs exactly once, inside the resolve, which carries its own
+ * progress toast; a stopped instance is started by the resolve pre-flight
+ * (DESIGN §7).
+ */
+async function connectToInstance(node: InstanceNode, tree: InstancesTree, newWindow: boolean): Promise<void> {
   try {
-    const ref = node.ref;
-    const stopped = node.contextValue === 'instance-stopped';
-    if (stopped) {
-      await withProgress(`Starting ${ref.instance} …`, () => startInstance(ref));
-      tree.refresh();
-    }
-    // Prepare the server HERE with progress UI (DESIGN §7 pre-flight slot), so
-    // the window's resolve() itself is fast — the first install (222 MB push)
-    // must not race core's resolve handling. Toast title carries the
-    // "(show log)" link; per-step percentages stream into the message line.
-    await withProgressReport(`Preparing ${ref.instance}`, (report) => ensureServerReady(context, ref, report));
-    log(`connect: opening a new window on authority ${formatAuthority(ref)}`);
+    log(`connect: opening ${newWindow ? 'a new window' : 'the current window'} on authority ${formatAuthority(node.ref)}`);
     await vscode.commands.executeCommand('vscode.newWindow', {
-      remoteAuthority: formatAuthority(ref),
-      reuseWindow: false,
+      remoteAuthority: formatAuthority(node.ref),
+      reuseWindow: !newWindow,
     });
+    // The (other) window's resolve may have started a stopped instance —
+    // cheaply repair stale state icons in THIS window's tree.
+    tree.refresh();
   } catch (err) {
-    log(`connect failed: ${firstLine(err)}`);
+    log(`connect failed: ${fullMessage(err)}`);
     showErrorWithLog(err);
   }
 }
@@ -81,7 +88,7 @@ async function killServerCommand(node: InstanceNode, tree: InstancesTree): Promi
     await withProgress(`Killing the VS Code server on ${node.ref.instance} …`, () => killServer(node.ref));
     tree.refresh();
   } catch (err) {
-    log(`kill server failed: ${firstLine(err)}`);
+    log(`kill server failed: ${fullMessage(err)}`);
     showErrorWithLog(err);
   }
 }
@@ -109,7 +116,7 @@ async function resetTokenCommand(context: vscode.ExtensionContext, node: Instanc
     await withProgress(`Resetting token and restarting the server on ${ref.instance} …`, () => resetToken(context, ref));
     tree.refresh();
   } catch (err) {
-    log(`reset token failed: ${firstLine(err)}`);
+    log(`reset token failed: ${fullMessage(err)}`);
     showErrorWithLog(err);
   }
 }

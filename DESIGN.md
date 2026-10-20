@@ -217,8 +217,9 @@ resolver + full tree + commands + bootstrap live in a real window):
   no CLI parsing needed; `code --version` line-2 parse kept as fallback
 - first resolve ran the whole install inline (download 217 MB ≈ 6 s client-side;
   path-push ≈ 117 s; extract) and **core waited 132 s without a resolve timeout**
-  ("returned managed authority"). Still, connect-from-tree pre-runs
-  `ensureServerReady` under progress UI (§7 pre-flight slot) so resolve stays fast.
+  ("returned managed authority"). ~~Still, connect-from-tree pre-runs
+  `ensureServerReady` under progress UI (§7 pre-flight slot) so resolve stays fast~~
+  — **reversed 2026-10-20** when the double flow was measured (next block).
 - idempotent re-resolve measured ≈ 17 s: tarball cache hit (sha re-verified),
   remote sha match → push skipped, running server under matching commit reused,
   port rediscovered from server.log, 2 bridges dialed
@@ -279,6 +280,37 @@ Phase-1 progress UX + reuse hardening (2026-10-19, same day, user-driven):
   `contribViewsRemote` are unstable across releases — a core change would need
   an extension fix release); `enable-proposed-api` grants survive updates
   (keyed by extension id, not version).
+
+Phase-1 connect-affordance parity (user-requested 2026-10-20, evidence from the
+official Remote Explorer extension 0.5.0 — installed manifest inspected — and
+`jeanp413/open-remote-ssh` source):
+- **official pattern**: `connectToRemoteInCurrentWindow` ("Connect in Current
+  Window...", `$(arrow-right)`) at `inline@1` + `navigation@1`,
+  `connectToRemoteInNewWindow` ("Connect in New Window...", `$(empty-window)`)
+  at `inline@2` + `navigation@2`; all explorer commands hidden from the
+  command palette (node-driven, `commandPalette: when false`).
+- **same-window mechanism** (open-remote-ssh): host-level connect =
+  `vscode.newWindow { remoteAuthority, reuseWindow: true }` (reloads the current
+  window into the remote); folder-level open = `vscode.openFolder`
+  on a `vscode-remote://` URI with `forceNewWindow: false`. We use the host
+  form — our connect opens an empty remote window, folder choice stays native.
+- our wiring: click on ANY instance node → `connectToInstance` (starts a
+  stopped instance first, Start & Connect §7); hover/context icons = the two
+  connect commands; Start/Stop moved from hover icons into the context menu
+  (`remote-incus@N` group sorts after `navigation`).
+
+Phase-1 single-flow connect (user-driven 2026-10-20, log evidence):
+- the tree-connect command pre-ran `ensureServerReady` before
+  `vscode.newWindow` — but core **restarts the extension host within ~1 s**
+  of the command and runs a fresh `resolver.resolve()` there (bridges are
+  ext-host-owned and never survive the reload; log: click-side ensure 18 s →
+  `activate` 0.8 s later → resolve-side ensure 23 s). The pre-flight never
+  saved anything; the user saw the ENTIRE flow twice (both instances logged).
+- decision: the connect command only delegates to `vscode.newWindow` — the
+  whole bootstrap runs exactly once, inside the resolve, under the resolve's
+  own progress toast (which displays in the loading/new window). A stopped
+  instance is started by the resolve pre-flight. `tree.refresh()` after the
+  command repairs this window's state icons.
 
 ## 9. Distribution & licensing constraints
 
