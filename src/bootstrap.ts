@@ -278,16 +278,22 @@ async function sha256File(file: string): Promise<string> {
 // in-instance install steps
 // ---------------------------------------------------------------------------
 
-async function ensureTarballInInstance(ref: InstanceRef, tar: { file: string; sha256: string }, commit: string, flavor: ServerFlavor, report?: Report): Promise<void> {
+async function ensureTarballInInstance(ref: InstanceRef, identity: Identity, tar: { file: string; sha256: string }, commit: string, flavor: ServerFlavor, report?: Report): Promise<void> {
   const tmp = `/tmp/vscode-server-${flavor}-${commit}.tar.gz`;
-  const probe = await execInInstance(ref, `sha256sum ${sq(tmp)} 2>/dev/null | cut -d' ' -f1 || true`);
+  const probe = await execInInstance(ref, `sha256sum ${sq(tmp)} 2>/dev/null | cut -d' ' -f1 || true`, { uid: identity.uid, home: identity.home });
   if (probe.trim() === tar.sha256) {
     log(`tarball already in ${target(ref)} (sha256 match) — skipping push`);
     report?.('server tarball already on instance', 30);
     return;
   }
   log(`pushing server tarball to ${target(ref)}${tmp} (path mode, ${(fs.statSync(tar.file).size / 1e6).toFixed(0)} MB) …`);
+  // Push AS THE TARGET USER: the extract step runs as the target user and
+  // must be able to remove the tarball afterwards — a root-owned file in
+  // sticky /tmp (1777) is undeletable for any other uid ("Operation not
+  // permitted"; hit live 2026-10-20 on the first fully fresh install —
+  // fixture-remote never exercised the extract path, its install was spike-era).
   await pushFile(ref, tar.file, tmp, {
+    uid: identity.uid, gid: identity.gid,
     onProgress: (p) => report?.(`${p}% — pushing to instance`, 30 + p * 0.6), // push phase = 30–90 %
   });
   const pushed = await execInInstance(ref, `sha256sum ${sq(tmp)} | cut -d' ' -f1`);
@@ -480,7 +486,7 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
     report?.('server already installed', 90);
   } else {
     const tar = await downloadTarball(context, commit, flavor, report);
-    await ensureTarballInInstance(ref, tar, commit, flavor, report);
+    await ensureTarballInInstance(ref, identity, tar, commit, flavor, report);
     await ensureExtracted(ref, identity, commit, flavor, report);
   }
   await stageRelay(context, ref, identity, report);
