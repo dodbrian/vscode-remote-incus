@@ -29,7 +29,9 @@ support pre-flight — Ubuntu 25.04+/packaging AppArmor trap),
 fresh-install harness), `52c3e50` (DESIGN §14 version-compat sketch),
 `8d22af6` (Dev Containers tree UX — no row-click connect, icon-less
 remote nodes), `a7761a2` (push progress restored on CLI 7.x),
-`22a336d` (ever-opened folders + one-go reconnect).
+`22a336d` (ever-opened folders + one-go reconnect), `90d38c5` +
+`52bb622` (green check-dot session marking; exact Dev Containers icons;
+authority-aware active row).
 
 - Phase 0 (spike) **COMPLETE** — all hypotheses validated in real windows
   (DESIGN §8). Spike extension uninstalled from the user's VS Code; source
