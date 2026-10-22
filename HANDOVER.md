@@ -109,7 +109,10 @@ remote nodes), `a7761a2` (push progress restored on CLI 7.x),
     (no connect), both hover icons connect, remotes render without an
     icon; CLI 7.x push progress verified end-to-end in a real window
     (server wiped → zombie kill → cache-hit push of 222 MB ≈ 2 min with
-    the toast bar crawling 30→90% → extract → fresh server).
+    the toast bar crawling 30→90% → extract → fresh server); ever-opened
+    folders + one-go reconnect verified (folder children render with the
+    three official-order hover icons, connecting lands straight in the
+    last-used folder, remove-from-history works).
   - one transient exec failure seen once (prune step, ~10 s then nonzero)
     — unreproducible standalone or with 2 live bridges (daemon/link hiccup,
     suspected); it aborted the connect then — now non-fatal and diagnosable.
