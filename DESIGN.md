@@ -314,6 +314,35 @@ Phase-1 single-flow connect (user-driven 2026-10-20, log evidence):
   instance is started by the resolve pre-flight. `tree.refresh()` after the
   command repairs this window's state icons.
 
+Dev Containers folder UX (user-requested 2026-10-22; evidence from the
+installed extensions' bundles — remote-explorer 0.5.0, remote-ssh 0.128,
+remote-containers 0.469):
+- **official pattern**: targets (SSH hosts / containers) render a nested
+  list of FOLDERS ever opened on that target (`viewItem ==
+  remote-explorer.remoteFolder` / `attachedFolder`); folder rows carry
+  three hover icons — connect in current window (`$(arrow-right)`,
+  `inline@1`), connect in new window (`$(empty-window)`, `inline@2`),
+  remove-from-history (`inline@3`) — plus context-menu equivalents.
+- **one-go reconnect**: connecting a target with folder history lands in
+  the LAST used folder directly; the open is `vscode.openFolder` on a
+  `vscode-remote://<authority>/<path>` URI (shell code verified: current
+  window = no force flag, new window = `!0`). The folder is the URI PATH —
+  transparent to the authority resolver (an authority ends at the first
+  slash; the resolver never sees it).
+- **history source of truth**: the remote extension's OWN globalState, NOT
+  core recents — remote-ssh `FolderHistoryManager`, key `folder.history.v1`,
+  shape `{ historyData: { <authority>: [paths…] } }`; the shared shell view
+  fetches it via `remote-internal.getSshFoldersHistory`. remote-ssh records
+  from its resolver success path; we record at open-command time and at
+  activation of windows already on an `incus+…` authority (a loading window
+  has no workspace at resolve time — activation is our equivalent moment).
+- **our wiring**: `src/history.ts` (key `remote-incus.folder.history.v1`,
+  dedup, most-recent-first, cap 10 per instance); instances with history
+  render collapsible with `FolderNode` children (full path as label);
+  `connectToInstance` opens `folders[0]` when present, else the empty-window
+  host connect; `removeFolderFromHistory` mirrors `removeRecentFolder` /
+  `deleteFolderHistoryItem`.
+
 Incus version & packaging findings (2026-10-20 evening — the user fully
 reinstalled the local daemon from the zabbly repo, CLI 6.0.5→7.5.1; planned
 compat layer in §14):

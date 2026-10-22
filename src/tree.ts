@@ -11,7 +11,9 @@
  *  - state icons: running (connectable) / stopped (startable).
  */
 import * as vscode from 'vscode';
+import { formatAuthority } from './authority';
 import { getDefaultRemote, InstanceRef, listInstances, listRemotes, RemoteInfo } from './incusCli';
+import { FolderHistory } from './history';
 import { firstLine, log } from './logging';
 
 export class RemoteNode extends vscode.TreeItem {
@@ -27,10 +29,12 @@ export class RemoteNode extends vscode.TreeItem {
 
 export class InstanceNode extends vscode.TreeItem {
   readonly ref: InstanceRef;
+  readonly authority: string;
 
-  constructor(remote: string, inst: { name: string; status: string; os?: string; release?: string }) {
-    super(inst.name, vscode.TreeItemCollapsibleState.None);
+  constructor(remote: string, inst: { name: string; status: string; os?: string; release?: string }, hasFolders: boolean) {
+    super(inst.name, hasFolders ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
     this.ref = { remote, instance: inst.name };
+    this.authority = formatAuthority(this.ref);
     const running = inst.status === 'Running';
     this.contextValue = running ? 'instance-running' : 'instance-stopped';
     this.iconPath = new vscode.ThemeIcon(running ? 'vm-running' : 'vm-outline');
@@ -47,6 +51,17 @@ export class InstanceNode extends vscode.TreeItem {
   }
 }
 
+export class FolderNode extends vscode.TreeItem {
+  constructor(readonly node: InstanceNode, readonly folderPath: string) {
+    // Full path as the label, like the official remote views' `${path}`
+    // resource label formatter (Dev Containers UX, 2026-10-22).
+    super(folderPath, vscode.TreeItemCollapsibleState.None);
+    this.iconPath = new vscode.ThemeIcon('folder');
+    this.contextValue = 'instance-folder';
+    this.tooltip = new vscode.MarkdownString(`**${folderPath}** on \`${node.authority}\``);
+  }
+}
+
 export class MessageNode extends vscode.TreeItem {
   constructor(label: string, icon: string) {
     super(label, vscode.TreeItemCollapsibleState.None);
@@ -56,6 +71,9 @@ export class MessageNode extends vscode.TreeItem {
 }
 
 export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
+  constructor(private readonly history: FolderHistory) {
+  }
+
   private readonly onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.onDidChange.event;
 
@@ -79,10 +97,16 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
       if (element instanceof RemoteNode) {
         try {
           const instances = await listInstances(element.info.name);
-          return instances.map((i) => new InstanceNode(element.info.name, i));
+          return instances.map((i) =>
+            new InstanceNode(element.info.name, i, this.history.folders(formatAuthority({ remote: element.info.name, instance: i.name })).length > 0));
         } catch (err) {
           return [new MessageNode(`unavailable: ${firstLine(err)}`, 'warning')];
         }
+      }
+      if (element instanceof InstanceNode) {
+        // The ever-opened folders on this instance (Dev Containers UX):
+        // each opens that folder in one go; no history → the node stays a leaf.
+        return this.history.folders(element.authority).map((f) => new FolderNode(element, f));
       }
       return [];
     } catch (err) {

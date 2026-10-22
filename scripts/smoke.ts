@@ -6,6 +6,7 @@
 import { parseAuthority, formatAuthority } from '../src/authority';
 import { listRemotes, getDefaultRemote, listInstances, execInInstance, target } from '../src/incusCli';
 import { resolveIdentity, probeFlavor, resolveClientCommit } from '../src/bootstrap';
+import { FolderHistory } from '../src/history';
 
 function assert(cond: boolean, msg: string): void {
   if (!cond) {
@@ -25,6 +26,20 @@ async function main(): Promise<void> {
     parseAuthority('incus/fixture-remote:fixture-container');
     assert(false, 'reject malformed authority');
   } catch { assert(true, 'reject malformed authority'); }
+
+  // folder history (pure memento logic)
+  const store: Record<string, unknown> = {};
+  const fakeContext = { globalState: { get: (_k: string) => store['v'], update: (_k: string, v: unknown) => { store['v'] = v; return Promise.resolve(); } } } as never;
+  const history = new FolderHistory(fakeContext);
+  history.record('incus+fixture-remote:fixture-container', '/home/ubuntu/proj-a');
+  history.record('incus+fixture-remote:fixture-container', '/home/ubuntu/proj-b');
+  history.record('incus+fixture-remote:fixture-container', '/home/ubuntu/proj-a'); // dedup → moves to front
+  assert(JSON.stringify(history.folders('incus+fixture-remote:fixture-container')) === '["/home/ubuntu/proj-a","/home/ubuntu/proj-b"]', 'history most-recent-first + dedup');
+  history.remove('incus+fixture-remote:fixture-container', '/home/ubuntu/proj-a');
+  assert(JSON.stringify(history.folders('incus+fixture-remote:fixture-container')) === '["/home/ubuntu/proj-b"]', 'history remove');
+  history.remove('incus+fixture-remote:fixture-container', '/home/ubuntu/proj-b');
+  assert(history.folders('incus+fixture-remote:fixture-container').length === 0, 'history empty after last removal');
+  assert(history.folders('incus+other:x').length === 0, 'history isolated per authority');
 
   // live daemon (read-only)
   const def = await getDefaultRemote();

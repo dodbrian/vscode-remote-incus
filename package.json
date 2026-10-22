@@ -55,6 +55,24 @@
         "icon": "$(empty-window)"
       },
       {
+        "command": "remote-incus.connectToFolder",
+        "title": "Connect in Current Window...",
+        "category": "Remote - Incus",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "remote-incus.connectToFolderInNewWindow",
+        "title": "Connect in New Window...",
+        "category": "Remote - Incus",
+        "icon": "$(empty-window)"
+      },
+      {
+        "command": "remote-incus.removeFolderFromHistory",
+        "title": "Remove Recent Folder",
+        "category": "Remote - Incus",
+        "icon": "$(close)"
+      },
+      {
         "command": "remote-incus.startInstance",
         "title": "Start",
         "category": "Remote - Incus",
@@ -119,6 +137,18 @@
         {
           "command": "remote-incus.connectToInstanceInNewWindow",
           "when": "false"
+        },
+        {
+          "command": "remote-incus.connectToFolder",
+          "when": "false"
+        },
+        {
+          "command": "remote-incus.connectToFolderInNewWindow",
+          "when": "false"
+        },
+        {
+          "command": "remote-incus.removeFolderFromHistory",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -129,6 +159,31 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "remote-incus.connectToFolder",
+          "when": "view == remote-incus.instances && viewItem == instance-folder",
+          "group": "inline@1"
+        },
+        {
+          "command": "remote-incus.connectToFolder",
+          "when": "view == remote-incus.instances && viewItem == instance-folder",
+          "group": "navigation@1"
+        },
+        {
+          "command": "remote-incus.connectToFolderInNewWindow",
+          "when": "view == remote-incus.instances && viewItem == instance-folder",
+          "group": "inline@2"
+        },
+        {
+          "command": "remote-incus.connectToFolderInNewWindow",
+          "when": "view == remote-incus.instances && viewItem == instance-folder",
+          "group": "navigation@2"
+        },
+        {
+          "command": "remote-incus.removeFolderFromHistory",
+          "when": "view == remote-incus.instances && viewItem == instance-folder",
+          "group": "inline@3"
+        },
         {
           "command": "remote-incus.connectToInstance",
           "when": "view == remote-incus.instances && viewItem =~ /instance-(running|stopped)/",
