@@ -17,7 +17,19 @@ with a Docker container".
 2. This file — operational context: environment snapshot, dev loop,
    debugging traps, and exactly where to resume.
 
-## Current state (session end 2026-10-20 late evening, main, clean tree)
+## Current state (session end 2026-10-23, main)
+
+Latest stopping point: tree icon parity and removal of the redundant
+`Running` row description are deployed and user-verified. Compared against
+the installed Dev Containers 0.469.0: disconnected running instances use
+`ThemeIcon('vm-running')`, stopped instances use `ThemeIcon('vm')`, and the
+connected instance uses the per-theme `vm-active.svg` check-dot asset.
+Folder rows use per-theme `folder.svg` / `folder-active.svg`; active marking
+requires BOTH authority and folder path. The copied SVGs are byte-identical
+to Dev Containers, but copying assets alone does NOT reproduce its runtime
+icon selection. State remains in tooltips; non-running descriptions remain.
+`npm run typecheck` and `npm run compile` passed; `./redeploy.sh` completed
+after each visual change, and the user approved the rendered result.
 
 Deltas on top of `0dcb016` (previous handover), all verified on stable
 1.142.0: `5f64f05` (tree connect affordances at Remote-SSH parity +
@@ -66,8 +78,8 @@ authority-aware active row).
      an `incus+…` authority.
      Session marking + always expanded (2026-10-22, screenshot-verified
      UX): the connected instance icon and its connected folder row carry a
-     green check-dot (baked into per-state SVG icons in `assets/`,
-     mirroring Dev Containers — ThemeIcons cannot carry overlays), and the
+     green check-dot (baked into active SVG icons in `assets/light/` and
+     `assets/dark/`, mirroring Dev Containers), and the
      tree defaults to fully expanded even when not connected.
   3. Bootstrap module (`src/bootstrap.ts`) — client-side cached download
      (globalStorage, sha256 sidecar), sha-gated path-mode push, idempotent

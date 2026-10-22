@@ -64,7 +64,7 @@ export class InstanceNode extends vscode.TreeItem {
     // at the right edge ($(arrow-right) current window, $(empty-window) new
     // window) and the context menu. A stopped instance is still started by the
     // connect flow itself (Start & Connect, DESIGN §7).
-    this.description = inst.status;
+    this.description = inst.status === 'Running' ? undefined : inst.status;
     this.tooltip = new vscode.MarkdownString(
       `**${inst.name}** (${remote})\n\n- state: \`${inst.status}\``
       + (inst.os ? `\n- image OS: ${inst.os}${inst.release ? ` ${inst.release}` : ''}` : ''));
@@ -106,8 +106,14 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
   }
 
   private icon(name: string): vscode.IconPath {
-    const p = vscode.Uri.file(`${this.assetsRoot}/${name}.svg`);
-    return { light: p, dark: p };
+    // Same per-theme structure as Dev Containers: assets/light/<name>.svg,
+    // assets/dark/<name>.svg; the icon files themselves are the Dev
+    // Containers tree icons (vm-default / vm-active / vm-stopped /
+    // folder / folder-active) copied verbatim.
+    return {
+      light: vscode.Uri.file(`${this.assetsRoot}/light/${name}.svg`),
+      dark: vscode.Uri.file(`${this.assetsRoot}/dark/${name}.svg`),
+    };
   }
 
   async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
@@ -124,14 +130,16 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
         try {
           const instances = await listInstances(element.info.name);
           return instances.map((i) => {
-            const running = i.status === 'Running';
             const authority = formatAuthority({ remote: element.info.name, instance: i.name });
             const hasFolders = this.history.folders(authority).length > 0;
             const online = session?.authority === authority;
             return new InstanceNode(element.info.name, i, {
               online,
               hasFolders,
-              icon: this.icon(online ? 'instance-online' : (running ? 'instance' : 'instance-stopped')),
+              // Dev Containers uses theme icons for disconnected containers;
+              // only the connected container uses the check-dot SVG.
+              icon: online ? this.icon('vm-active')
+                : new vscode.ThemeIcon(i.status === 'Running' ? 'vm-running' : 'vm'),
             });
           });
         } catch (err) {
@@ -141,8 +149,12 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
       if (element instanceof InstanceNode) {
         // The ever-opened folders on this instance (Dev Containers UX):
         // each opens that folder in one go; no history → the node stays a leaf.
+        // The ACTIVE row is marked only when BOTH the authority and the folder
+        // path match the current window — the same path on a different
+        // instance is NOT active (bug fixed 2026-10-23).
         return this.history.folders(element.authority).map((f) =>
-          new FolderNode(element, f, this.icon(session?.folder === f ? 'folder-online' : 'folder')));
+          new FolderNode(element, f,
+            this.icon(session?.authority === element.authority && session.folder === f ? 'folder-active' : 'folder')));
       }
       return [];
     } catch (err) {
