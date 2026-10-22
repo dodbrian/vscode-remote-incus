@@ -29,7 +29,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
-  const tree = new InstancesTree(history);
+  const tree = new InstancesTree(history, context.asAbsolutePath('assets'));
   context.subscriptions.push(
     vscode.workspace.registerRemoteAuthorityResolver(AUTHORITY_PREFIX, new IncusAuthorityResolver(context)),
     vscode.window.registerTreeDataProvider('remote-incus.instances', tree),

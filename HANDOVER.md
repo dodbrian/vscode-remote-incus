@@ -62,6 +62,11 @@ remote nodes), `a7761a2` (push progress restored on CLI 7.x),
      (`src/history.ts`, key `remote-incus.folder.history.v1`, cap 10),
      recorded at open-command time and at activation of windows already on
      an `incus+…` authority.
+     Session marking + always expanded (2026-10-22, screenshot-verified
+     UX): the connected instance icon and its connected folder row carry a
+     green check-dot (baked into per-state SVG icons in `assets/`,
+     mirroring Dev Containers — ThemeIcons cannot carry overlays), and the
+     tree defaults to fully expanded even when not connected.
   3. Bootstrap module (`src/bootstrap.ts`) — client-side cached download
      (globalStorage, sha256 sidecar), sha-gated path-mode push, idempotent
      extract as target user (`.incus-install-ok` marker), sticky 0600 token,

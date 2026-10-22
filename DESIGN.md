@@ -336,6 +336,15 @@ remote-containers 0.469):
   from its resolver success path; we record at open-command time and at
   activation of windows already on an `incus+…` authority (a loading window
   has no workspace at resolve time — activation is our equivalent moment).
+- **session marking + always expanded** (screenshot-verified UX): the live
+  session is marked with a green check-dot on BOTH the connected container's
+  icon and its connected folder row, and the tree renders expanded by
+  default even when not connected. TreeItems cannot overlay badges on
+  ThemeIcons; Dev Containers bakes the dot into per-state SVG icons — we
+  mirror with `assets/instance{-online,}`.svg / `assets/folder{-online,}.svg`
+  (the light/dark icon variants point at the same files; the gray works on
+  both themes). The session is derived per window from `vscode.env.remoteAuthority`
+  + the workspace folder whose authority matches it.
 - **our wiring**: `src/history.ts` (key `remote-incus.folder.history.v1`,
   dedup, most-recent-first, cap 10 per instance); instances with history
   render collapsible with `FolderNode` children (full path as label);
