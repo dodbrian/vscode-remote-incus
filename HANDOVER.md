@@ -93,6 +93,12 @@ remote nodes), `a7761a2` (push progress restored on CLI 7.x).
     connects through the resolve pre-flight; stopped instance's automatic
     re-resolve loop also verified (instance stop mid-session → bridges die
     → core re-resolves → "starting …" → fresh server, new port picked up).
+  - 2026-10-22 session (on stable 1.143.0, commit `2d0b7506…`): Dev
+    Containers tree UX verified by the user — row click = selection only
+    (no connect), both hover icons connect, remotes render without an
+    icon; CLI 7.x push progress verified end-to-end in a real window
+    (server wiped → zombie kill → cache-hit push of 222 MB ≈ 2 min with
+    the toast bar crawling 30→90% → extract → fresh server).
   - one transient exec failure seen once (prune step, ~10 s then nonzero)
     — unreproducible standalone or with 2 live bridges (daemon/link hiccup,
     suspected); it aborted the connect then — now non-fatal and diagnosable.
