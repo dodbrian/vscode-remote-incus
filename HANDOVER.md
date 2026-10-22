@@ -28,7 +28,8 @@ support pre-flight — Ubuntu 25.04+/packaging AppArmor trap),
 `67167ea` (CLI 7.x list-filter regression), `80ef6be` (windowless
 fresh-install harness), `52c3e50` (DESIGN §14 version-compat sketch),
 `8d22af6` (Dev Containers tree UX — no row-click connect, icon-less
-remote nodes), `a7761a2` (push progress restored on CLI 7.x).
+remote nodes), `a7761a2` (push progress restored on CLI 7.x),
+`22a336d` (ever-opened folders + one-go reconnect).
 
 - Phase 0 (spike) **COMPLETE** — all hypotheses validated in real windows
   (DESIGN §8). Spike extension uninstalled from the user's VS Code; source
@@ -51,6 +52,16 @@ remote nodes), `a7761a2` (push progress restored on CLI 7.x).
      Remote Explorer 0.5.0 manifest); a stopped instance is still started by
      the resolve; Start/Stop live in the context menu; connect commands
      hidden from the command palette; remote nodes show no icon.
+     Ever-opened FOLDERS under each instance + one-go reconnect
+     (2026-10-22, user-requested, Dev Containers UX): instance nodes with
+     folder history render collapsible children (full path label, three
+     hover icons: open current window / new window / remove from history);
+     connecting an instance opens the LAST used folder directly
+     (`vscode.openFolder` on a `vscode-remote://` URI — folder is the URI
+     path, invisible to the resolver); history in extension globalState
+     (`src/history.ts`, key `remote-incus.folder.history.v1`, cap 10),
+     recorded at open-command time and at activation of windows already on
+     an `incus+…` authority.
   3. Bootstrap module (`src/bootstrap.ts`) — client-side cached download
      (globalStorage, sha256 sidecar), sha-gated path-mode push, idempotent
      extract as target user (`.incus-install-ok` marker), sticky 0600 token,
