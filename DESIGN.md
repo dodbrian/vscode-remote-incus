@@ -294,10 +294,12 @@ official Remote Explorer extension 0.5.0 — installed manifest inspected — an
   window into the remote); folder-level open = `vscode.openFolder`
   on a `vscode-remote://` URI with `forceNewWindow: false`. We use the host
   form — our connect opens an empty remote window, folder choice stays native.
-- our wiring: click on ANY instance node → `connectToInstance` (starts a
-  stopped instance first, Start & Connect §7); hover/context icons = the two
-  connect commands; Start/Stop moved from hover icons into the context menu
-  (`remote-incus@N` group sorts after `navigation`).
+- our wiring (amended 2026-10-22, user decision — follow the Dev Containers
+  UX, dropping the Remote-SSH row-click parity): NO connect on the row click;
+  connecting is only via hover/context icons = the two connect commands
+  (they still start a stopped instance first, Start & Connect §7); Start/Stop
+  live in the context menu (`remote-incus@N` group sorts after `navigation`);
+  remote nodes render without an icon (chevron only).
 
 Phase-1 single-flow connect (user-driven 2026-10-20, log evidence):
 - the tree-connect command pre-ran `ensureServerReady` before

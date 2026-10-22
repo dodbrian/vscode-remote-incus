@@ -18,7 +18,8 @@ export class RemoteNode extends vscode.TreeItem {
   constructor(readonly info: RemoteInfo, readonly isDefault: boolean) {
     super(info.name, vscode.TreeItemCollapsibleState.Collapsed);
     this.contextValue = 'remote';
-    this.iconPath = new vscode.ThemeIcon('remote');
+    // No iconPath: remotes render with just the chevron, like folders in the
+    // official Remote Explorer (user decision 2026-10-22, Dev Containers UX).
     this.description = `${info.address}${isDefault ? ' (default)' : ''}`;
     this.tooltip = new vscode.MarkdownString(`**${info.name}** — \`${info.address}\` (auth: ${info.authType || 'none'})`);
   }
@@ -33,20 +34,16 @@ export class InstanceNode extends vscode.TreeItem {
     const running = inst.status === 'Running';
     this.contextValue = running ? 'instance-running' : 'instance-stopped';
     this.iconPath = new vscode.ThemeIcon(running ? 'vm-running' : 'vm-outline');
-    if (running) {
-      this.description = inst.status;
-    } else {
-      // Click still connects: the connect command starts a stopped instance
-      // first (Start & Connect, DESIGN §7).
-      this.description = `${inst.status} — click to start & connect`;
-    }
+    // Plain state description, no click affordance: row click does NOT connect
+    // (Dev Containers UX, user decision 2026-10-22, superseding the earlier
+    // Remote-SSH parity wiring) — connecting lives only on the two hover icons
+    // at the right edge ($(arrow-right) current window, $(empty-window) new
+    // window) and the context menu. A stopped instance is still started by the
+    // connect flow itself (Start & Connect, DESIGN §7).
+    this.description = inst.status;
     this.tooltip = new vscode.MarkdownString(
       `**${inst.name}** (${remote})\n\n- state: \`${inst.status}\``
       + (inst.os ? `\n- image OS: ${inst.os}${inst.release ? ` ${inst.release}` : ''}` : ''));
-    // Click = connect in the current window, both states (Remote-SSH parity:
-    // connect commands also sit in the context menu / hover icons, and
-    // "Connect in New Window..." is a separate command).
-    this.command = { command: 'remote-incus.connectToInstance', title: 'Connect', arguments: [this] };
   }
 }
 

@@ -41,13 +41,14 @@ fresh-install harness), `52c3e50` (DESIGN §14 version-compat sketch).
      "unavailable:" leaves; commands: connect, start, stop, restart,
      kill server, uninstall server, reset token, open terminal (exec),
      collect diagnostics, refresh. User signed off on rendered UX.
-     Connect affordances now at REMOTE-SSH PARITY (2026-10-20, user-verified):
-     click / `$(arrow-right)` hover icon = connect in the CURRENT window,
-     `$(empty-window)` = connect in a NEW window (titles verbatim from the
-     official Remote Explorer 0.5.0 manifest); row click on a stopped
-     instance = start & connect (started by the resolve); Start/Stop live in
-     the context menu (two hover icons only, like SSH hosts); connect
-     commands hidden from the command palette.
+     Connect affordances now at DEV CONTAINERS UX (amended 2026-10-22,
+     user-requested — replaces the 2026-10-20 Remote-SSH-parity wiring):
+     row click does NOT connect (click only selects); connect happens ONLY
+     via the right-side hover icons — `$(arrow-right)` = CURRENT window,
+     `$(empty-window)` = NEW window (titles verbatim from the official
+     Remote Explorer 0.5.0 manifest); a stopped instance is still started by
+     the resolve; Start/Stop live in the context menu; connect commands
+     hidden from the command palette; remote nodes show no icon.
   3. Bootstrap module (`src/bootstrap.ts`) — client-side cached download
      (globalStorage, sha256 sidecar), sha-gated path-mode push, idempotent
      extract as target user (`.incus-install-ok` marker), sticky 0600 token,
