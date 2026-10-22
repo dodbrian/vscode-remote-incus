@@ -26,7 +26,9 @@ prune), `d95120d` (relaunch waits for clean exit), `128621b` (signal-
 support pre-flight — Ubuntu 25.04+/packaging AppArmor trap),
 `41b8712` (push tarball as the target user — sticky-/tmp fix),
 `67167ea` (CLI 7.x list-filter regression), `80ef6be` (windowless
-fresh-install harness), `52c3e50` (DESIGN §14 version-compat sketch).
+fresh-install harness), `52c3e50` (DESIGN §14 version-compat sketch),
+`8d22af6` (Dev Containers tree UX — no row-click connect, icon-less
+remote nodes), `a7761a2` (push progress restored on CLI 7.x).
 
 - Phase 0 (spike) **COMPLETE** — all hypotheses validated in real windows
   (DESIGN §8). Spike extension uninstalled from the user's VS Code; source
@@ -58,9 +60,12 @@ fresh-install harness), `52c3e50` (DESIGN §14 version-compat sketch).
   4. Progress UX (user-requested): connection/setup runs under a notification
      toast with a progress bar; title embeds a clickable "(show log)" link
      → `remote-incus.showLog` command → output channel; download % from
-     content-length, push % parsed from the `incus file push` CLI meter
-     (it prints even when piped); percent-first messages (collapsed-toast
-     truncation cuts from the right). Error toasts carry the same link.
+     content-length, push % from polling the growing target file's size
+     (1 Hz `stat -c %s`) with the 6.x CLI meter as a secondary source —
+     CLI 7.x (≥ SFTP push) prints NO meter when piped and creates no
+     operation (TTY-gated renderer; DESIGN §14.1); percent-first messages
+     (collapsed-toast truncation cuts from the right). Error toasts carry
+     the same link.
      **Single flow** (2026-10-20): the toast belongs to the RESOLVE now —
      the tree-connect command only delegates to `vscode.newWindow`; the
      whole bootstrap runs exactly once inside the post-reload resolve
@@ -138,7 +143,8 @@ fresh-install harness), `52c3e50` (DESIGN §14 version-compat sketch).
   6.8) and member `member-b` (192.0.2.11, Tailscale, kernel 7.0.0-38).
   `fixture-container` runs on member `member-b`. Address instances as
   `<remote>:<name>`; never assume a member.
-- **VS Code stable 1.142.0** (commit `6d62b1d5…`), weekly auto-updates.
+- **VS Code stable 1.143.0** (commit `2d0b7506…` as of 2026-10-22), weekly
+  auto-updates.
 - Node v24.21.0 / npm 11.19.0; esbuild + tsc + @vscode/vsce devDependencies.
 - Companion container: **`fixture-container`** (cluster member `member-b`, Ubuntu
   24.04, RUNNING):
@@ -155,11 +161,11 @@ fresh-install harness), `52c3e50` (DESIGN §14 version-compat sketch).
 - Client-side tarball cache:
   `~/.config/Code/User/globalStorage/local-dev.remote-incus/server-cache/`
   (217 MB tarball + sha sidecar for the current commit).
-- Local test instance: **`previous-local-fixture`** (user-created 2026-10-20 evening
-  on the local daemon, Ubuntu 26.04 "resolute" daily image 20261018,
-  RUNNING, no VS Code server connected yet — the reinstall wiped
-  `previous-fixture-a`, `previous-fixture-b`, and the throwaway
-  `signal-fixture`).
+- Local test instance: **`local-fixture`** (RUNNING on the local daemon,
+  Ubuntu "resolute" daily image; `previous-local-fixture` was wiped — recreated
+  under a new random name, presumably by the user 2026-10-22). Earlier
+  test instances (`previous-local-fixture`, `previous-fixture-a`, `previous-fixture-b`,
+  `signal-fixture`) were lost in the 2026-10-20 daemon reinstall.
 
 ## ISOLATION RULE (important)
 
