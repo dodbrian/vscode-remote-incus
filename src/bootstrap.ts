@@ -38,7 +38,7 @@ import * as path from 'path';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import * as vscode from 'vscode';
-import { execInInstance, InstanceRef, pushFile, target } from './incusCli';
+import { execInInstance, InstanceRef, pushFile, sq, target } from './incusCli';
 import { firstLine, log } from './logging';
 import { Report } from './progress';
 
@@ -51,11 +51,6 @@ const relayPath = (home: string): string => `${home}/${VS_SERVER_DIR}/relay.js`;
 const DEFAULT_URL_TEMPLATE = 'https://update.code.visualstudio.com/commit:{commit}/server-{flavor}/stable';
 const PORT_POLL_INTERVAL_MS = 500;
 const PORT_POLL_TRIES = 120; // 60 s
-
-/** Shell-quote a value interpolated into an in-instance script. */
-function sq(s: string): string {
-  return `'${s.replace(/'/g, `'\\''`)}'`;
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -216,6 +211,7 @@ export async function downloadTarball(context: vscode.ExtensionContext, commit: 
   if (fs.existsSync(file) && fs.existsSync(shaFile)) {
     const expected = (await fs.promises.readFile(shaFile, 'utf8')).trim();
     log(`tarball cache hit (${path.basename(file)}) — verifying sha256 …`);
+    report?.('verifying cached tarball…');
     const actual = await sha256File(file);
     if (actual === expected) {
       return { file, sha256: actual };
@@ -287,6 +283,7 @@ async function ensureTarballInInstance(ref: InstanceRef, identity: Identity, tar
     return;
   }
   log(`pushing server tarball to ${target(ref)}${tmp} (path mode, ${(fs.statSync(tar.file).size / 1e6).toFixed(0)} MB) …`);
+  report?.('pushing to instance…', 30);
   // Push AS THE TARGET USER: the extract step runs as the target user and
   // must be able to remove the tarball afterwards — a root-owned file in
   // sticky /tmp (1777) is undeletable for any other uid ("Operation not

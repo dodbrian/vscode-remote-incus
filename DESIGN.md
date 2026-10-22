@@ -452,6 +452,7 @@ not rediscovered.
 |---|---|---|---|
 | `incus list <remote>:<name>` glued filter | matches | no matches ("did you forget a space") | `incus list <remote>: <name>` — verified both; add exact-name find |
 | `incus <op> <remote>:<name>` (exec/file/start/stop/restart) | ok | ok | — |
+| `incus file push` progress meter | prints `<n>% (<speed>)` even when piped | prints NOTHING when piped — 7.x push is SFTP-based (`sftpCreateFile`), the meter is TTY-gated (`shared/cmd/progress.go` `Update()` returns unless stdout is a terminal), and a file push creates NO operation (no progress metadata to poll; verified 2026-10-22, piped and under a pty) | poll the growing target file in-instance (`stat -c %s`, 1 Hz) — the SFTP writer extends it in place; keep the meter parse for 6.x |
 
 | host stack | in-container signals | cause |
 |---|---|---|

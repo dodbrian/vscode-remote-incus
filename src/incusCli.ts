@@ -10,6 +10,7 @@
  *  - `incus file push` must run in PATH mode (stdin mode is broken on 6.0.5).
  */
 import * as cp from 'child_process';
+import * as fs from 'fs';
 export class IncusError extends Error {
   constructor(message: string, readonly args: string[], readonly stderr?: string) {
     super(message);
@@ -36,6 +37,11 @@ export function incus(args: string[], opts: IncusRunOptions = {}): Promise<strin
       }
     });
   });
+}
+
+/** Shell-quote a value interpolated into an in-instance script. */
+export function sq(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
 /** Compact command preview for messages — full args stay on the error object. */
@@ -85,14 +91,22 @@ export interface PushOptions {
   uid?: number;
   gid?: number;
   mode?: string;
-  /** reports 0–100, parsed from the CLI's own progress meter */
+  /** reports 0–100 — see the progress-source note below */
   onProgress?: (percent: number) => void;
 }
 
 /**
  * Path-mode file push (stdin mode is broken on incus 6.0.5 — never use it).
- * The CLI prints a "<n>% (<speed>)" meter even when piped; it is streamed and
- * parsed so the UI gets real transfer progress.
+ *
+ * Progress sources, in order of trust (both feed a monotonic max):
+ *  - CLI 6.x: prints a "<n>% (<speed>)" meter even when piped — parsed here.
+ *  - CLI 7.x: push is SFTP-based (cmd/incus/file.go → sftpCreateFile) and the
+ *    meter renderer is TTY-gated (shared/cmd/progress.go: Update() returns
+ *    unless stdout is a terminal) — verified 2026-10-22 on 7.5.1: piped AND
+ *    pty pushes print NOTHING, and no operation event carries progress
+ *    (a file push creates no operation). Fallback: poll the growing target
+ *    file's size in the instance (`stat -c %s`) — the SFTP writer extends
+ *    the file in place, so the byte count is the real transfer progress.
  */
 export function pushFile(ref: InstanceRef, localPath: string, remotePath: string, opts: PushOptions = {}): Promise<void> {
   const args = ['file', 'push', localPath, `${target(ref)}${remotePath}`];
@@ -104,25 +118,56 @@ export function pushFile(ref: InstanceRef, localPath: string, remotePath: string
     const child = cp.spawn('incus', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let output = '';
     let last = 0;
+    const report = (percent: number): void => {
+      if (percent > last) {
+        last = percent;
+        opts.onProgress?.(last);
+      }
+    };
     const onData = (d: Buffer): void => {
       output += d.toString();
       if (output.length > 128 * 1024) { output = output.slice(-64 * 1024); } // the meter rewrites one line
       for (const m of d.toString().matchAll(/(\d+)%/g)) {
-        last = Number(m[1]);
+        report(Number(m[1]));
       }
-      opts.onProgress?.(last);
     };
     child.stdout?.on('data', onData);
     child.stderr?.on('data', onData);
+
+    // 7.x fallback: size-poll the target file (1 Hz; stat hiccups never fail
+    // the push). The poller stops with the push; one in-flight stat may
+    // outlive it briefly and is ignored.
+    let polling = true;
+    let totalBytes = 0;
+    try { totalBytes = fs.statSync(localPath).size; } catch { /* size unknown → no % from polls */ }
+    if (totalBytes > 0) {
+      void (async () => {
+        const probe = ['exec', target(ref), '--', 'bash', '-c', `stat -c %s ${sq(remotePath)} 2>/dev/null || echo 0`];
+        while (polling) {
+          try {
+            const size = Number((await incus(probe, { timeoutMs: 15_000 })).trim());
+            if (Number.isFinite(size) && size > 0) {
+              report(Math.min(100, Math.floor((size / totalBytes) * 100)));
+            }
+          } catch { /* transient exec hiccup — the push itself decides success */ }
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      })();
+    }
+
+    const stop = (): void => { polling = false; };
     const timer = setTimeout(() => {
+      stop();
       child.kill();
       reject(new IncusError('incus file push timed out after 15 min', args));
     }, 15 * 60_000);
     child.on('error', (err) => {
+      stop();
       clearTimeout(timer);
       reject(err);
     });
     child.on('close', (code) => {
+      stop();
       clearTimeout(timer);
       if (code === 0) {
         resolve();
