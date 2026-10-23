@@ -106,10 +106,8 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
   }
 
   private icon(name: string): vscode.IconPath {
-    // Same per-theme structure as Dev Containers: assets/light/<name>.svg,
-    // assets/dark/<name>.svg; the icon files themselves are the Dev
-    // Containers tree icons (vm-default / vm-active / vm-stopped /
-    // folder / folder-active) copied verbatim.
+    // Public microsoft/vscode-icons assets, unchanged under CC BY 4.0.
+    // Source revision and attribution: ThirdPartyNotices.md.
     return {
       light: vscode.Uri.file(`${this.assetsRoot}/light/${name}.svg`),
       dark: vscode.Uri.file(`${this.assetsRoot}/dark/${name}.svg`),

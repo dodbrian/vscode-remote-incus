@@ -25,9 +25,18 @@ the installed Dev Containers 0.469.0: disconnected running instances use
 `ThemeIcon('vm-running')`, stopped instances use `ThemeIcon('vm')`, and the
 connected instance uses the per-theme `vm-active.svg` check-dot asset.
 Folder rows use per-theme `folder.svg` / `folder-active.svg`; active marking
-requires BOTH authority and folder path. The copied SVGs are byte-identical
-to Dev Containers, but copying assets alone does NOT reproduce its runtime
-icon selection. State remains in tooltips; non-running descriptions remain.
+requires BOTH authority and folder path. The original Dev Containers SVG
+copies have now been replaced with unchanged
+public `microsoft/vscode-icons` assets at revision
+`2ca0f3225c1ecd16537107f60f109317fcfc3eb0` (CC BY 4.0).
+Attribution and provenance are in `ThirdPartyNotices.md`; the full license is
+in `licenses/vscode-icons-CC-BY-4.0.txt`, both included in packaging.
+Unused copied `vm-default.svg` / `vm-stopped.svg` assets were removed.
+The public assets have small path/color differences from Dev Containers;
+runtime icon selection remains as described above.
+The CC BY replacements passed typecheck/compile and were redeployed with
+`./redeploy.sh`; the user approved the rendered result on 2026-10-23.
+State remains in tooltips; non-running descriptions remain.
 `npm run typecheck` and `npm run compile` passed; `./redeploy.sh` completed
 after each visual change, and the user approved the rendered result.
 

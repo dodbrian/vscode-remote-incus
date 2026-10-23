@@ -340,13 +340,13 @@ remote-containers 0.469):
   session is marked with a green check-dot on BOTH the connected container's
   icon and its connected folder row, and the tree renders expanded by
   default even when not connected. TreeItems cannot overlay badges on
-  ThemeIcons; we ship the Dev Containers TREE ICONS verbatim —
-  `vm-default` (running) / `vm-active` (connected) / `vm-stopped` (exited) /
-  `folder` / `folder-active`, copied byte-for-byte from remote-containers
-  0.469.0 into `assets/light|dark/` (user request 2026-10-23: "exactly the
-  same as DevContainers"). LICENSING: Microsoft's assets — fine for private
-  local use; must be revisited (redraw or license) before any OpenVSX
-  publish (§12.7). The session is derived per window from
+  ThemeIcons; we ship unchanged public `microsoft/vscode-icons` SVGs for
+  `vm-active` (connected), `folder`, and `folder-active` in
+  `assets/light|dark/`. Disconnected instances use the built-in `vm-running`
+  or `vm` ThemeIcon. The original Dev Containers asset copies were replaced
+  on 2026-10-23 with CC BY 4.0 assets; source revision, attribution, and
+  bundled license are recorded in `ThirdPartyNotices.md`. The session is
+  derived per window from
   `vscode.env.remoteAuthority` + the workspace folder whose authority
   matches it.
 - **our wiring**: `src/history.ts` (key `remote-incus.folder.history.v1`,

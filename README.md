@@ -40,3 +40,9 @@ npm install
 npm run typecheck
 ./redeploy.sh        # build + package + install + reopen the remote window
 ```
+
+## Icon licensing
+
+Bundled tree SVGs are by Microsoft and contributors, licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+See `ThirdPartyNotices.md` in the extension package for source and license details.
