@@ -7,7 +7,8 @@ const os = require('node:os');
 async function main() {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'remote-incus-tests-build-'));
   try {
-    const entryPoints = fs.readdirSync('tests').filter(name => name.endsWith('.test.ts')).sort().map(name => path.join('tests', name));
+    const source = process.argv.includes('--known-defects') ? 'tests/known-defects' : 'tests';
+    const entryPoints = fs.readdirSync(source).filter(name => name.endsWith('.test.ts')).sort().map(name => path.join(source, name));
     if (!entryPoints.length) throw new Error('No offline test files found in tests/');
     await esbuild.build({
       entryPoints,

@@ -18,6 +18,8 @@ export function fixture(): Fixture {
 
 export class Fixture {
   readonly directory = mkdtempSync(join(tmpdir(), 'remote-incus-test-'));
+  readonly state = new Map<string, any>();
+  readonly routes = new Map<string, Handler>();
   readonly configuration = new Map<string, unknown>();
   readonly subscriptions: { dispose(): void }[] = [];
   readonly calls: { name: string; args: any[] }[] = [];
@@ -33,7 +35,7 @@ export class Fixture {
 
   call(name: string, args: any[]): any {
     this.calls.push({ name, args });
-    const handler = this.handlers.get(name)?.shift();
+    const handler = this.handlers.get(name)?.shift() ?? this.routes.get(name);
     if (!handler) {
       const message = `Unexpected offline call: ${name}`;
       this.unexpected.push(message);

@@ -20,9 +20,48 @@ with a Docker container".
 3. `ALTERNATIVES.md` — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current state (session end 2026-10-23, main)
+## Current state (session end 2026-10-23, Task 2 worktree)
 
-Latest stopping point: related-project and distribution research is recorded
+Latest stopping point: **Task 2 offline regression baseline is complete and
+accepted by the user**, including the review correction below. Task 1's result
+was discussed and accepted in its own session; the user explicitly confirmed
+that prerequisite before Task 2 implementation. Task 1 harness commit:
+`49c0ac0`. Task 2 changes remain uncommitted in
+`/path/to/task-worktree`.
+
+- Verification after the review correction: `npm test` **59 passed, 0 failed,
+  0 skipped**; `npm run typecheck`, `npm run compile` and `git diff --check`
+  passed. Local Node version: 24.21.0.
+- [tests/COVERAGE.md](tests/COVERAGE.md) maps coverage and gaps to C1–C13,
+  B1–B6, T1–T4 and X1–X8. [tests/README.md](tests/README.md) explains the
+  offline fixtures and commands. Coverage is partial where explicitly marked;
+  mocks do not prove executable shell behavior, real handshakes, rendered UX
+  or cross-window locking.
+- `npm run test:known-defects` is a separate, intentionally failing command:
+  **3 failures, no skips**. Intended contracts expose asynchronous bridge
+  spawn errors not reaching the managed client, final stdout lost between
+  process `exit` and stdio `close`, and an in-flight stat reporting push
+  progress after completion. Production code remains unchanged.
+- Review correction: the green transport tests now emit stdio `close` before
+  checking terminal events and listener cleanup. They no longer require valid
+  bytes between `exit` and `close` to be discarded; the separate red test
+  retains that intended delivery contract.
+- Other plan gaps remain open: extraction can falsely publish success after
+  tar failure; repair-before-health can mask lost token/install state;
+  mixed-user/process selection, resolver taxonomy, token validation, stale
+  ports/identity and current-window folder reuse need further work. Root
+  fallback and multi-user policy discrepancies remain undecided.
+
+**Resume only when Task 3 is explicitly authorized.** Read
+`TASK-03-CONNECTION-CORRECTNESS.md`, `REGRESSION_TEST_PLAN.md` and the coverage
+report before correctness work; demonstrate failures before repairs. The task
+documents and plan were available in the primary checkout at
+`/path/to/repository/`, not in this worktree. Task 3 has not
+begun. No live Incus/VS Code checks, executable script/relay checks, real
+downloads, redeploy, commit or push occurred during Task 2. Updating this
+handover does not authorize those actions.
+
+Previous stopping point: related-project and distribution research is recorded
 in `ALTERNATIVES.md` and linked from README/DESIGN. No equivalent public
 Incus exec-based resolver was found. Workshop and ssh2incus are the closest
 comparisons; no publication was attempted. No public API GA timeline was found.
@@ -330,8 +369,10 @@ select explicitly; never "first instance".
    leads with stderr/exit status, catches log full detail, prune non-fatal);
    open: `RemoteAuthorityResolverError` usage for the §7 taxonomy (deleted
    instance → NotAvailable unresolvable, starting → TemporarilyNotAvailable, …).
-3. Tests (§12.6): mechanics harness against `fixture-container`; resolver contract
-   on stable; matrix smoke x64/arm64 (Ubuntu/Debian) — mind the ISOLATION RULE.
+3. Tests (§12.6): accepted Task 2 offline baseline is in `tests/` (see current
+   stopping point and `tests/COVERAGE.md`). Correctness work is gated on Task 3
+   authorization. Later live mechanics/resolver and x64/arm64 matrix checks
+   require their own task scope — mind the ISOLATION RULE.
 4. Packaging (§12.7): CI-built VSIX + OpenVSX publish + README argv step
    (README stub exists). Decide final naming/publisher (§11.1) first.
 
@@ -373,6 +414,8 @@ src/
   logging.ts               output channel (+ REMOTE_INCUS_DEBUG_LOG mirror)
   types/                   proposal d.ts pinned to vscode 1.142.0
 assets/relay.js            bundled relay (staged in-instance per install)
+tests/                     offline baseline, fixtures and separate known-defect tests
+tests/COVERAGE.md          plan-ID coverage, limits, defects and verification
 scripts/                   smoke harness + vscode stub
 spike/                     Phase-0 artifacts (reference only)
 ```

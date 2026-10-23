@@ -1,4 +1,4 @@
-# Offline harness (task 1 only)
+# Offline regression baseline (tasks 1 and 2)
 
 Run `npm test` with installed dependencies and Node 22.13+ (the extension build
 also targets Node 22). Verified locally with Node 24.21.0. No additional test
@@ -26,7 +26,8 @@ hangs. Normal test completion/failure cleans temporary output; forced process
 termination relies on the CI runner's temporary-directory cleanup.
 
 These commands are CI-ready; no provider-specific workflow is added in task 1.
-The verification so far is local, not a run on a hosted CI worker.
+Verification is local, not a run on a hosted CI worker. Task 2 coverage and
+its exact limits are recorded in [COVERAGE.md](COVERAGE.md).
 
 ## Structure
 
@@ -34,11 +35,14 @@ The verification so far is local, not a run on a hosted CI worker.
   into a temporary directory, runs Node's built-in test runner, propagates its
   exit status, and removes build output even on failure.
 - `support/vscode.ts`: test-only events, disposables, subscription registration,
-  and configurable workspace settings. Emitters register with the fixture for
-  cleanup. It deliberately implements only the API needed for harness checks.
+  and fixture-scoped workspace/authority settings, URI/tree models, command
+  registration and controlled host actions. Emitters register for cleanup.
+  This is a minimal host substitute, not a VS Code implementation.
 - `support/fixture.ts`: per-fixture AsyncLocalStorage, FIFO expectations, call
   recording, controlled children with real EventEmitter/PassThrough streams,
-  temporary directories, cleanup callbacks, and fetch interception. Node's mock
+  temporary directories, cleanup callbacks, and fetch interception. FIFO
+  expectations take precedence over explicitly configured operation routes;
+  routes model variable-count operations such as port polls. Node's mock
   clock controls Date, timeout, interval and immediate scheduling and resets in
   finally. Cleanup attempts every registered action even if another one fails.
 - `harness.test.ts`: five harness checks covering events/disposal, failure-path
@@ -55,7 +59,7 @@ expectations also fail. Fetch never delegates to the host implementation.
 Production `esbuild.js` is unchanged and keeps `vscode` external. Test sources
 are excluded from VSIX packaging.
 
-## Adding tests after scope approval
+## Adding offline tests
 
 Add `tests/name.test.ts` and import real code from `../src/…`. Use:
 
@@ -81,6 +85,23 @@ Use sequential fixtures within each test file: mock clocks and fetch are global
 in that test process, so concurrent fixtures are unsupported. Separate test
 files run in isolated Node test processes.
 
+## Known defects, separate from the baseline
+
+`npm test` runs the passing top-level tests with no skips. Run
+`npm run test:known-defects` explicitly to execute intended contracts in
+`tests/known-defects/`. This command currently exits nonzero with three failures;
+these are real failures, not expected-failure inversions or skipped checks.
+Do not use it as the green CI gate until separately authorized repairs land.
+Typecheck includes both suites. See [COVERAGE.md](COVERAGE.md) for evidence.
+
+`support/scenario.ts` supplies a temporary-storage context and semantic remote
+command model. It recognizes script intent and rejects unmodeled scripts;
+it does not execute scripts or prove their shell behavior. Tests use unique
+instance refs to avoid identity-cache leakage across fixtures; production module
+state is deliberately retained when testing retries, caching and deduplication.
+Commands and VS Code env/workspace data are fixture-owned. No production-source
+testability changes were necessary.
+
 ## Limits and boundary
 
 This is a controlled module boundary, not an OS sandbox. Host filesystem APIs
@@ -94,7 +115,7 @@ future stateful source tests need deliberate module-state isolation or a small
 reviewed dependency boundary. Fixtures isolate their own state and resources.
 
 Live smoke/fresh-install scripts remain separate and explicitly opt-in. This
-suite does not execute shell scripts, start a relay, contact Incus, validate
-application defects, or establish connection regression coverage. No production
-source change is needed or proposed. Task 1 stops here for discussion before
-regression coverage, correctness fixes, integration tests or optimization.
+suite does not execute shell scripts, start a real relay, or contact Incus.
+Task 1 was accepted by the user before Task 2 began. Task 2 establishes the
+bounded offline coverage described in COVERAGE.md, exposes defects separately,
+and stops for discussion before correctness work, live checks or optimization.
