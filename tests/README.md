@@ -1,4 +1,4 @@
-# Offline regression and script checks (tasks 1–3)
+# Regression, script and relay verification
 
 Run `npm test` with installed dependencies and Node 22.13+ (the extension build
 also targets Node 22). Verified locally with Node 24.21.0. No additional test
@@ -13,6 +13,7 @@ from the repository root. The existing lockfile supplies dependency versions:
 ```sh
 npm ci --include=dev
 npm test
+npm run test:relay
 npm run typecheck
 npm run compile
 ```
@@ -118,4 +119,80 @@ reviewed dependency boundary. Fixtures isolate their own state and resources.
 
 Live smoke/fresh-install scripts remain separate and explicitly opt-in. The
 suite executes local shell cases but does not start a real relay or contact
-Incus. Task 3 stops for discussion before real-handshake checks or optimization.
+Incus. The separate Task 4 relay/live commands and completed verification
+evidence are described below. Its discussion gate has been resolved; further
+work requires explicit next-step authorization.
+
+## Task 4 portable verification and private manual integration
+
+Scoped verification is complete; see [TASK-04-RESULTS.md](../TASK-04-RESULTS.md).
+The Ports view was unavailable, so real VS Code forwarding is unverified.
+Already-open identical-folder new-window requests reuse the existing window;
+distinct-folder concurrent windows and reconnect passed. The results have been
+discussed and the Task 4 discussion gate resolved; fixes or further testing
+still require explicit next-step authorization.
+
+`npm run test:relay` runs the bundled relay with real local TCP sockets and child
+processes. `node scripts/verify-relay.cjs --exercise-failure-cleanup` also
+injects a failure with two live channels and requires cleanup to pass. It checks all byte values, simultaneous independent channels, stdin
+EOF, peer closure, connection refusal, stdout EPIPE and repeated teardown. Every
+wait is bounded; cleanup runs after failures as well as success. It needs Node
+and loopback TCP access, no Incus daemon, server download or credentials. CI may
+run this alongside `npm test`; the latter includes the executable bash cases.
+
+`scripts/verify-live.ts` is **manual and destructive**, excluded from CI and
+packaging. It refuses missing/implicit targets, missing destructive opt-in and
+any nonempty `CI` environment variable. There is no repository-owned remote,
+address or instance. Supply `INCUS_TEST_TARGET` privately as an explicit
+`remote:instance` and `INCUS_TEST_ALLOW_DESTRUCTIVE=yes` only after establishing
+that the instance is test-owned, idle and permitted by local isolation rules.
+It removes the selected user's server installation and replaces running server
+processes on that fixture; do not use a personal workspace or active session.
+It never creates/deletes instances or changes daemon configuration.
+
+After setting the three runtime variables privately, build/run from the repo
+root using installed dependencies:
+
+```sh
+task4_bundle=$(mktemp /tmp/remote-incus-live-XXXXXX.cjs)
+trap 'rm -f "$task4_bundle"' EXIT
+./node_modules/.bin/esbuild scripts/verify-live.ts --bundle --platform=node \
+  --alias:vscode=./scripts/vscode-stub.js --outfile="$task4_bundle" &&
+  node "$task4_bundle"
+```
+
+Keep its output private; it intentionally emits fixed scenario labels and suppresses
+production diagnostics. Do not put target values into scripts, workflow files,
+reports or committed shell history. Delete the temporary bundle afterward.
+The context, downloads and server installation created by the run are removed
+at completion; inspect cleanup failures before any retry. There is no promise
+to restore the fixture's preexisting server installation.
+
+The manual harness checks fresh install, healthy reuse with two signed
+management channels and live protocol traffic, installed-but-stopped startup,
+missing token, wiped installation, explicit reset and a synthetic stale-commit
+process. It performs a WebSocket upgrade, token authentication and signed
+management handshake, requiring signature validation and `ok` for the valid token and
+`error` for an invalid token. Supply the installed stable client's `vsda` module
+path privately in `INCUS_TEST_VSDA_PATH`; no binary is copied into the repo.
+It sends a protocol disconnect before EOF. A management handshake through the
+bundled relay does not prove editor/terminal/forwarded-port behavior; those
+require a real development window.
+
+For window checks, use a fresh temporary `--user-data-dir` and
+`--extensions-dir`, this checkout's isolated bundle through
+`--extensionDevelopmentPath`, and `--enable-proposed-api=local-dev.remote-incus`.
+Do not install a VSIX, run redeploy.sh or restart normal windows. Supply only
+the authorized explicit authority at runtime. User data, logs and history may
+contain private infrastructure details: keep them outside the repository and
+remove them after the development windows exit. Check, with user assistance:
+
+- Remote Explorer selector, row selection, hover/context actions and icons.
+- Restricted Mode activation, progress and show-log link.
+- Current/new-window intent, recent folders and one-step folder reconnect.
+- Two concurrent windows, file access and integrated terminal.
+- A fixture-owned loopback HTTP listener, forwarded port, reload/reconnect.
+
+Record actual observations separately from static/offline assertions. Report
+unavailable checks as unverified. Stable is primary; Insiders is additional
+only when installed. Do not attach raw private logs or token values to reports.

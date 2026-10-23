@@ -11,8 +11,8 @@ same slot Dev Containers / Remote-SSH occupy in the Remote Explorer.
 
 - Instances are addressed via the existing `incus` client configuration
   (`incus remote list`) — the auth boundary is the Incus daemon identity (TLS
-  client certs / trust tokens / OIDC). No SSH anywhere, no listening ports in
-  the instance.
+  client certs / trust tokens / OIDC). No SSH or externally exposed instance
+  ports are required; the VS Code server listens only on instance loopback.
 - The transport is `incus exec … -- node relay.js`: the child's stdio is the
   byte transport, wrapped as a VS Code managed remote connection.
 - The VS Code server is downloaded client-side (cache + sha256-verified),
@@ -39,7 +39,24 @@ and opt in once via `~/.vscode/argv.json`:
 ```
 
 Then install the VSIX: `code --install-extension remote-incus.vsix`.
-Requires: incus ≥ 6.0, Linux client, instances with glibc (x64/arm64).
+Target requirements: incus ≥ 6.0, Linux client, instances with glibc (x64/arm64).
+Task 4 verified Linux x64 with Stable 1.143.1 and Incus 7.5.1; arm64 and
+Insiders were not exercised in that verification.
+
+## Verification status
+
+Task 4 verification is complete; its results have been discussed and the user
+has resolved the discussion gate. Real shell/relay
+checks and explicitly authorized local/TLS integration passed, along with
+user-assisted files, terminals, Restricted Mode, distinct-folder concurrent
+windows and reload/folder reconnect. See [the evidence report](TASK-04-RESULTS.md)
+for versions, cleanup and exact limits.
+
+Two findings remain: requesting a new window for an already-open remembered
+folder focuses its existing window, and the Ports view is unavailable, leaving
+actual VS Code port forwarding unverified. No production fixes were made in
+Task 4. The findings remain open; further work requires explicit next-step
+authorization.
 
 ## Development
 
@@ -47,16 +64,23 @@ The offline Node suite uses the existing local dependencies. After `npm ci`:
 
 ```sh
 npm test
+npm run test:relay
 npm run typecheck
 npm run compile
 ```
 
 `npm test` needs no VS Code installation, Incus binary/daemon, credentials,
-network access or server download. See [tests/README.md](tests/README.md) for
-fixtures and adding tests. The live `scripts/smoke.ts` and
-`scripts/fresh-install-test.ts` scripts are separate, explicitly opt-in checks;
-`npm test` never invokes them. Fresh-install checks require a separately
-approved, test-owned target.
+internet access or server download. `npm run test:relay` additionally needs
+local loopback TCP sockets and runs the bundled relay as real child processes.
+These portable checks can run in CI without private infrastructure.
+
+The manual `scripts/verify-live.ts` verifier is separate: it refuses CI and
+requires an explicit runtime target, destructive opt-in and the installed
+client's signing-module path. Establish that the fixture is test-owned and idle
+before use. No instance is created/deleted automatically, and target values or
+raw private logs belong outside tracked artifacts. See
+[tests/README.md](tests/README.md) for commands and boundaries. The older
+smoke/fresh-install scripts are not CI entry points.
 
 ```
 npm install

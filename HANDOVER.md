@@ -20,7 +20,48 @@ with a Docker container".
 3. `ALTERNATIVES.md` — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current state (2026-10-23, Task 3 worktree)
+## Current state (2026-10-23, Task 4 verification)
+
+Task 3 completion and discussion were explicitly confirmed before Task 4.
+Task 4 scoped verification is complete. **Its results have been discussed and
+the user explicitly resolved the Task 4 discussion gate.** Read
+[TASK-04-RESULTS.md](TASK-04-RESULTS.md) for evidence and limitations.
+
+- 80 tests pass with no skips; generated bash and the bundled relay execute
+  against local temporary fixtures. Relay binary/channel/error/EOF checks and
+  injected-failure cleanup pass.
+- Explicitly authorized idle local and TLS cluster fixtures pass signed
+  management handshakes, healthy reuse with parallel channels, normal startup,
+  missing-token/wiped-install recovery, reset and synthetic stale replacement.
+  UID/modes/content, loopback listeners and temporary-file cleanup are asserted.
+- User-assisted Stable development-window checks pass selection/actions,
+  themes, actual remote Restricted Mode, files, integrated/rescue terminals,
+  distinct-folder concurrent windows, history removal and reload/reconnect.
+- Two findings remain: identical-folder new-window requests reuse the existing
+  window in the tested runtime; Ports is unavailable, so actual VS Code
+  forwarding remains unverified. Reproductions and runtime-source evidence are
+  in the report. No production fixes were attempted.
+- Ports cause confirmed by installed-runtime comparison: Dev Containers
+  0.469.0 calls `setContext('forwardedPortsViewEnabled', true)` during its
+  resolver setup. VS Code 1.143.1 gates Ports-view registration on this feature
+  context (or its view-only counterpart). The Incus resolver does not enable
+  it, explaining the missing view in the clean Incus test profile. Enabling
+  the UI and proving actual forwarded-loopback connectivity are both still
+  required for a complete fix; underlying forwarding remains unverified.
+- Test processes, installations, temporary workspaces/HTTP service, private
+  development profile and diagnostic/bundle files were cleaned and checked.
+  Production/test and harness typechecks, isolated compile and diff checks pass.
+
+The new manual verifier requires runtime target/opt-in/signing-module inputs
+and refuses CI. Neither private fixture is a CI dependency; identifying target
+values/logs are excluded from the new verification artifacts. Preexisting
+repository content/history still requires a separate publication privacy audit.
+No production source changes, deployment, normal-session restart, commit or
+push. The two findings remain open; resolving the discussion gate does not
+implement their fixes or authorize the next task. **Wait for an explicit
+next-step instruction before implementation, optimization or further live work.**
+
+## Previous state (2026-10-23, Task 3 worktree)
 
 Task 3 is complete offline and **stopped for discussion** in
 `/path/to/task-worktree`. The user authorized
@@ -394,10 +435,12 @@ select explicitly; never "first instance".
    leads with stderr/exit status, catches log full detail, prune non-fatal);
    open: `RemoteAuthorityResolverError` usage for the §7 taxonomy (deleted
    instance → NotAvailable unresolvable, starting → TemporarilyNotAvailable, …).
-3. Tests (§12.6): accepted Task 2 offline baseline is in `tests/` (see current
-   stopping point and `tests/COVERAGE.md`). Correctness work is gated on Task 3
-   authorization. Later live mechanics/resolver and x64/arm64 matrix checks
-   require their own task scope — mind the ISOLATION RULE.
+3. Tests (§12.6): Task 3 correctness and scoped Task 4 real-behavior verification
+   are complete; see `tests/COVERAGE.md` and `TASK-04-RESULTS.md`. Discuss the
+   identical-folder window behavior and unavailable Ports view before further
+   work. Insiders, arm64 and additional version/image checks remain unverified;
+   expanding that matrix requires separate authorization. Private fixtures are
+   manual runtime inputs, not CI dependencies.
 4. Packaging (§12.7): CI-built VSIX + OpenVSX publish + README argv step
    (README stub exists). Decide final naming/publisher (§11.1) first.
 
@@ -421,7 +464,8 @@ transport, token policy, and user policy are frozen after evidence.
 
 ```
 DESIGN.md                  canonical architecture + findings + plan
-HANDOVER.md                this file
+HANDOVER.md                current stopping point and historical context
+TASK-04-RESULTS.md         real-behavior evidence, findings and limits
 package.json               extension manifest (proposals, views, commands, settings)
 tsconfig.json / esbuild.js build config (bundle → dist/extension.js)
 redeploy.sh                dev loop: build + package + install + relaunch
@@ -439,8 +483,8 @@ src/
   logging.ts               output channel (+ REMOTE_INCUS_DEBUG_LOG mirror)
   types/                   proposal d.ts pinned to vscode 1.142.0
 assets/relay.js            bundled relay (staged in-instance per install)
-tests/                     offline baseline, fixtures and separate known-defect tests
+tests/                     regression/script suite, fixtures and coverage
 tests/COVERAGE.md          plan-ID coverage, limits, defects and verification
-scripts/                   smoke harness + vscode stub
+scripts/                   portable relay check, opt-in live verifier, older harnesses
 spike/                     Phase-0 artifacts (reference only)
 ```

@@ -38,9 +38,10 @@ test('S B4: actual token setup mints atomically and preserves a healthy token', 
   const token = `${f.directory}/home/.vscode-server/data/Machine/.incus-conn-token`;
   assert.equal(spawnSync('bash', ['-c', script]).status, 0);
   const original = readFileSync(token, 'utf8');
-  assert.match(original, /^[A-Za-z0-9]{43}$/); assert.equal(statSync(token).mode & 0o777, 0o600);
+  assert.ok(/^[A-Za-z0-9]{43}$/.test(original), 'token must contain 43 alphanumeric characters');
+  assert.equal(statSync(token).uid, process.getuid!()); assert.equal(statSync(token).mode & 0o777, 0o600);
   assert.equal(existsSync(`${token}.tmp`), false);
   chmodSync(token, 0o644);
   assert.equal(spawnSync('bash', ['-c', script]).status, 0);
-  assert.equal(readFileSync(token, 'utf8'), original); assert.equal(statSync(token).mode & 0o777, 0o600);
+  assert.ok(readFileSync(token, 'utf8') === original, 'sticky token must be unchanged'); assert.equal(statSync(token).mode & 0o777, 0o600);
 }));

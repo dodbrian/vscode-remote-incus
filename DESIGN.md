@@ -44,7 +44,7 @@ This research does not change the frozen transport decision.
 The core architectural decision, validated end-to-end:
 
 - **No SSH anywhere**: no sshd in instances, no ssh client, no `~/.ssh/*` involvement,
-  no listening network ports in instances, no published ports.
+  no externally exposed instance ports; the server listens on 127.0.0.1.
 - **Auth boundary = the Incus daemon identity** (TLS client certs / trust tokens / OIDC
   via the user's existing `incus` client configuration; `incus --remote <host>` handles
   remote daemons for free).
@@ -59,7 +59,10 @@ Wiring through the VS Code API:
 - terminal/PTY traffic is **multiplexed over the management channel** (no extra dial);
 - if no custom `tunnelFactory` is returned, **core synthesizes one for forwarded app
   ports** — dialing `makeConnection()` once per forwarded port and running the server's
-  tunnel protocol itself. Phase 1 relies on this; phase 2 may optimize per-port via
+  tunnel protocol itself. This API path still requires Ports feature activation:
+  Task 4 found the Ports view unavailable, so actual forwarding remains unverified
+  ([evidence](TASK-04-RESULTS.md#observed-integration-gap-ports-view-unavailable)).
+  Phase 1 intends to use the core path; phase 2 may optimize per-port via
   `incus port-forward` (Incus ≥ 7.3, not available on the 6.0.5 dev host) or hotplug
   ephemeral proxy devices.
 
@@ -416,6 +419,29 @@ compat layer in §14):
   daemon: 217 MB push ≈ 1 s (~200 MB/s unix socket) vs fixture-remote's 2.1 MB/s
   TLS websocket ceiling.
 
+### Task 4 real-behavior verification (2026-10-23)
+
+Task 3 completion/discussion was confirmed before Task 4. Real generated bash
+and bundled-relay checks passed, including failure propagation and bounded
+cleanup. Authorized local and TLS cluster fixtures passed signed management
+handshakes, ownership/mode/content assertions, healthy reuse with live parallel
+channels, ordinary startup, wiped-install/token recovery, reset and synthetic
+stale-process replacement. The local run also requires fresh channel traffic
+after reuse returns. This does not test an actual old server binary.
+
+Stable 1.143.1 development windows passed files, integrated/rescue terminals,
+remote Restricted Mode, history removal, distinct-folder concurrent windows
+and reload/one-step reconnect. Two findings remain: an already-open identical
+folder is reused despite a new-window request; Ports is unavailable, so the
+forwarded application path remains unverified. Runtime-source inspection and
+reproductions are recorded in [TASK-04-RESULTS.md](TASK-04-RESULTS.md).
+
+No production code or frozen policy was changed. Test fixtures/processes,
+private profile and temporary artifacts were cleaned. The user subsequently
+discussed the results and resolved the Task 4 discussion gate. The findings
+remain open; implementation, optimization and further live work still require
+explicit next-step authorization.
+
 ## 9. Distribution & licensing constraints
 
 - Extension source: MIT (copies may come from MIT sources: `jeanp413/open-remote-ssh`,
@@ -435,11 +461,11 @@ compat layer in §14):
 | dimension | MVP | later |
 |---|---|---|
 | client OS | Linux | macOS, Windows (upstream client builds exist; CLI discovery TBD) |
-| client version | ≥ 1.140 (engine range `^1.140.0`); proposal d.ts verified byte-identical 1.140→1.142; live-verified on 1.142.0 only | proposal-shape change in a future client → extension fix release (runtime guard errors loudly, never silently) |
+| client version | ≥ 1.140 (engine range `^1.140.0`); proposal d.ts verified byte-identical 1.140→1.142; historically verified on 1.142.0; Task 4 verified scoped behavior on Stable 1.143.1, with window/Ports findings below | proposal-shape change in a future client → extension fix release (runtime guard errors loudly, never silently) |
 | daemon | local unix socket, remote TLS (`--remote`) | restricted remotes/projects |
 | Incus CLI (client) | ≥ 6.0 — verified on 6.0.5 and 7.5.1 (list-filter quirk: §14) | — |
 | Incus server / packaging | ≥ 6.0 — verified 6.0.5 (Ubuntu deb) and 7.5.1 (zabbly); packaging variant changes behavior (§14) | port-forward on ≥ 7.3 |
-| instance arch | x64, arm64 (glibc) | alpine-musl x64 |
+| instance arch | x64, arm64 (glibc) intended; Task 4 live checks cover x64 only | alpine-musl x64 |
 | explicit non-goals | musl-arm64 server (doesn't exist upstream) | — |
 
 ## 11. Open questions (recorded, with leaning)
@@ -474,8 +500,13 @@ compat layer in §14):
 5. Diagnostics: output channel, per-bridge structured logs, "collect diagnostics"
    command; sensible `RemoteAuthorityResolverError` usage. *(output channel +
    per-bridge logs + collect-diagnostics exist; error-taxonomy refinement open)*
-6. Tests: mechanics harness (install/start/dial against `fixture-container`), resolver
-   contract test on Insiders + stable, matrix smoke on x64/arm64 Ubuntu/Debian images.
+6. Tests: Task 3's 80-test correctness gate and Task 4's real shell/relay,
+   explicit-target local/TLS handshakes and Stable development-window checks
+   are complete within their recorded scope. See [Task 4 results](TASK-04-RESULTS.md).
+   Ports/identical-folder findings remain open after the completed discussion; Insiders and
+   arm64/additional image/version matrices remain unverified. Private fixtures
+   are manual runtime inputs, never CI dependencies. Do not begin further
+   testing or optimization without explicit next-step authorization.
 7. Packaging pipeline: CI-built VSIX + OpenVSX publish + README with the argv.json step.
 8. Incus version-compat layer (design sketch §14 — NOT yet implemented):
    version probe, behavioral adapter table, per-member/per-instance feature gates.

@@ -1,9 +1,11 @@
-# Task 3 coverage update
+# Regression coverage through Task 4
 
 See [TASK-03-RESULTS.md](../TASK-03-RESULTS.md) for the current behavior and
 failure-before-fix evidence. The historical Task 2 matrix below is retained as
 the accepted baseline, rather than rewritten as though script checks existed
 then. Its known-defect and separate-runner statements are superseded here.
+Task 4 real-behavior evidence and transport/window limits are recorded in
+[TASK-04-RESULTS.md](../TASK-04-RESULTS.md).
 
 - B3: actual captured extraction/probe scripts with corrupt archives,
   interrupted complete-looking installs, real SIGTERM after unpacking, stale
@@ -17,10 +19,14 @@ then. Its known-defect and separate-runner statements are superseded here.
 - C13 / uninstall / startup: actual bash injected prune rm/cd, uninstall rm
   and old-log rm failures. Prune remains nonfatal at orchestration level.
 
-Final gate: 80 passed, no failures/skips; typecheck and compile passed. Real
-handshake, relay and managed VS Code host behavior still need Task 4. No policy
-resolution or integration result is implied. All original defect tests now
-run with `npm test`; the separate known-defect command was removed.
+Task 3 gate: 80 passed, no failures/skips; typecheck and compile passed. The
+original defect tests run with `npm test`; the separate red command was removed.
+Task 4 subsequently verified real shell/relay, local/TLS handshakes and scoped
+Stable window behavior; see the overlay below and the evidence report. Ports
+forwarding remains unverified, and identical-folder new-window behavior is an
+outstanding finding. No deferred policy resolution or broader support matrix
+is implied. Task 4 results have been discussed and its discussion gate resolved;
+further work awaits explicit next-step authorization.
 
 ---
 
@@ -117,3 +123,21 @@ and command. Its sources are still typechecked.
 No live Incus/VS Code checks, real downloads, executable script/relay checks,
 redeploy, commit or push were performed. Task 3 has not begun. Stop here for
 discussion of coverage, gaps and defects before any correctness or live work.
+
+
+## Task 4 evidence overlay
+
+| IDs | Additional real evidence | Remaining distinction |
+| --- | --- | --- |
+| B3, B4, C13 | Generated bash executes against temporary filesystem fixtures; token mode/UID/content/sticky reuse and failure propagation asserted | Scoped failure injection, not a real remote permission-failure matrix |
+| T1, T2 | Bundled relay runs against loopback TCP: binary bytes, independent channels, EOF, refusal, peer closure, EPIPE, repeated teardown and injected-failure cleanup | Local TCP fixture; arbitrary-byte matrix not repeated across every Incus transport |
+| C5, B2, B4, B5 | Real local and TLS installs assert UID/modes/content, generated token shape, relay hash and temporary-file cleanup | GID/multi-user policy unchanged |
+| C8, C9, C10 | Both manual targets pass signed management handshakes, healthy reuse with parallel channels, normal startup and wiped-state/token recovery | Synthetic stale process, not an old server binary; no cross-window locking certification |
+| T3, T4 | Real protocol negotiation/disconnect and bounded cleanup; stale-process replacement | Managed-host window results are separately recorded; no multi-user sweep claim |
+| X1, X2, X5, X6 | User confirms selector, selection-only click, actions/icons/themes and Restricted Mode; transient unavailable warning/recovery observed | Rendering observations are separate from manifest/unit assertions |
+| X3, X4, X8 | Remote files with spaces/hash, integrated/rescue terminals, history removal, distinct-folder concurrent windows and reload/one-step reconnect pass | Already-open identical-folder new-window behavior and missing Ports are reported findings; forwarding unverified |
+
+Manual targets and their identifying logs remain outside tracked artifacts.
+Neither private fixture is a CI dependency. The standalone live harness refuses
+CI and requires explicit target and destructive opt-in; no fixture is created
+or deleted automatically. See tests/README.md for commands and boundaries.
