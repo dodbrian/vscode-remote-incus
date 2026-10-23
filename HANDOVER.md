@@ -17,10 +17,18 @@ with a Docker container".
 2. This file — operational context: environment snapshot, dev loop,
    debugging traps, and exactly where to resume.
 
+3. `ALTERNATIVES.md` — related projects, sources, search limits, and
+   Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
+
 ## Current state (session end 2026-10-23, main)
 
-Latest stopping point: tree icon parity and removal of the redundant
-`Running` row description are deployed and user-verified. Compared against
+Latest stopping point: related-project and distribution research is recorded
+in `ALTERNATIVES.md` and linked from README/DESIGN. No equivalent public
+Incus exec-based resolver was found. Workshop and ssh2incus are the closest
+comparisons; no publication was attempted. No public API GA timeline was found.
+
+Tree icon parity and removal of the redundant `Running` and `Stopped` row
+descriptions are deployed and user-verified. Compared against
 the installed Dev Containers 0.469.0: disconnected running instances use
 `ThemeIcon('vm-running')`, stopped instances use `ThemeIcon('vm')`, and the
 connected instance uses the per-theme `vm-active.svg` check-dot asset.

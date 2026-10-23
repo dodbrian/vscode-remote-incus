@@ -13,7 +13,7 @@ the Phase-1 plan.
 ## 1. Problem & approach
 
 Official VS Code remote development ships fixed connection types (Remote-SSH, Dev
-Containers, WSL, Tunnels). None attaches to an Incus/LXD instance. The Dev Containers
+Containers, WSL, Tunnels). None provides a native Incus exec transport. The Dev Containers
 extension cannot be extended toward Incus: its runtime surface is hardcoded to a
 Docker-compliant CLI (variants: Docker / Podman / wslc only; nerdctl/Singularity/crictl
 requests open since 2020–2021, never acted on), and Incus does not speak the Docker
@@ -29,7 +29,15 @@ provider — the same proposed-API surface third parties already use in producti
 - distribution: VSIX / OpenVSX; on Microsoft stable builds the user opts in once via
   `~/.vscode/argv.json`: `"enable-proposed-api": ["<publisher>.remote-incus"]`
   (verified working in the spike; marketplace publishing of proposed-API extensions is
-  not permitted — OpenVSX/VSIX is the sanctioned alternative)
+  not permitted under the documented policy; VSIX sharing is documented,
+  and Open VSX is a prospective additional registry)
+
+Related-project research (2026-10-23): [ALTERNATIVES.md](ALTERNATIVES.md)
+compares Workshop, ssh2incus, the LXD explorer, isx, bubble, and XPipe.
+No equivalent public Incus resolver was found; similar full-development
+workflows exist through SSH. Avoid "first" or "only" claims. Workshop is the
+closest extension UX; ssh2incus already avoids per-instance SSH servers.
+This research does not change the frozen transport decision.
 
 ## 2. Transport: exec-stdio, no SSH (frozen)
 
@@ -416,8 +424,11 @@ compat layer in §14):
   developer use is fine; building a hosted service on it is not (server license
   aka.ms/vscode-server-license). The extension never redistributes the binary — it
   fetches from the official URL at runtime.
-- Marketplace: proposed-API extensions can't be published there → OpenVSX + VSIX;
-  stable builds need the one-time `argv.json` opt-in (spike-verified).
+- Marketplace: the documented policy excludes proposed-API extensions.
+  Use VSIX sharing; Open VSX is a prospective additional registry, with
+  comparable proposed-API extensions already listed. Acceptance is not
+  guaranteed. Stable builds need the one-time `argv.json` opt-in
+  (spike-verified). See [distribution research](ALTERNATIVES.md#distribution-implications).
 
 ## 10. Support matrix (MVP)
 

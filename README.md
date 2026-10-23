@@ -19,6 +19,14 @@ same slot Dev Containers / Remote-SSH occupy in the Remote Explorer.
   pushed with `incus file push`, and started detached as the instance's
   primary unprivileged user.
 
+## Similar projects
+
+Canonical Workshop provides LXD development environments through Remote-SSH;
+ssh2incus provides an Incus SSH gateway without per-instance SSH servers.
+Remote - Incus connects through the existing Incus client using exec-stdio,
+without SSH setup or a separate gateway. See `ALTERNATIVES.md` in the source
+repository for the dated comparison, sources, and distribution research.
+
 ## Install (VS Code stable)
 
 Proposed APIs are not permitted on the Marketplace; install from VSIX/OpenVSX
