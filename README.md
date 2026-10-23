@@ -43,6 +43,21 @@ Requires: incus ≥ 6.0, Linux client, instances with glibc (x64/arm64).
 
 ## Development
 
+The offline Node suite uses the existing local dependencies. After `npm ci`:
+
+```sh
+npm test
+npm run typecheck
+npm run compile
+```
+
+`npm test` needs no VS Code installation, Incus binary/daemon, credentials,
+network access or server download. See [tests/README.md](tests/README.md) for
+fixtures and adding tests. The live `scripts/smoke.ts` and
+`scripts/fresh-install-test.ts` scripts are separate, explicitly opt-in checks;
+`npm test` never invokes them. Fresh-install checks require a separately
+approved, test-owned target.
+
 ```
 npm install
 npm run typecheck

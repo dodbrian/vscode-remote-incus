@@ -11,3 +11,4 @@ redeploy.sh
 HANDOVER.md
 DESIGN.md
 ALTERNATIVES.md
+tests/**

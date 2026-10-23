@@ -261,10 +261,11 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tests/tsconfig.json",
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "package": "npx --yes @vscode/vsce@latest package --allow-missing-repository -o remote-incus.vsix"
+    "package": "npx --yes @vscode/vsce@latest package --allow-missing-repository -o remote-incus.vsix",
+    "test": "node tests/build.cjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
