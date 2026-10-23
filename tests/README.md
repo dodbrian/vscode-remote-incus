@@ -1,4 +1,4 @@
-# Offline regression baseline (tasks 1 and 2)
+# Offline regression and script checks (tasks 1–3)
 
 Run `npm test` with installed dependencies and Node 22.13+ (the extension build
 also targets Node 22). Verified locally with Node 24.21.0. No additional test
@@ -85,14 +85,16 @@ Use sequential fixtures within each test file: mock clocks and fetch are global
 in that test process, so concurrent fixtures are unsupported. Separate test
 files run in isolated Node test processes.
 
-## Known defects, separate from the baseline
+## Task 3 correctness regressions
 
-`npm test` runs the passing top-level tests with no skips. Run
-`npm run test:known-defects` explicitly to execute intended contracts in
-`tests/known-defects/`. This command currently exits nonzero with three failures;
-these are real failures, not expected-failure inversions or skipped checks.
-Do not use it as the green CI gate until separately authorized repairs land.
-Typecheck includes both suites. See [COVERAGE.md](COVERAGE.md) for evidence.
+All repaired known-defect cases now run in `npm test`; the separate red command
+was removed. See [Task 3 results](../TASK-03-RESULTS.md) for failure-before-fix
+evidence and remaining boundaries. `recovery.test.ts` and
+`mutating-scripts.test.ts` deliberately load local child_process through
+createRequire to execute captured production bash in temporary directories.
+They require bash, tar and ordinary GNU/Linux utilities, redirect selected home
+and archive paths, and never invoke Incus or launch a real server. This is the
+explicit script-test exception to the mocked process boundary.
 
 `support/scenario.ts` supplies a temporary-storage context and semantic remote
 command model. It recognizes script intent and rejects unmodeled scripts;
@@ -114,8 +116,6 @@ source module state between test files, not between fixtures in the same file;
 future stateful source tests need deliberate module-state isolation or a small
 reviewed dependency boundary. Fixtures isolate their own state and resources.
 
-Live smoke/fresh-install scripts remain separate and explicitly opt-in. This
-suite does not execute shell scripts, start a real relay, or contact Incus.
-Task 1 was accepted by the user before Task 2 began. Task 2 establishes the
-bounded offline coverage described in COVERAGE.md, exposes defects separately,
-and stops for discussion before correctness work, live checks or optimization.
+Live smoke/fresh-install scripts remain separate and explicitly opt-in. The
+suite executes local shell cases but does not start a real relay or contact
+Incus. Task 3 stops for discussion before real-handshake checks or optimization.

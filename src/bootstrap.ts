@@ -14,8 +14,9 @@
  *   2. flavor    — in-instance arch/libc probe → server build
  *   3. commit    — client commit (vscode.env.appCommit, CLI fallback);
  *                  server and client must match by commit
- *   4. install?  — if bin/<commit> already holds a complete install (marker
- *                  or core files), the tarball steps are skipped entirely
+ *   4. install?  — core files must be complete with no in-progress marker;
+ *                  assess process health before any repair, then skip tarball
+ *                  steps entirely for a complete installation
  *   5. download  — client-side, cached under globalStorage, sha256 recorded
  *   6. push      — `incus file push` PATH mode; skipped when the remote copy
  *                  already matches (sha256 compared before every push)
@@ -302,8 +303,8 @@ async function ensureTarballInInstance(ref: InstanceRef, identity: Identity, tar
 async function isServerInstalled(ref: InstanceRef, identity: Identity, commit: string): Promise<boolean> {
   const dir = `${identity.home}/${VS_SERVER_DIR}/bin/${commit}`;
   const out = await execInInstance(ref, [
-    `if [ -f ${sq(`${dir}/.incus-install-ok`)} ]; then`,
-    `  echo yes`,
+    `if [ -f ${sq(`${dir}/.incus-installing`)} ]; then`,
+    `  echo no`,
     `elif [ -x ${sq(`${dir}/bin/code-server`)} ] && [ -f ${sq(`${dir}/out/server-main.js`)} ] && [ -x ${sq(`${dir}/node`)} ]; then`,
     `  echo yes`,
     `else`,
@@ -319,17 +320,20 @@ async function ensureExtracted(ref: InstanceRef, identity: Identity, commit: str
   report?.('extracting server…', 91);
   if (await isServerInstalled(ref, identity, commit)) {
     log(`server install for ${commit.slice(0, 10)}… already present — skipping extract`);
-    // Heal spike-era installs (no marker) so future checks are marker-fast.
+    // Record success for complete legacy installs too. A marker alone is not proof.
     await execInInstance(ref, `touch ${sq(marker)}`, { uid: identity.uid, home: identity.home });
     return;
   }
   const tmp = `/tmp/vscode-server-${flavor}-${commit}.tar.gz`;
   // rm first: a previously interrupted extract must not leave debris behind.
   await execInInstance(ref, [
+    `set -e`,
     `rm -rf ${sq(dir)}`,
     `mkdir -p ${sq(dir)}`,
+    `touch ${sq(`${dir}/.incus-installing`)}`,
     `tar -xzf ${sq(tmp)} -C ${sq(dir)} --strip-components=1`,
     `touch ${sq(marker)}`,
+    `rm -f ${sq(`${dir}/.incus-installing`)}`,
     `rm -f ${sq(tmp)}`,
   ].join('\n'), { uid: identity.uid, home: identity.home, timeoutMs: 300_000 });
 }
@@ -354,10 +358,12 @@ async function ensureToken(ref: InstanceRef, identity: Identity, report?: Report
   report?.('preparing token…', 95);
   const dir = `${identity.home}/${VS_SERVER_DIR}/data/Machine`;
   await execInInstance(ref, [
+    `set -e`,
     `mkdir -p ${sq(dir)}`,
     `if [ ! -s ${sq(tokenPath(identity.home))} ]; then`,
     `  ( umask 077`,
     `    tr -dc A-Za-z0-9 < /dev/urandom | head -c 43 > ${sq(tokenPath(identity.home))}.tmp`,
+    `    test "$(wc -c < ${sq(tokenPath(identity.home))}.tmp)" -eq 43`,
     `    mv ${sq(tokenPath(identity.home))}.tmp ${sq(tokenPath(identity.home))} )`,
     `  echo 'fresh token minted'`,
     `else`,
@@ -392,6 +398,7 @@ async function startServer(ref: InstanceRef, identity: Identity, commit: string)
   const bin = `${identity.home}/${VS_SERVER_DIR}/bin/${commit}/bin/code-server`;
   const logFile = logPath(identity.home);
   await execInInstance(ref, [
+    `set -e`,
     `rm -f ${sq(logFile)}`,
     `nohup ${sq(bin)} \\`,
     `  --host 127.0.0.1 --port 0 \\`,
@@ -432,7 +439,8 @@ async function sweepOrphanRelays(ref: InstanceRef): Promise<void> {
 async function pruneOldInstalls(ref: InstanceRef, identity: Identity, commit: string): Promise<void> {
   const binRoot = `${identity.home}/${VS_SERVER_DIR}/bin`;
   await execInInstance(ref, [
-    `cd ${sq(binRoot)} 2>/dev/null || exit 0`,
+    `set -e`,
+    `cd ${sq(binRoot)}`,
     'for d in */; do',
     '  d=${d%/}',
     `  [ "$d" = ${sq(commit)} ] && continue`,
@@ -476,19 +484,9 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
   await pruneServerCache(path.join(context.globalStorageUri.fsPath, 'server-cache'), commit);
   const flavor = await probeFlavor(ref, identity);
   report?.('checking for an existing server…');
-  if (await isServerInstalled(ref, identity, commit)) {
-    // The most common case: nothing to transfer at all — not even the local
-    // tarball as a sha reference.
-    log(`server install for ${commit.slice(0, 10)}… already present — skipping download/push/extract`);
-    report?.('server already installed', 90);
-  } else {
-    const tar = await downloadTarball(context, commit, flavor, report);
-    await ensureTarballInInstance(ref, identity, tar, commit, flavor, report);
-    await ensureExtracted(ref, identity, commit, flavor, report);
-  }
-  await stageRelay(context, ref, identity, report);
-  await ensureToken(ref, identity, report);
-
+  // Snapshot installation validity before any repair, including partial installs.
+  const installed = await isServerInstalled(ref, identity, commit);
+  // Assess the existing process before bootstrap can recreate its state.
   const running = await findRunningServerCommit(ref);
   let reuse = false;
   if (running) {
@@ -506,7 +504,7 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
         `test -f ${sq(logPath(identity.home))} &&`,
         `test -s ${sq(tokenPath(identity.home))} && echo yes || echo no`,
       ].join(' '))).trim() === 'yes';
-      if (healthy) {
+      if (healthy && installed) {
         reuse = true;
       } else {
         log(`running server on ${target(ref)} lost its install (zombie) — killing and starting fresh`);
@@ -514,6 +512,19 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
       }
     }
   }
+  if (installed) {
+    // The most common case: nothing to transfer at all — not even the local
+    // tarball as a sha reference.
+    log(`server install for ${commit.slice(0, 10)}… already present — skipping download/push/extract`);
+    report?.('server already installed', 90);
+  } else {
+    const tar = await downloadTarball(context, commit, flavor, report);
+    await ensureTarballInInstance(ref, identity, tar, commit, flavor, report);
+    await ensureExtracted(ref, identity, commit, flavor, report);
+  }
+  await stageRelay(context, ref, identity, report);
+  await ensureToken(ref, identity, report);
+
   if (reuse) {
     log(`server already running under ${commit.slice(0, 10)}… — reusing`);
   } else {
@@ -551,6 +562,7 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
 /** Root rm: must also catch /tmp leftovers pushed by root (mode 644 root:root). */
 export async function uninstallServer(ref: InstanceRef, identity: Identity): Promise<void> {
   await execInInstance(ref, [
+    `set -e`,
     `rm -rf ${sq(`${identity.home}/${VS_SERVER_DIR}`)}`,
     `rm -f /tmp/vscode-server-*.tar.gz`,
   ].join('\n'));

@@ -1,3 +1,29 @@
+# Task 3 coverage update
+
+See [TASK-03-RESULTS.md](../TASK-03-RESULTS.md) for the current behavior and
+failure-before-fix evidence. The historical Task 2 matrix below is retained as
+the accepted baseline, rather than rewritten as though script checks existed
+then. Its known-defect and separate-runner statements are superseded here.
+
+- B3: actual captured extraction/probe scripts with corrupt archives,
+  interrupted complete-looking installs, real SIGTERM after unpacking, stale
+  success markers, retry and complete legacy installation probes.
+- C10: pre-repair lost-token/install and partial-install reuse regressions;
+  healthy session preservation remains covered by the original baseline.
+- B4: actual mint/reuse/0600 checks and injected mkdir/mv/generator failures.
+- T3: synchronous/early rejection, published managed failure, trailing data,
+  abnormal/signal termination, duplicate and post-terminal suppression.
+- B6: late in-flight stat regression promoted into the passing suite.
+- C13 / uninstall / startup: actual bash injected prune rm/cd, uninstall rm
+  and old-log rm failures. Prune remains nonfatal at orchestration level.
+
+Final gate: 80 passed, no failures/skips; typecheck and compile passed. Real
+handshake, relay and managed VS Code host behavior still need Task 4. No policy
+resolution or integration result is implied. All original defect tests now
+run with `npm test`; the separate known-defect command was removed.
+
+---
+
 # Task 2 offline baseline
 
 Task 1 acceptance was explicitly confirmed by the user in this session before

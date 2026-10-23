@@ -99,13 +99,14 @@ export function boundaryModule(name: string, keys: string[]): object {
 // Installed before the test body imports source. Never delegate to host fetch.
 globalThis.fetch = ((...args: Parameters<typeof fetch>) => fixture().call('fetch', args)) as typeof fetch;
 
-export function childProcess(): EventEmitter & {
+export function childProcess(options: { spawn?: boolean } = {}): EventEmitter & {
   stdin: PassThrough; stdout: PassThrough; stderr: PassThrough; kill: () => boolean;
 } {
   const child = Object.assign(new EventEmitter(), {
     stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(),
     kill: () => true,
   });
+  if (options.spawn !== false) queueMicrotask(() => child.emit('spawn'));
   fixture().defer(() => {
     child.removeAllListeners();
     for (const stream of [child.stdin, child.stdout, child.stderr]) {

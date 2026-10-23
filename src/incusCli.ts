@@ -118,8 +118,9 @@ export function pushFile(ref: InstanceRef, localPath: string, remotePath: string
     const child = cp.spawn('incus', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let output = '';
     let last = 0;
+    let polling = true;
     const report = (percent: number): void => {
-      if (percent > last) {
+      if (polling && percent > last) {
         last = percent;
         opts.onProgress?.(last);
       }
@@ -137,7 +138,6 @@ export function pushFile(ref: InstanceRef, localPath: string, remotePath: string
     // 7.x fallback: size-poll the target file (1 Hz; stat hiccups never fail
     // the push). The poller stops with the push; one in-flight stat may
     // outlive it briefly and is ignored.
-    let polling = true;
     let totalBytes = 0;
     try { totalBytes = fs.statSync(localPath).size; } catch { /* size unknown → no % from polls */ }
     if (totalBytes > 0) {
@@ -146,10 +146,12 @@ export function pushFile(ref: InstanceRef, localPath: string, remotePath: string
         while (polling) {
           try {
             const size = Number((await incus(probe, { timeoutMs: 15_000 })).trim());
+            if (!polling) { break; }
             if (Number.isFinite(size) && size > 0) {
               report(Math.min(100, Math.floor((size / totalBytes) * 100)));
             }
           } catch { /* transient exec hiccup — the push itself decides success */ }
+          if (!polling) { break; }
           await new Promise((r) => setTimeout(r, 1000));
         }
       })();

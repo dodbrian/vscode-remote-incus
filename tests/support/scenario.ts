@@ -49,7 +49,7 @@ export function installedServer(f: Fixture, options: {
         else if (script.startsWith('uname -m')) output = 'x86_64\nglibc';
         else if (script.startsWith('if [ -f')) output = options.installed === false ? 'no' : 'yes';
         else if (script.startsWith('sha256sum')) output = script.includes('2>/dev/null') ? options.remoteSha ?? '' : options.pushedSha ?? '';
-        else if (script.startsWith('rm -rf') && script.includes('tar -xzf')) { if (options.extractionError) throw new Error('extract failed'); output = ''; }
+        else if (script.includes('tar -xzf')) { if (options.extractionError) throw new Error('extract failed'); output = ''; }
         else if (script.includes('fresh token minted')) output = '';
         else if (script.startsWith('pgrep')) output = options.running === '' ? '' : `10 /home/alice/.vscode-server/bin/${options.running ?? f.state.get('commit')}/out/server-main.js`;
         else if (script.startsWith('test -x')) output = options.healthy === false ? 'no' : 'yes';
@@ -58,7 +58,7 @@ export function installedServer(f: Fixture, options: {
         else if (script.startsWith('grep -s')) output = options.port ?? 'Extension host agent listening on 1234\nExtension host agent listening on 4567';
         else if (script.startsWith('cat ') && script.includes('server.log')) output = 'fixture startup diagnostic';
         else if (script.startsWith('cat ')) output = options.token ?? TOKEN;
-        else if (script.startsWith('cd ')) { if (options.pruneError) throw new Error('prune unavailable'); output = ''; }
+        else if (script.includes('cd ')) { if (options.pruneError) throw new Error('prune unavailable'); output = ''; }
         else { f.unexpected.push(`Unmodeled command: ${args.join(' ')}`); throw new Error('Unmodeled script'); }
       }
       callback(null, output, '');

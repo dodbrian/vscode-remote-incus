@@ -26,35 +26,48 @@ export function openBridge(session: ServerSession): Promise<vscode.ManagedMessag
       '--', nodeBin, remoteRelay,
     ]);
 
-    child.on('error', reject);
-
     const receive = new vscode.EventEmitter<Uint8Array>();
     const closed = new vscode.EventEmitter<Error | undefined>();
     const ended = new vscode.EventEmitter<void>();
 
-    child.stdout?.on('data', (d: Buffer) => receive.fire(new Uint8Array(d)));
+    child.stdout?.on('data', (d: Buffer) => { if (!terminal) { receive.fire(new Uint8Array(d)); } });
     child.stderr?.on('data', (d: Buffer) => {
       const line = d.toString().trim();
       if (line) { log(`[bridge ${target(ref)} stderr] ${line}`); }
     });
-    child.on('exit', (code, signal) => {
-      log(`bridge to ${target(ref)} exited: code=${code} signal=${signal}`);
-      if (code === 0) { ended.fire(); } else { closed.fire(new Error(`exec bridge died: code=${code} signal=${signal}`)); }
+    let terminal = false;
+    let published = false;
+    const finish = (error?: Error) => {
+      if (terminal) { return; }
+      terminal = true;
+      if (!published) { reject(error ?? new Error('exec bridge closed before spawn')); }
+      if (error) { closed.fire(error); } else { ended.fire(); }
       receive.dispose();
       closed.dispose();
       ended.dispose();
+    };
+    // Reject failed spawns before publication; established channels report closure.
+    child.on('error', (error: Error) => finish(error));
+    // exit may precede the final stdout bytes. close waits for stdio drainage.
+    child.on('close', (code, signal) => {
+      log(`bridge to ${target(ref)} closed: code=${code} signal=${signal}`);
+      finish(code === 0 ? undefined : new Error(`exec bridge died: code=${code} signal=${signal}`));
     });
 
-    resolve({
-      onDidReceiveMessage: receive.event,
-      onDidClose: closed.event,
-      onDidEnd: ended.event,
-      send: (data: Uint8Array) => {
-        if (child.stdin && !child.stdin.destroyed) { child.stdin.write(Buffer.from(data)); }
-      },
-      end: () => {
-        if (child.stdin && !child.stdin.destroyed) { child.stdin.end(); }
-      },
+    child.once('spawn', () => {
+      if (terminal) { return; }
+      published = true;
+      resolve({
+        onDidReceiveMessage: receive.event,
+        onDidClose: closed.event,
+        onDidEnd: ended.event,
+        send: (data: Uint8Array) => {
+          if (child.stdin && !child.stdin.destroyed) { child.stdin.write(Buffer.from(data)); }
+        },
+        end: () => {
+          if (child.stdin && !child.stdin.destroyed) { child.stdin.end(); }
+        },
+      });
     });
   });
 }

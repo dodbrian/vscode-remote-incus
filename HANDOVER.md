@@ -20,7 +20,32 @@ with a Docker container".
 3. `ALTERNATIVES.md` — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current state (session end 2026-10-23, Task 2 worktree)
+## Current state (2026-10-23, Task 3 worktree)
+
+Task 3 is complete offline and **stopped for discussion** in
+`/path/to/task-worktree`. The user authorized
+Task 3 after Task 2 acceptance and then explicitly included newly found
+regressions in this session. Changes remain uncommitted.
+
+Read [TASK-03-RESULTS.md](TASK-03-RESULTS.md) for changed behavior,
+failure-before-fix evidence, the expanded script audit and remaining limits.
+Final gates: 80 tests passed with no skips; typecheck, compile and diff check
+passed. Extraction/interruption, recovery, bridge lifecycle and newly included
+script/progress defects have retained regressions. Real handshakes remain
+unverified. No live mutations, VS Code restart, deployment, commit or push.
+Compilation used an isolated worktree-local dist directory.
+
+The user-supplied review found no actionable regressions across staged,
+unstaged and untracked changes, and reported all 80 offline tests and
+TypeScript checking passing. Production fixes are in `src/bootstrap.ts`,
+`src/bridge.ts` and `src/incusCli.ts`, with retained regression tests.
+Live Incus and VS Code handshake behavior remains unverified.
+
+**Wait for discussion. Do not begin Task 4 automatically.** Root fallback,
+multi-user scope, normal token lifecycle, transport and public error policy
+were not changed. The prior Task 2 record below is historical.
+
+## Previous state (session end 2026-10-23, Task 2 worktree)
 
 Latest stopping point: **Task 2 offline regression baseline is complete and
 accepted by the user**, including the review correction below. Task 1's result

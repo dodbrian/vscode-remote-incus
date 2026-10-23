@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
-import { childProcess, withFixture } from '../support/fixture';
-import { pushFile } from '../../src/incusCli';
+import { childProcess, withFixture } from './support/fixture';
+import { pushFile } from '../src/incusCli';
 
 test('B6 defect: in-flight stat must not report after push completes', t => withFixture(t, async f => {
   const file = `${f.directory}/archive`; writeFileSync(file, Buffer.alloc(100));
