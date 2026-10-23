@@ -64,7 +64,7 @@ export class InstanceNode extends vscode.TreeItem {
     // at the right edge ($(arrow-right) current window, $(empty-window) new
     // window) and the context menu. A stopped instance is still started by the
     // connect flow itself (Start & Connect, DESIGN §7).
-    this.description = inst.status === 'Running' ? undefined : inst.status;
+    this.description = inst.status === 'Running' || inst.status === 'Stopped' ? undefined : inst.status;
     this.tooltip = new vscode.MarkdownString(
       `**${inst.name}** (${remote})\n\n- state: \`${inst.status}\``
       + (inst.os ? `\n- image OS: ${inst.os}${inst.release ? ` ${inst.release}` : ''}` : ''));

@@ -36,7 +36,8 @@ The public assets have small path/color differences from Dev Containers;
 runtime icon selection remains as described above.
 The CC BY replacements passed typecheck/compile and were redeployed with
 `./redeploy.sh`; the user approved the rendered result on 2026-10-23.
-State remains in tooltips; non-running descriptions remain.
+Running and Stopped row descriptions are omitted because their icons convey
+the state. State remains in tooltips; other state descriptions remain.
 `npm run typecheck` and `npm run compile` passed; `./redeploy.sh` completed
 after each visual change, and the user approved the rendered result.
 
