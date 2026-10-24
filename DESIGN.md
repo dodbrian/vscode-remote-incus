@@ -98,6 +98,43 @@ supported; armhf dropped upstream after VS Code 1.122. Requirements since VS Cod
 1.99: kernel ≥ 4.18, glibc ≥ 2.28, libstdc++ ≥ 3.4.25 — pre-flight via the bundled
 `bin/helpers/check-requirements.sh` for clean refusals.
 
+Additional authorized experiments in [TASK-05-EXPERIMENTS.md](TASK-05-EXPERIMENTS.md)
+compare native keepalive, an unapplied batching prototype and alternative transfer
+paths. They do not change the implementation below. The historical roughly
+2 MB/s observation is not a WebSocket protocol limit; later methods transferred
+the same verified archive substantially faster.
+
+### Task 5 implementation flow (2026-10-24)
+
+The current implementation first checks identity, selected-user signal support,
+client commit, architecture, installation completeness and pre-repair process
+health. Complete installations skip archive download, hashing, transfer and
+extraction. This check remains independent of the client archive cache.
+
+Token preparation and the relay probe share one selected-user exec. The probe
+requires a regular, non-symlink relay with the bundled asset's SHA-256, selected
+UID/GID and mode 0600. Matching state skips push; missing/changed state is pushed
+in path mode and verified before returning any dialable session. Symlinks are
+unlinked as the selected user before push, preserving their targets. An
+unexpected directory rejects without deletion. The asset hash is computed
+anew on each bootstrap; no new cross-session cache is introduced.
+Token minting, sticky reuse and permission repair retain the established
+regression contract (which supersedes the early rotation sketch below).
+
+Port announcements and token contents are read in one selected-user exec. The
+last announcement wins, and an empty token rejects. Fresh starts still remove
+the old log before launch. Waiting retains the existing bounded client-side
+polling and diagnostic log dump; in-instance polling was considered but deferred
+because measured startup needed only one readiness read. Token contents remain
+captured in memory, absent from argv, environment, logs and persistent client
+state. No `.devport` file is written by this implementation.
+
+Only fresh startup performs orphan-relay sweeping and best-effort install/cache
+pruning. Healthy reconnect preserves active bridges and skips this hygiene.
+The transport, within-host in-flight deduplication and unresolved identity/GID
+policies are unchanged. Measurements and remaining limits are in
+[TASK-05-RESULTS.md](TASK-05-RESULTS.md).
+
 ## 4. Connection token policy (frozen)
 
 - **Purpose**: attachment gate against *other UIDs inside the instance*. It is NOT
@@ -125,17 +162,18 @@ supported; armhf dropped upstream after VS Code 1.122. Requirements since VS Cod
 
 ## 6. Relay lifecycle (frozen)
 
-- Helper (`relay.js`, ~30 lines of Node) is **staged inside the instance** once per
-  install (host paths don't exist in-container) and run with the **server's own bundled
+- Helper (`relay.js`, ~30 lines of Node) is **staged inside the instance**
+  (host paths don't exist in-container), checked for content/metadata on each
+  bootstrap and repaired when needed. It runs with the **server's own bundled
   node** — zero extra dependencies.
 - Teardown semantics: stdin EOF → `client.end()` (server sees FIN); client socket close
   → `process.exit(0)`; stdout EPIPE → exit. Spike-verified: relay gone ≤ 1 s after the
   local tree dies.
-- **Orphan sweep on every attach** (mandatory, not paranoia): broken half-connected
-  bridges leave immortal relays (spike produced one specimen; MS's Docker attach
-  produced 2,200+ and pid exhaustion). Sweep = pkill by bracketed pattern (pattern AND
-  payload text must never self-match — `pkill -f` matches the whole `bash -c` string,
-  including comments) + age-based heuristic on staged relays.
+- **Orphan sweep after fresh startup only**: healthy reuse must preserve live
+  bridges. Obsolete relays are cleared before new dials after server replacement.
+  Sweep uses a bracketed pattern whose payload never matches its invoking shell.
+  Relays self-exit on EOF; the early sweep-on-every-attach sketch is superseded
+  by the established regression contract.
 - Bridges are disposable; reconnect is core's re-resolve cycle, never our retry loop.
   Return `RemoteAuthorityResolverError.TemporarilyNotAvailable` only for controllable
   waits (e.g. starting a stopped instance).

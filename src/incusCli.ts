@@ -113,7 +113,7 @@ export function pushFile(ref: InstanceRef, localPath: string, remotePath: string
   if (opts.uid !== undefined) { args.push('--uid', String(opts.uid)); }
   if (opts.gid !== undefined) { args.push('--gid', String(opts.gid)); }
   if (opts.mode) { args.push('--mode', opts.mode); }
-  // 222 MB at the ~2.1 MB/s websocket ceiling ≈ 110 s (spike); generous ceiling.
+  // 222 MB took ~110 s on the measured CLI path; this is not a protocol ceiling.
   return new Promise((resolve, reject) => {
     const child = cp.spawn('incus', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let output = '';
