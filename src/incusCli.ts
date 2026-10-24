@@ -90,7 +90,10 @@ export interface ExecOptions {
   timeoutMs?: number;
 }
 
-/** Run a shell snippet inside an instance (bash assumed; glibc MVP images). */
+/**
+ * Run a POSIX shell snippet inside an instance. Use /bin/sh so minimal images
+ * need no Bash; never retry a failed script with another shell after mutation.
+ */
 export async function execInInstance(
   ref: InstanceRef,
   script: string,
@@ -109,7 +112,7 @@ export async function execInInstance(
   for (const [k, v] of Object.entries(opts.env ?? {})) {
     args.push('--env', `${k}=${v}`);
   }
-  args.push('--', 'bash', '-c', script);
+  args.push('--', '/bin/sh', '-c', script);
   return incus(args, { timeoutMs: opts.timeoutMs });
 }
 
@@ -190,7 +193,7 @@ export function pushFile(
           'exec',
           target(ref),
           '--',
-          'bash',
+          '/bin/sh',
           '-c',
           `stat -c %s ${sq(remotePath)} 2>/dev/null || echo 0`,
         ];

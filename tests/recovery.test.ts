@@ -7,7 +7,7 @@ import { COMMIT, context, installedServer } from './support/scenario';
 import { defined } from './support/assert';
 import { ensureServerReady } from '../src/bootstrap';
 
-// Deliberate S-layer boundary: only captured install scripts run in local bash.
+// Deliberate S-layer boundary: only captured install scripts run in local POSIX sh.
 // Rewrite the fixed archive path and selected home into the fixture directory.
 const { spawnSync } = createRequire(process.cwd() + '/package.json')(
   'node:child_process',
@@ -40,7 +40,7 @@ for (const mode of ['corrupt', 'interrupted', 'stale-marker'] as const)
               .replaceAll('/home/alice', home)
               .replaceAll(`/tmp/vscode-server-linux-x64-${COMMIT}.tar.gz`, archive);
             if (script.startsWith('if [ -f')) probe = local;
-            const result = spawnSync('bash', ['-c', local], { encoding: 'utf8' });
+            const result = spawnSync('/bin/sh', ['-c', local], { encoding: 'utf8' });
             if (script.includes('tar -xzf')) {
               extraction = local;
               if (result.status !== 0) throw new Error('actual extraction failed');
@@ -65,7 +65,7 @@ for (const mode of ['corrupt', 'interrupted', 'stale-marker'] as const)
       );
       assert.equal(existsSync(`${dir}/.incus-install-ok`), false);
       assert.ok(extraction);
-      assert.equal(spawnSync('bash', ['-c', probe], { encoding: 'utf8' }).stdout.trim(), 'no');
+      assert.equal(spawnSync('/bin/sh', ['-c', probe], { encoding: 'utf8' }).stdout.trim(), 'no');
       // Retry the identical generated script with a valid tiny archive.
       const payload = `${f.directory}/payload`;
       mkdirSync(`${payload}/bin`, { recursive: true });
@@ -76,21 +76,21 @@ for (const mode of ['corrupt', 'interrupted', 'stale-marker'] as const)
       }
       assert.equal(spawnSync('tar', ['-czf', archive, '-C', f.directory, 'payload']).status, 0);
       if (mode === 'interrupted') {
-        const interrupted = spawnSync('bash', [
+        const interrupted = spawnSync('/bin/sh', [
           '-c',
           `tar() { command tar "$@"; kill -TERM "$$"; };\n${extraction}`,
         ]);
         assert.equal(interrupted.signal, 'SIGTERM');
         assert.equal(existsSync(`${dir}/.incus-install-ok`), false);
-        assert.equal(spawnSync('bash', ['-c', probe], { encoding: 'utf8' }).stdout.trim(), 'no');
+        assert.equal(spawnSync('/bin/sh', ['-c', probe], { encoding: 'utf8' }).stdout.trim(), 'no');
       }
-      assert.equal(spawnSync('bash', ['-c', extraction]).status, 0);
+      assert.equal(spawnSync('/bin/sh', ['-c', extraction]).status, 0);
       assert.equal(existsSync(`${dir}/.incus-install-ok`), true);
       assert.equal(existsSync(`${dir}/.incus-installing`), false);
-      assert.equal(spawnSync('bash', ['-c', probe], { encoding: 'utf8' }).stdout.trim(), 'yes');
+      assert.equal(spawnSync('/bin/sh', ['-c', probe], { encoding: 'utf8' }).stdout.trim(), 'yes');
       (await import('node:fs')).unlinkSync(`${dir}/.incus-install-ok`);
       assert.equal(
-        spawnSync('bash', ['-c', probe], { encoding: 'utf8' }).stdout.trim(),
+        spawnSync('/bin/sh', ['-c', probe], { encoding: 'utf8' }).stdout.trim(),
         'yes',
         'complete legacy install needs no marker',
       );

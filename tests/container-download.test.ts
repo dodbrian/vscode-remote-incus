@@ -100,9 +100,9 @@ for (const state of [
               : state === 'signal'
                 ? 'curl() { kill -TERM "$$"; return 1; };'
                 : state === 'missing-curl'
-                  ? 'command() { if [ "$2" = curl ]; then return 1; else builtin command "$@"; fi; };'
+                  ? 'command() { return 1; };'
                   : copy;
-        const result = spawnSync('bash', ['-c', prefix + '\n' + local], { encoding: 'utf8' });
+        const result = spawnSync('/bin/sh', ['-c', prefix + '\n' + local], { encoding: 'utf8' });
         cb(
           result.status ? new Error('controlled remote failure') : null,
           result.stdout,

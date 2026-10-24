@@ -43,6 +43,12 @@ Target requirements: incus ≥ 6.0, Linux client, instances with glibc (x64/arm6
 Task 4 verified Linux x64 with Stable 1.143.1 and Incus 7.5.1; arm64 and
 Insiders were not exercised in that verification.
 
+Bootstrap requires `/bin/sh`; Bash is optional. The rescue terminal additionally
+requires util-linux `script`. Minimal Alpine x64 images need `libstdc++` and
+`libgcc` for the musl server runtime; installing Bash does not supply those
+libraries. Install prerequisites explicitly; the extension does not install
+system packages.
+
 ## Server download strategy
 
 `remote-incus.downloadStrategy` defaults to `auto`. No selection is required

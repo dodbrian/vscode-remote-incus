@@ -1,3 +1,41 @@
+# Shell portability follow-up (2026-10-25)
+
+`tests/shell.test.ts` executes generated CLI scripts with Bash absent from PATH
+and checks failure propagation without shell retries. It executes the rescue
+terminal's shell selection for Bash present, absent and failing, and verifies
+its explicit `SHELL=/bin/sh` wrapper environment. Existing actual-script tests
+for install recovery, mutating failures, token/relay integrity and verified
+container download now run under `/bin/sh` (dash on the test host). The terminal
+selection tests exercise the command payload without a real PTY or Incus daemon.
+No full minimal-image or BusyBox runtime compatibility claim is made.
+
+Live follow-up on the user's explicitly named idle Alpine 3.24 x86_64 fixture
+used Incus 7.5.1 and Stable 1.143.1's server commit. Bash was absent; `/bin/sh`
+was BusyBox. The original Bash invocation failed; production identity lookup,
+musl flavor detection and signal probes succeeded through `/bin/sh`. Initial
+server startup failed on missing libstdc++.so.6 and libgcc_s.so.1, independently
+of shell execution. The user explicitly approved installing `libstdc++`,
+`libgcc` and `util-linux-misc` (including their dependencies). Bash was not
+installed. The production rescue-terminal implementation then passed with a
+real util-linux PTY, BusyBox fallback, command output and normal exit. The
+terminal's VS Code UI was not exercised; its host API was supplied by a small
+test adapter. A repeat fresh bootstrap passed relay/token modes, full signed
+management handshake, invalid-token rejection, healthy reuse and another signed handshake.
+Cleanup removed the test-created installation, processes and archives; approved
+system prerequisites remain. The image had no unprivileged login user, so the
+existing root fallback applied. No normal-profile redeploy or editor UI check
+was performed. Private targets and raw logs remain outside the repository.
+
+# Resolver classification follow-up (2026-10-25)
+
+`resolver.test.ts` covers exact-instance absence before and after start, tree
+refresh, Starting without duplicate starts, retryable post-start waits, and
+refusal of unsupported states without bootstrap. It also checks daemon socket,
+missing CLI, TLS, permission, timeout, start and bootstrap failures: these retain
+the original diagnostic cause and are never guessed to be deleted instances
+from message text. Explicit resolver errors retain their identity. These are
+offline fixture checks; live resolver UX has not been reverified for this change.
+
 # Window integration follow-up (2026-10-24)
 
 `explorer.test.ts` now checks both current-window folder entry points and

@@ -64,7 +64,7 @@ test('C1 C5 X8: lifecycle and exec target full remote, numeric user, HOME and no
         '--env',
         'HOME=/home/alice',
         '--',
-        'bash',
+        '/bin/sh',
         '-c',
         'printf ok',
       ]);

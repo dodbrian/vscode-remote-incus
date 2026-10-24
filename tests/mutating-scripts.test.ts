@@ -72,7 +72,7 @@ for (const failure of [
                   : failure === 'prune'
                     ? 'rm() { case "$*" in *old-a*) return 31;; *) command rm "$@";; esac; };'
                     : 'rm() { case "$*" in *.vscode-server*) return 31;; *) return 0;; esac; };';
-      const result = spawnSync('bash', ['-c', `${prefix}\n${local}`], { encoding: 'utf8' });
+      const result = spawnSync('/bin/sh', ['-c', `${prefix}\n${local}`], { encoding: 'utf8' });
       assert.notEqual(result.status, 0, `${failure} was hidden by a subsequent successful command`);
     }));
 
@@ -85,14 +85,14 @@ test('S B4: actual token setup mints atomically and preserves a healthy token', 
       ops.map((a) => defined(a.at(-1))).find((s) => s.includes('fresh token minted')),
     ).replaceAll('/home/alice', `${f.directory}/home`);
     const token = `${f.directory}/home/.vscode-server/data/Machine/.incus-conn-token`;
-    assert.equal(spawnSync('bash', ['-c', script]).status, 0);
+    assert.equal(spawnSync('/bin/sh', ['-c', script]).status, 0);
     const original = readFileSync(token, 'utf8');
     assert.ok(/^[A-Za-z0-9]{43}$/.test(original), 'token must contain 43 alphanumeric characters');
     assert.equal(statSync(token).uid, hostUid());
     assert.equal(statSync(token).mode & 0o777, 0o600);
     assert.equal(existsSync(`${token}.tmp`), false);
     chmodSync(token, 0o644);
-    assert.equal(spawnSync('bash', ['-c', script]).status, 0);
+    assert.equal(spawnSync('/bin/sh', ['-c', script]).status, 0);
     assert.ok(readFileSync(token, 'utf8') === original, 'sticky token must be unchanged');
     assert.equal(statSync(token).mode & 0o777, 0o600);
   }));
@@ -110,7 +110,7 @@ test('S B5: relay probe requires matching bytes, UID, GID, mode and regular path
       .replaceAll('/home/alice', home)
       .replaceAll('1001:1002:600', `${hostUid()}:${hostGid()}:600`);
     const probe = (source = script): string | undefined => {
-      const result = spawnSync('bash', ['-c', source], { encoding: 'utf8' });
+      const result = spawnSync('/bin/sh', ['-c', source], { encoding: 'utf8' });
       assert.equal(result.status, 0);
       return result.stdout.trim().split('\n').at(-1);
     };
@@ -143,7 +143,7 @@ test('S B5: relay probe requires matching bytes, UID, GID, mode and regular path
     assert.equal(probe(), 'relay-current');
     fs.unlinkSync(relay);
     fs.mkdirSync(relay);
-    const directoryResult = spawnSync('bash', ['-c', script], { encoding: 'utf8' });
+    const directoryResult = spawnSync('/bin/sh', ['-c', script], { encoding: 'utf8' });
     assert.notEqual(directoryResult.status, 0, 'a directory must reject before file push');
     assert.ok(
       fs.statSync(relay).isDirectory(),
@@ -168,7 +168,7 @@ test('S C11 B4: combined readiness read uses last port and rejects an empty toke
         if (!script.startsWith('grep -s')) return undefined;
         assert.ok(args.includes('1001'));
         assert.ok(args.includes('HOME=/home/alice'));
-        const result = spawnSync('bash', ['-c', script.replaceAll('/home/alice', home)], {
+        const result = spawnSync('/bin/sh', ['-c', script.replaceAll('/home/alice', home)], {
           encoding: 'utf8',
         });
         assert.equal(result.status, 0);
@@ -202,7 +202,7 @@ test('S: healthy combined preparation/read returns the real last port and sticky
         const local = script
           .replaceAll('/home/alice', home)
           .replaceAll('1001:1002:600', `${hostUid()}:${hostGid()}:600`);
-        const result = spawnSync('bash', ['-c', local], { encoding: 'utf8' });
+        const result = spawnSync('/bin/sh', ['-c', local], { encoding: 'utf8' });
         assert.equal(result.status, 0);
         return result.stdout;
       },

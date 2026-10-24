@@ -39,8 +39,9 @@ class ExecPty implements vscode.Pseudoterminal {
   open(initialDimensions?: vscode.TerminalDimensions): void {
     const cols = initialDimensions?.columns ?? 80;
     const rows = initialDimensions?.rows ?? 24;
-    // stty must run INSIDE the pty `script` allocates; `exec bash` replaces the wrapper.
-    const inner = `stty rows ${rows} cols ${cols} 2>/dev/null; exec bash`;
+    // Run the wrapper through POSIX sh even if the inherited SHELL is missing.
+    // Select before exec: a failing interactive shell must not launch a second one.
+    const inner = `stty rows ${rows} cols ${cols} 2>/dev/null; if command -v bash >/dev/null 2>&1; then exec bash; else exec /bin/sh; fi`;
     log(`terminal: opening exec shell on ${target(this.ref)} as ${this.identity.username}`);
     this.child = incusSpawn([
       'exec',
@@ -51,6 +52,8 @@ class ExecPty implements vscode.Pseudoterminal {
       `HOME=${this.identity.home}`,
       '--env',
       'TERM=xterm-256color',
+      '--env',
+      'SHELL=/bin/sh',
       '--',
       'script',
       '-qec',

@@ -20,7 +20,88 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: deployed fixes and Ports acceptance (2026-10-25)
+## Current stopping point: resolver classification and shell portability (2026-10-25)
+
+The user authorized the recommended resolver classification task. Implemented
+in `src/resolver.ts`, with tree-refresh wiring in `src/extension.ts`:
+
+- Successful daemon lookup with no exact instance match returns
+  `RemoteAuthorityResolverError.NotAvailable` and refreshes the tree. This also
+  applies if the instance disappears after a start request. No recreation.
+- `Starting` waits return `TemporarilyNotAvailable` without issuing another
+  start. `Stopped` retains inline start-and-connect; a post-start Stopped or
+  Starting state is retryable. Other states fail with the actual state and
+  do not issue a start or bootstrap.
+- The formerly unused error mapper now runs at the resolver boundary. Explicit
+  resolver errors pass through unchanged; other failures retain their first-line
+  diagnostic and the original error as `cause`, with full error logging.
+  Text such as "not found" or "No such file" alone never implies deletion.
+- Offline regressions cover missing instances before/after start, startup waits,
+  unsupported states, daemon/socket/CLI/TLS/permission/timeout failures, start
+  and bootstrap failures, and preservation of explicit taxonomy and causes.
+  New regressions failed against the original implementation.
+
+The user also reported containers without Bash. `src/incusCli.ts` now uses
+`/bin/sh -c` for generated POSIX scripts and transfer-size polling. The rescue
+terminal in `src/terminal.ts` gives util-linux `script` a known `/bin/sh`
+wrapper, prefers Bash if available, and otherwise executes `/bin/sh`. Shell
+selection happens before execution; script failures never trigger a rerun
+under another shell. No packages are installed automatically.
+
+New `tests/shell.test.ts` checks execution with no Bash on PATH, propagation
+of script failures without retry, and rescue-terminal Bash preference/fallback.
+Existing actual-script tests for installation recovery, token/relay handling,
+mutation failures and container download now execute under `/bin/sh` (dash on
+this host). The offline checks alone do not establish full minimal-image
+compatibility; server/runtime utilities and util-linux `script` remain requirements for their
+respective paths. Scoped live BusyBox evidence follows.
+
+`npm test` passes all 13 test-file entries, including typecheck, lint and
+format checks. Compile and `git diff --check` pass.
+
+At the user's request, live shell verification ran against their explicitly
+named idle Alpine 3.24 x86_64 fixture over TLS/cluster Incus 7.5.1, using Stable
+1.143.1's server commit. Bash remained absent and `/bin/sh` was BusyBox. Original
+Bash execution failed; production sh execution, identity lookup, musl detection
+and signals passed. The image had no unprivileged login user, so the existing
+root fallback applied; no user-policy change was made.
+
+Initial fresh bootstrap reached installation but server startup failed because
+`libstdc++.so.6` and `libgcc_s.so.1` were missing. Cleanup succeeded. The user
+explicitly approved installing `libstdc++`, `libgcc` and `util-linux-misc` plus
+their dependencies, and rerunning. The repeat passed fresh Alpine bootstrap,
+relay/token 0600 checks, the full signed management handshake, invalid-token
+rejection, healthy reuse and a second signed handshake. Separately, production
+rescue-terminal code passed through a real util-linux PTY with BusyBox fallback,
+command output and clean exit. Its VS Code host API used a test adapter; no
+editor-window or rendered terminal UI claim is made.
+
+Test-created server installation, archives and processes were removed; approved
+system prerequisites remain installed. No Bash was installed. Private targets
+and raw logs stay outside the repository. The ordinary loopback relay suite
+also passed outside the sandbox, which blocks TCP listeners. Full installation
+and cleanup, followed by prerequisite installation and a rerun, were explicitly
+approved by the user.
+
+No redeploy or normal-profile restart occurred. Resolver taxonomy regressions
+remain offline evidence; these live checks exercise shell/bootstrap/relay and
+rescue-terminal behavior. Ports acceptance and identical-folder evidence below
+remain scoped to their previously tested build. The user accepted the live
+results and requested committing the fixes, regressions and documentation.
+Resolver classification is committed as `aee3bc5`; shell portability and live
+evidence are committed together with this handover. No push was requested.
+
+Recommended next step: at the user's request, redeploy these fixes and smoke-test
+a normal VS Code window against the Bash-free fixture, including the integrated
+terminal and rescue terminal. This is not yet authorized. Next implementation
+candidate: detect missing server runtime prerequisites before the readiness
+poll, with a direct actionable error naming the missing libraries or utilities.
+The Alpine run exposed this diagnostic gap; no prerequisite detection or
+automatic package installation has been implemented. The IPv6-only fixture
+edge case, normal-profile new-window acceptance, and naming/publisher plus
+publication-privacy prerequisites remain open.
+
+## Previous state: deployed fixes and Ports acceptance (2026-10-25)
 
 The user manually checked the Ports feature after redeploy and reported
 “everything works.” Record this as user acceptance of the tested Ports workflow;
