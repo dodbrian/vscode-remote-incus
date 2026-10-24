@@ -44,32 +44,48 @@ export class Fixture {
     return handler(...args);
   }
 
-  defer(cleanup: () => void): void { this.cleanup.push(cleanup); }
+  defer(cleanup: () => void): void {
+    this.cleanup.push(cleanup);
+  }
 
   // Use these helpers for fixture-owned wall timers; Node mock timers are also
   // available through the test context and are automatically reset by Node.
   timeout(callback: () => void, ms: number): ReturnType<typeof setTimeout> {
     const timer = setTimeout(callback, ms);
-    this.defer(() => clearTimeout(timer));
+    this.defer(() => {
+      clearTimeout(timer);
+    });
     return timer;
   }
 
   dispose(): void {
     const failures: unknown[] = [];
     const actions = [
-      ...this.subscriptions.splice(0).reverse().map(item => () => item.dispose()),
+      ...this.subscriptions
+        .splice(0)
+        .reverse()
+        .map((item) => () => {
+          item.dispose();
+        }),
       ...this.cleanup.splice(0).reverse(),
-      () => rmSync(this.directory, { recursive: true, force: true }),
+      () => {
+        rmSync(this.directory, { recursive: true, force: true });
+      },
     ];
     for (const action of actions) {
-      try { action(); } catch (error) { failures.push(error); }
+      try {
+        action();
+      } catch (error) {
+        failures.push(error);
+      }
     }
     if (failures.length) throw new AggregateError(failures, 'Fixture cleanup failed');
   }
 
   verify(): void {
     assert.deepEqual(this.unexpected, [], 'Unexpected external calls (even if caught by source)');
-    for (const [name, queue] of this.handlers) assert.equal(queue.length, 0, `Unused expectation: ${name}`);
+    for (const [name, queue] of this.handlers)
+      assert.equal(queue.length, 0, `Unused expectation: ${name}`);
   }
 }
 
@@ -80,30 +96,43 @@ export async function withFixture(t: TestContext, body: (f: Fixture) => unknown)
     await current.run(f, () => body(f));
     f.verify();
   } finally {
-    try { f.dispose(); } finally { t.mock.timers.reset(); }
+    try {
+      f.dispose();
+    } finally {
+      t.mock.timers.reset();
+    }
   }
 }
 
 // All intercepted modules fail closed, including methods not yet modeled.
 export function boundaryModule(name: string, keys: string[]): object {
-  return new Proxy({}, {
-    ownKeys: () => keys,
-    getOwnPropertyDescriptor: () => ({ configurable: true, enumerable: true }),
-    get(_target, key) {
-      if (key === '__esModule') return true;
-      return (...args: any[]) => fixture().call(`${name}.${String(key)}`, args);
+  return new Proxy(
+    {},
+    {
+      ownKeys: () => keys,
+      getOwnPropertyDescriptor: () => ({ configurable: true, enumerable: true }),
+      get(_target, key) {
+        if (key === '__esModule') return true;
+        return (...args: any[]) => fixture().call(`${name}.${String(key)}`, args);
+      },
     },
-  });
+  );
 }
 
 // Installed before the test body imports source. Never delegate to host fetch.
-globalThis.fetch = ((...args: Parameters<typeof fetch>) => fixture().call('fetch', args)) as typeof fetch;
+globalThis.fetch = ((...args: Parameters<typeof fetch>) =>
+  fixture().call('fetch', args)) as typeof fetch;
 
 export function childProcess(options: { spawn?: boolean } = {}): EventEmitter & {
-  stdin: PassThrough; stdout: PassThrough; stderr: PassThrough; kill: () => boolean;
+  stdin: PassThrough;
+  stdout: PassThrough;
+  stderr: PassThrough;
+  kill: () => boolean;
 } {
   const child = Object.assign(new EventEmitter(), {
-    stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(),
+    stdin: new PassThrough(),
+    stdout: new PassThrough(),
+    stderr: new PassThrough(),
     kill: () => true,
   });
   if (options.spawn !== false) queueMicrotask(() => child.emit('spawn'));
