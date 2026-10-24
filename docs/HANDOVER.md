@@ -20,7 +20,38 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: identical-folder new windows (2026-10-24)
+## Current stopping point: deployed fixes and Ports acceptance (2026-10-25)
+
+The user manually checked the Ports feature after redeploy and reported
+“everything works.” Record this as user acceptance of the tested Ports workflow;
+individual controls were not enumerated, so do not invent a control-by-control
+checklist or extend this result to other runtimes/network configurations.
+Manual Ports testing is no longer deferred.
+
+Both fixes are committed: Ports activation `3c80096` and identical-folder
+new-window workspaces `2e5b68b`. At the user's request, `./redeploy.sh` built,
+packaged and installed the extension, restarted VS Code and reopened the
+designated remote window. The installed bundle was byte-verified against the
+build. Post-redeploy logs confirmed successful resolution, healthy server
+reuse and both exec transport bridges starting on Stable 1.143.1. These are
+prior-turn deployment observations, not fresh live checks during this update.
+No further redeploy, live mutation, push or publication occurred here.
+
+The identical-folder fix passed the isolated three-window and workspace
+reopening checks below. The user's manual Ports confirmation does not
+separately confirm normal-profile identical-folder UX acceptance. The
+IPv6-only-networked local fixture's IPv4-loopback resolution edge case also
+remains open; successful IPv4 forwarding on the TLS/cluster fixture and the
+user's Ports acceptance do not resolve it for that different environment.
+
+Recommended next task: resolver error classification against DESIGN §7.
+Establish offline regressions for deleted/unavailable instances, retryable
+starting states and daemon/transport failures, then refine the production
+error mapping without losing the underlying cause. No implementation of this
+next task has started or been authorized. Naming/publisher decisions and a
+publication privacy audit remain prerequisites to packaging/publication work.
+
+## Previous state: identical-folder new windows (2026-10-24)
 
 The user authorized fixing identical-folder new-window behavior and explicitly
 approved opening the folder in a separate workspace. Manual Ports testing is

@@ -15,8 +15,9 @@ This proves managed-host behavior for the tested runtime, not other clients
 or platforms. Historical Task 4 findings below remain the original baseline.
 
 Ports context activation is covered by resolver expectations. Automated live
-IPv4-only service forwarding passed on the TLS/cluster fixture; manual Ports
-controls remain deferred. See [HANDOVER.md](../HANDOVER.md) for the separate
+IPv4-only service forwarding passed on the TLS/cluster fixture. After redeploy,
+the user manually checked Ports on 2026-10-25 and reported everything working.
+The individual controls exercised were not enumerated. See [HANDOVER.md](../HANDOVER.md) for the separate
 IPv6-only-networked fixture's address-resolution limitation.
 
 # Current coverage through Task 5

@@ -85,8 +85,9 @@ for versions, cleanup and exact limits.
 
 The Ports view is now enabled; actual forwarding passed with an IPv4-only
 service on the TLS/cluster fixture and an IPv6-loopback service locally.
-Manual Ports controls remain to be tested. A local fixture with IPv6-only
-external networking exposed a separate IPv4-loopback address-resolution edge
+After redeploy, the user manually verified Ports and reported it working
+on 2026-10-25. A local fixture with IPv6-only external networking exposed a
+separate IPv4-loopback address-resolution edge
 case; see [the handover](docs/HANDOVER.md) for the diagnosis.
 
 “Connect in New Window” opens a separate workspace containing the chosen or
