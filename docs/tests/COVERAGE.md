@@ -9,8 +9,17 @@ remedy. Successful startup still launches the selected executable. The existing
 log-removal failure test supplies working prerequisites to reach its original
 failure point. `shell.test.ts` executes the rescue terminal's outer wrapper,
 covering missing-script installation guidance and retained Bash/sh selection.
-These are offline failure-injection results; the new diagnostics have not been
-live-verified or redeployed.
+The diagnostics build (`be8da26`) was subsequently redeployed and byte-verified.
+Live BusyBox checks used the private production startup function exposed only
+in a temporary harness bundle, with isolated temporary homes and controlled
+failing executables. Library diagnostics, permission failure and missing
+launcher preserved logs and refused background launch. The success case used
+the actual installed Alpine Node with a harmless fixture launcher. All owned
+temporary directories were removed; no system libraries or active installation
+were replaced. The updated rescue terminal passed a real PTY, marker command
+and clean exit with a host-API adapter. Missing-nohup/missing-script refusal
+remain offline evidence. Normal remote reconnection and bridge startup were
+log-verified; no new rendered UI acceptance is claimed for this build.
 
 # Shell portability follow-up (2026-10-25)
 

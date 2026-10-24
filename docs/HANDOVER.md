@@ -55,10 +55,36 @@ lint and format checks; compile and `git diff --check` pass. No test files fail
 or skip.
 
 The user requested committing these diagnostics and proceeding with deployment.
-Deployment and live verification of this change are pending at this commit;
-the previously installed build is the accepted `aee3bc5` / `15ba764` version
-below. Live failure checks must use isolated fixtures and must not remove
-libraries from the user's active Alpine session. No push was requested.
+Implementation, tests and documentation are committed as `be8da26`.
+`./redeploy.sh` installed that build and restarted normal VS Code. The installed
+bundle was SHA-256 verified byte-identical to the production build. Stable
+1.143.1 logs confirmed healthy server reuse, resolution and both exec bridges
+for the established remote and the Bash-free Alpine window.
+
+Scoped live diagnostics checks passed on the named Alpine/BusyBox fixture.
+A temporary harness exposed the private startup function in its temporary
+bundle only; repository exports were unchanged. It ran the production startup
+script against per-case temporary homes: controlled missing-library diagnostics,
+non-executable runtime and missing launcher all refused before background
+launch and preserved the previous log. The success case used a symlink to the
+actual installed Alpine Node binary and a harmless fixture launcher. This is
+live shell/control-flow evidence with injected failures, not a second test
+with genuinely removed system libraries. The temporary directories were
+removed; installed libraries and the active server installation were unchanged.
+
+The updated production rescue terminal passed a real util-linux PTY, BusyBox
+fallback, marker command and clean exit using a small host-API adapter.
+Missing-nohup and missing-script failures remain offline test evidence. Normal
+window reconnection is log-verified; no new manual terminal UI acceptance or
+error-dialog screenshot is claimed for this diagnostics build. The user's
+prior two-terminal acceptance below remains scoped to the preceding build.
+
+Current stopping point: prerequisite diagnostics are committed, deployed and
+verified within the boundaries above. No push or publication occurred. Further
+implementation needs a selected next task: the IPv6-only-network fixture's
+IPv4-loopback issue remains open; publication still needs naming/publisher
+decisions and a privacy audit. Do not remove libraries or stop the active
+Alpine session to extend failure coverage.
 
 ## Previous state: resolver classification and shell portability (2026-10-25)
 
