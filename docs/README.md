@@ -20,10 +20,10 @@ unless stated otherwise.
 
 ## Task plans and results
 
-| Task | Plan | Results |
-| --- | --- | --- |
-| 1: Offline test harness | [Plan](TASK-01-OFFLINE-TEST-HARNESS.md) | [Testing guide](tests/README.md) |
-| 2: Regression baseline | [Plan](TASK-02-REGRESSION-BASELINE.md) | [Coverage](tests/COVERAGE.md) |
-| 3: Connection correctness | [Plan](TASK-03-CONNECTION-CORRECTNESS.md) | [Results](TASK-03-RESULTS.md) |
-| 4: Real behavior verification | [Plan](TASK-04-REAL-BEHAVIOR-VERIFICATION.md) | [Results](TASK-04-RESULTS.md) |
-| 5: Connection optimization | [Plan](TASK-05-CONNECTION-OPTIMIZATION.md) | [Results](TASK-05-RESULTS.md), [measurements](TASK-05-MEASUREMENTS.json) |
+| Task                          | Plan                                          | Results                                                                  |
+| ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------ |
+| 1: Offline test harness       | [Plan](TASK-01-OFFLINE-TEST-HARNESS.md)       | [Testing guide](tests/README.md)                                         |
+| 2: Regression baseline        | [Plan](TASK-02-REGRESSION-BASELINE.md)        | [Coverage](tests/COVERAGE.md)                                            |
+| 3: Connection correctness     | [Plan](TASK-03-CONNECTION-CORRECTNESS.md)     | [Results](TASK-03-RESULTS.md)                                            |
+| 4: Real behavior verification | [Plan](TASK-04-REAL-BEHAVIOR-VERIFICATION.md) | [Results](TASK-04-RESULTS.md)                                            |
+| 5: Connection optimization    | [Plan](TASK-05-CONNECTION-OPTIMIZATION.md)    | [Results](TASK-05-RESULTS.md), [measurements](TASK-05-MEASUREMENTS.json) |

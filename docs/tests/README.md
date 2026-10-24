@@ -71,10 +71,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { withFixture } from './support/fixture';
 
-test('example', t => withFixture(t, async f => {
-  f.expect('fetch', () => Promise.resolve(new Response('fixture')));
-  assert.equal(await (await fetch('https://offline.invalid')).text(), 'fixture');
-}));
+test('example', (t) =>
+  withFixture(t, async (f) => {
+    f.expect('fetch', () => Promise.resolve(new Response('fixture')));
+    assert.equal(await (await fetch('https://offline.invalid')).text(), 'fixture');
+  }));
 ```
 
 Declare one expectation per invocation. Handlers receive original arguments;
@@ -233,12 +234,12 @@ Bundle each TypeScript entry with esbuild, `--platform=node` and
 `--alias:vscode=./scripts/vscode-stub.js` as shown above. The test-only stub maps
 `INCUS_TEST_DOWNLOAD_STRATEGY`; production reads normal VS Code configuration.
 
-| Verifier | Coverage and additional requirements |
-| --- | --- |
-| `scripts/verify-live.ts` | Full signed handshake, positive/negative authentication, ownership, reuse, recovery and teardown. Requires `INCUS_TEST_VSDA_PATH`. Leave strategy unset for auto, or set auto/client/container explicitly. `INCUS_TEST_RELAY_REPAIRS=yes` adds symlink/content/metadata repairs with two live channels. |
-| `scripts/verify-auto-fallback.ts` | Linux x64, auto only, signing module required. Prefills a verified client archive, injects one curl exit 22 only through the download exec's PATH, and requires one visible switch, real upload/extraction, signed authentication and surviving channels. Cache preparation is outside timing. |
-| `scripts/verify-container-download-failures.ts` | Requires no install/archive. Controlled corruption, exit 22 and actual SIGTERM/exit 143 must leave no accepted archive/install/partial. Uses a scoped fake curl, not a system binary replacement. |
-| `scripts/verify-container-curl-config.ts` | Requires no install/archive. Proves ordinary curl reads an injected invalid CURL_HOME config, then verifies managed download SHA/metadata with it present. The control checks diagnostics because curl can warn and continue. |
+| Verifier                                        | Coverage and additional requirements                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/verify-live.ts`                        | Full signed handshake, positive/negative authentication, ownership, reuse, recovery and teardown. Requires `INCUS_TEST_VSDA_PATH`. Leave strategy unset for auto, or set auto/client/container explicitly. `INCUS_TEST_RELAY_REPAIRS=yes` adds symlink/content/metadata repairs with two live channels. |
+| `scripts/verify-auto-fallback.ts`               | Linux x64, auto only, signing module required. Prefills a verified client archive, injects one curl exit 22 only through the download exec's PATH, and requires one visible switch, real upload/extraction, signed authentication and surviving channels. Cache preparation is outside timing.          |
+| `scripts/verify-container-download-failures.ts` | Requires no install/archive. Controlled corruption, exit 22 and actual SIGTERM/exit 143 must leave no accepted archive/install/partial. Uses a scoped fake curl, not a system binary replacement.                                                                                                       |
+| `scripts/verify-container-curl-config.ts`       | Requires no install/archive. Proves ordinary curl reads an injected invalid CURL_HOME config, then verifies managed download SHA/metadata with it present. The control checks diagnostics because curl can warn and continue.                                                                           |
 
 Run verifiers sequentially and require bounded successful teardown between them.
 The last two checks need client metadata access but no signing module. Owned

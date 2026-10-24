@@ -62,17 +62,17 @@ compilation and whitespace checks passed at the recorded checkpoint.
 Both explicit-target manual runs passed. TLS/cluster and local results are
 kept distinct; neither target is a CI dependency.
 
-| Contract | Local daemon fixture | TLS cluster fixture |
-| --- | --- | --- |
-| Clean install and usable returned session | Signed management handshake and invalid-token rejection passed | Same passed |
-| Ownership/modes/content | Node/launcher/relay/token UID assertions, relay/token 0600, relay hash and token shape passed | Same passed |
-| Healthy reuse | PID, port and sticky token unchanged; two live management channels receive new keep-alives after bootstrap returns | PID, port and sticky token unchanged; two management channels remained live through reuse |
-| Installed but not running | Detached startup and signed handshake passed | Same passed |
-| Missing token and wiped install | Real replacement/recovery and signed handshakes passed | Same passed |
-| Explicit reset | Token changed and new authenticated session passed | Same passed |
-| Stale commit | Harmless synthetic old-commit process replaced with a real current server | Same passed; no old VS Code binary compatibility claim |
-| Temporary files and teardown | Marker/temp-file assertions and bounded final process/install/cache cleanup passed | Same passed |
-| Loopback listener/server UID | Actual listener asserted to be only 127.0.0.1 on the discovered port; server UID asserted | Same asserted |
+| Contract                                  | Local daemon fixture                                                                                               | TLS cluster fixture                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| Clean install and usable returned session | Signed management handshake and invalid-token rejection passed                                                     | Same passed                                                                               |
+| Ownership/modes/content                   | Node/launcher/relay/token UID assertions, relay/token 0600, relay hash and token shape passed                      | Same passed                                                                               |
+| Healthy reuse                             | PID, port and sticky token unchanged; two live management channels receive new keep-alives after bootstrap returns | PID, port and sticky token unchanged; two management channels remained live through reuse |
+| Installed but not running                 | Detached startup and signed handshake passed                                                                       | Same passed                                                                               |
+| Missing token and wiped install           | Real replacement/recovery and signed handshakes passed                                                             | Same passed                                                                               |
+| Explicit reset                            | Token changed and new authenticated session passed                                                                 | Same passed                                                                               |
+| Stale commit                              | Harmless synthetic old-commit process replaced with a real current server                                          | Same passed; no old VS Code binary compatibility claim                                    |
+| Temporary files and teardown              | Marker/temp-file assertions and bounded final process/install/cache cleanup passed                                 | Same passed                                                                               |
+| Loopback listener/server UID              | Actual listener asserted to be only 127.0.0.1 on the discovered port; server UID asserted                          | Same asserted                                                                             |
 
 The local candidate initially had two live relays. The verifier refused before
 mutation; only after the user closed its editor session and a fresh check found

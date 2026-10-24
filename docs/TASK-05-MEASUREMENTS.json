@@ -652,11 +652,7 @@
       "median_ms": 8503,
       "min_ms": 8380,
       "max_ms": 8739,
-      "samples_ms": [
-        8739,
-        8503,
-        8380
-      ]
+      "samples_ms": [8739, 8503, 8380]
     },
     {
       "implementation": "current",
@@ -665,11 +661,7 @@
       "median_ms": 6378,
       "min_ms": 6303,
       "max_ms": 6438,
-      "samples_ms": [
-        6303,
-        6438,
-        6378
-      ]
+      "samples_ms": [6303, 6438, 6378]
     },
     {
       "implementation": "current",
@@ -678,11 +670,7 @@
       "median_ms": 5974,
       "min_ms": 5675,
       "max_ms": 6698,
-      "samples_ms": [
-        5675,
-        6698,
-        5974
-      ]
+      "samples_ms": [5675, 6698, 5974]
     },
     {
       "implementation": "batched",
@@ -691,11 +679,7 @@
       "median_ms": 2872,
       "min_ms": 2738,
       "max_ms": 3969,
-      "samples_ms": [
-        2738,
-        2872,
-        3969
-      ]
+      "samples_ms": [2738, 2872, 3969]
     },
     {
       "implementation": "batched",
@@ -704,11 +688,7 @@
       "median_ms": 2549,
       "min_ms": 2547,
       "max_ms": 2653,
-      "samples_ms": [
-        2653,
-        2549,
-        2547
-      ]
+      "samples_ms": [2653, 2549, 2547]
     },
     {
       "implementation": "batched",
@@ -717,11 +697,7 @@
       "median_ms": 2065,
       "min_ms": 2045,
       "max_ms": 2067,
-      "samples_ms": [
-        2045,
-        2065,
-        2067
-      ]
+      "samples_ms": [2045, 2065, 2067]
     }
   ],
   "experimental_transfers": [
@@ -818,10 +794,7 @@
     "live_checks": true,
     "manual_performance_accepted": true
   },
-  "source_checkpoints": [
-    "e03dcf8",
-    "2a99945"
-  ],
+  "source_checkpoints": ["e03dcf8", "2a99945"],
   "limitations": [
     "small samples and variable network; no CI wall-time threshold",
     "manual approval covers perceived improvement, not a new all-editor/terminal/forwarding certification",

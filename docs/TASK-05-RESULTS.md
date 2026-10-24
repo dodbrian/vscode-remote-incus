@@ -24,11 +24,11 @@ best-effort pruning; installed-but-stopped startup takes seven execs.
 
 `remote-incus.downloadStrategy` is application-scoped:
 
-| Setting | Behavior |
-| --- | --- |
+| Setting          | Behavior                                                                                                                                                        |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `auto` (default) | Try verified container download, then visibly fall back once to client transfer after an expected route failure. Custom mirrors go directly to client transfer. |
-| `client` | Force cached client download, path-mode Incus push and post-transfer SHA verification. |
-| `container` | Force container download; failures do not switch routes. Unsupported mirrors reject. |
+| `client`         | Force cached client download, path-mode Incus push and post-transfer SHA verification.                                                                          |
+| `container`      | Force container download; failures do not switch routes. Unsupported mirrors reject.                                                                            |
 
 Matching installations skip all archive work in every mode. Container mode
 obtains exact commit/flavor metadata and publisher SHA client-side, then uses
@@ -54,11 +54,11 @@ selected phase timings, original samples and final assertions. All comparisons
 used the same authorized TLS remote fixture and matching client/server commit,
 with warm identity for bootstrap timing. Private identifiers are omitted.
 
-| Scenario | Original baseline | Integrated result |
-| --- | ---: | ---: |
-| Healthy reuse | 14.277 s; 10 execs + 1 relay push | Default auto: 2.744 s; 3 execs, no push |
-| Installed, stopped | 12.857 s; 11 execs + 1 push | Explicit container run: 8.084 s; 7 execs, no push |
-| Clean install | 141.096 s using client transfer | Explicit client: 139.397 s; default auto: 27.956 s |
+| Scenario           |                 Original baseline |                                  Integrated result |
+| ------------------ | --------------------------------: | -------------------------------------------------: |
+| Healthy reuse      | 14.277 s; 10 execs + 1 relay push |            Default auto: 2.744 s; 3 execs, no push |
+| Installed, stopped |       12.857 s; 11 execs + 1 push |  Explicit container run: 8.084 s; 7 execs, no push |
+| Clean install      |   141.096 s using client transfer | Explicit client: 139.397 s; default auto: 27.956 s |
 
 These full-run wall times are single observations, not confidence intervals or
 CI thresholds. They time bootstrap, not complete editor/window startup. Exec

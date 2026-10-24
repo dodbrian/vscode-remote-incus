@@ -50,11 +50,11 @@ before installation: setup tries container download first and visibly switches
 to client download/transfer once if that route fails. A matching installation
 skips downloading altogether.
 
-| Setting | Behavior |
-| --- | --- |
+| Setting          | Behavior                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------ |
 | `auto` (default) | Container first, one visible client fallback; custom mirrors use client transfer directly. |
-| `client` | Always download on the client and transfer through Incus. |
-| `container` | Container download only; failure is reported without fallback. |
+| `client`         | Always download on the client and transfer through Incus.                                  |
+| `container`      | Container download only; failure is reported without fallback.                             |
 
 To force a route, explicitly set `remote-incus.downloadStrategy` to `client` or
 `container`. Container downloading requires existing curl and outbound HTTPS to
@@ -104,6 +104,28 @@ npm run compile
 internet access or server download. `npm run test:relay` additionally needs
 local loopback TCP sockets and runs the bundled relay as real child processes.
 These portable checks can run in CI without private infrastructure.
+
+### Mandatory quality gates
+
+Linting (strict, type-checked rules), code formatting and the strict
+TypeScript compiler settings are enforced as one gate — `npm run check` — and
+every diagnostic is a failure, including anything set to "warn" (`--max-warnings 0`).
+`npm test` and `npm run package` run this gate first; a `pre-commit` hook
+(installed automatically by `npm install`) blocks non-conforming commits.
+
+```sh
+npm run check          # typecheck + lint + formatting verification
+npm run lint           # ESLint only (warnings fail)
+npm run lint:fix       # auto-fix lint findings
+npm run format         # Prettier --write
+npm run format:check   # Prettier --check (fails on unformatted files)
+```
+
+Formatting is Prettier's (single quotes, print width 100, defaults otherwise);
+`.vscode/settings.json` applies the same on save. Rules that only make sense
+for shipped code (the unsafe-`any` family, strict nullish/condition checks) run
+at full strength under `src/`, with a documented carve-out for the test
+fixture's opaque stub boundary in `eslint.config.mjs`.
 
 The manual `scripts/verify-live.ts` verifier is separate: it refuses CI and
 requires an explicit runtime target, destructive opt-in and the installed

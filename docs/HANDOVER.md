@@ -370,8 +370,8 @@ select explicitly; never "first instance".
   `REMOTE_INCUS_DEBUG_LOG`, which redeploy.sh sets) plus the
   "Remote - Incus" output channel.
 - Offline smoke: `npx esbuild scripts/smoke.ts --bundle --platform=node
-  --alias:vscode=./scripts/vscode-stub.js --outfile=/tmp/remote-incus-dev/smoke.js &&
-  node /tmp/remote-incus-dev/smoke.js` (authority round-trips + read-only daemon probes).
+--alias:vscode=./scripts/vscode-stub.js --outfile=/tmp/remote-incus-dev/smoke.js &&
+node /tmp/remote-incus-dev/smoke.js` (authority round-trips + read-only daemon probes).
 - Chain deploy steps with `&&`, not `;` — a `;` chain once relaunched a
   window with STALE code after a failed typecheck (cost: confusing session).
 - **Committing + harness-verifying is NOT deployment** — the running windows
@@ -417,7 +417,7 @@ select explicitly; never "first instance".
   toasts and `firstLine()` cut at the first `\n`; a multi-line command joined
   into line 1 hid the stderr everywhere (cost one undiagnosable failure).
   `IncusError` now reads `incus <target> --<inline script> failed (exit N /
-  timed out): <stderr line 1>`; catches log the FULL message, toasts take
+timed out): <stderr line 1>`; catches log the FULL message, toasts take
   `firstLine()`.
 - **"Another instance of Code is running but not responding" modal**: relaunch
   raced a half-dead pkilled instance; Code processes can ignore SIGTERM

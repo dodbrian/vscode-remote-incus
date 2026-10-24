@@ -22,14 +22,14 @@ a host-side gateway.
 
 ## Closest alternatives
 
-| Project | Overlap | Difference from Remote - Incus |
-| --- | --- | --- |
-| Canonical Workshop | VS Code extension with environment discovery, creation, start, reconnect, and full in-container development | LXD/Workshop-managed environments; connects through Remote-SSH |
-| ssh2incus | Incus containers and VMs, multiple remotes, IDE access without per-instance SSH servers | Separate host-side SSH gateway; SSH remains the IDE transport |
-| dviererbe.vscode-lxd | Container/resource explorer inside VS Code | Management and inspection; no remote development connection found |
-| Incus-spawn / isx | One-click Open in VS Code for Incus environments | External CLI/TUI; installs instance sshd and uses Remote-SSH |
-| bubble | Provisions Incus development environments and opens VS Code | Opinionated environment manager, especially for Lean; uses Remote-SSH |
-| XPipe | Incus discovery, management, shells, and file access | Separate desktop application; documented VS Code remote integration uses SSH |
+| Project              | Overlap                                                                                                     | Difference from Remote - Incus                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Canonical Workshop   | VS Code extension with environment discovery, creation, start, reconnect, and full in-container development | LXD/Workshop-managed environments; connects through Remote-SSH               |
+| ssh2incus            | Incus containers and VMs, multiple remotes, IDE access without per-instance SSH servers                     | Separate host-side SSH gateway; SSH remains the IDE transport                |
+| dviererbe.vscode-lxd | Container/resource explorer inside VS Code                                                                  | Management and inspection; no remote development connection found            |
+| Incus-spawn / isx    | One-click Open in VS Code for Incus environments                                                            | External CLI/TUI; installs instance sshd and uses Remote-SSH                 |
+| bubble               | Provisions Incus development environments and opens VS Code                                                 | Opinionated environment manager, especially for Lean; uses Remote-SSH        |
+| XPipe                | Incus discovery, management, shells, and file access                                                        | Separate desktop application; documented VS Code remote integration uses SSH |
 
 ### Canonical Workshop
 

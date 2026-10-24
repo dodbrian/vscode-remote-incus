@@ -49,13 +49,13 @@ The core architectural decision, validated end-to-end:
   via the user's existing `incus` client configuration; `incus --remote <host>` handles
   remote daemons for free).
 - **Connection primitive**: `incus exec <instance> --mode non-interactive --user <uid>
-  --env … -- node <staged-relay.js>` — the child's stdio is the byte transport.
+--env … -- node <staged-relay.js>` — the child's stdio is the byte transport.
 
 Wiring through the VS Code API:
 
 - resolver returns `new vscode.ManagedResolvedAuthority(makeConnection, connectionToken)`
 - **core dials `makeConnection()` once per logical channel** — spike measured exactly
-  2 dials at connect (management + extension host) and *held both open*;
+  2 dials at connect (management + extension host) and _held both open_;
 - terminal/PTY traffic is **multiplexed over the management channel** (no extra dial);
 - if no custom `tunnelFactory` is returned, **core synthesizes one for forwarded app
   ports** — dialing `makeConnection()` once per forwarded port and running the server's
@@ -88,7 +88,7 @@ tries container HTTPS download and falls back to this route if needed:
    owner = target user; fresh 43-char URL-safe token minted when missing.
 5. Start detached (survives any single exec session):
    `~/.vscode-server/bin/<commit>/bin/code-server --host 127.0.0.1 --port 0
-   --connection-token-file <token-file> --accept-server-license-terms > log 2>&1`
+--connection-token-file <token-file> --accept-server-license-terms > log 2>&1`
 6. Discover port by parsing stdout log: `Extension host agent listening on <port>`
    (no lockfile needed; also persist a `.devport`-style state file like MS does).
 7. Hand `connectionToken` to `ManagedResolvedAuthority`; the token travels only over
@@ -172,7 +172,7 @@ manual-selection policy at the user's request; no keepalive setting is changed.
 
 ## 4. Connection token policy (frozen)
 
-- **Purpose**: attachment gate against *other UIDs inside the instance*. It is NOT
+- **Purpose**: attachment gate against _other UIDs inside the instance_. It is NOT
   encryption and NOT per-user authorization; channel confidentiality rides on
   loopback/unix-socket confinement and daemon TLS.
 - **Fresh token per server (re)start** (MS-style auto-rotation: a leaked token dies with
@@ -182,7 +182,7 @@ manual-selection policy at the user's request; no keepalive setting is changed.
   the secret out of argv/env/logs. Client reads the same file through the exec channel
   and forgets it after the handshake.
 - **Charset**: only `[0-9a-zA-Z_-]` — the server silently rejects other characters
-  (discovered in spike; raw base64 with `+/=` fails *after* health-check OK).
+  (discovered in spike; raw base64 with `+/=` fails _after_ health-check OK).
 - Explicit **"Reset server & connection token"** command for the hygiene case.
 
 ## 5. User policy (frozen default, override available)
@@ -217,13 +217,13 @@ manual-selection policy at the user's request; no keepalive setting is changed.
 
 Pre-flight before every resolve, from `incus list` / daemon state:
 
-| situation | behavior |
-|---|---|
-| instance stopped | offer "Start & connect" (progress UI), then proceed |
-| instance deleted (404) | distinct error + tree refresh; never auto-recreate |
-| recreated instance (stale `~/.vscode-server`, wrong commit) | detect, restart server under correct commit |
-| container stopped mid-session | all bridges die at once → fatal "Connection lost" + "Start and reconnect" action |
-| glibc/musl/arch mismatch | refusal names the exact constraint (via check-requirements) |
+| situation                                                   | behavior                                                                         |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| instance stopped                                            | offer "Start & connect" (progress UI), then proceed                              |
+| instance deleted (404)                                      | distinct error + tree refresh; never auto-recreate                               |
+| recreated instance (stale `~/.vscode-server`, wrong commit) | detect, restart server under correct commit                                      |
+| container stopped mid-session                               | all bridges die at once → fatal "Connection lost" + "Start and reconnect" action |
+| glibc/musl/arch mismatch                                    | refusal names the exact constraint (via check-requirements)                      |
 
 Parity commands (with official Remote-SSH): Kill VS Code Server on Instance, Uninstall
 from Instance, plus an escape-hatch **open terminal over exec** (no sshd → no plain
@@ -236,12 +236,14 @@ metadata in its `globalStorage` (never `~/.ssh/config`, never per-instance confi
 ## 8. Spike evidence ledger (all hands-on verified, incus 6.0.5, VS Code 1.141.2→1.142.0)
 
 Transport & API:
+
 - resolver accepted, `makeConnection` dialed ×2 and held; PTY multiplexed over
   management (2 live bridges during terminal use)
 - version mismatch → core reports "Client refused: version mismatch" cleanly
 - `enable-proposed-api` via `~/.vscode/argv.json` works for installed VSIX on stable
 
 Incus specifics:
+
 - `incus file push -` (stdin) **broken on 6.0.5** — died at 77% (`connection lost`);
   path-mode push works at ~2.1 MB/s websocket ceiling (222 MB ≈ 110 s) — production
   transfers must be resumable/cached with sha256 verification
@@ -252,6 +254,7 @@ Incus specifics:
   respawned idempotently and stale servers detected before reuse
 
 Shell hygiene traps (spike-caused, now codified):
+
 - `pkill -f` self-match twice over: the pattern AND any comment text inside the same
   `bash -c` payload are matchable — bracket-class every pattern, keep payloads free of
   plain names
@@ -261,6 +264,7 @@ Shell hygiene traps (spike-caused, now codified):
   repo/script paths from it
 
 VS Code CLI/instance lessons:
+
 - CLI flags apply only to **newly created windows**; handoff to a running window
   silently drops dev-path/enable-proposed flags and reuses stale resolution state
 - two main processes (pre/post auto-update) cause confusing window/session routing;
@@ -269,6 +273,7 @@ VS Code CLI/instance lessons:
 
 Remote Explorer tree (`contribViewsRemote`, verified on stable 1.142.0, spike ext
 0.0.2/0.0.3 — tree rendered, connect-from-tree resolved and dialed ×2):
+
 - `contributes.views` container key is **`"remote"`** (= viewlet `workbench.view.remote`);
   without the `contribViewsRemote` proposal the contribution is silently dropped with
   a warning in the extension-host log (`viewsExtensionPoint.ts` gates on the proposal)
@@ -284,7 +289,7 @@ Remote Explorer tree (`contribViewsRemote`, verified on stable 1.142.0, spike ex
   entry, full-viewlet takeover, auto-select in the connected window)
 - `group: "targets@N"` is required for switcher participation (and sorts views)
 - connect from tree: `vscode.commands.executeCommand('vscode.newWindow',
-  { remoteAuthority, reuseWindow })` — the open-remote-ssh pattern, works for
+{ remoteAuthority, reuseWindow })` — the open-remote-ssh pattern, works for
   third-party authorities; extension activates via `onView:<viewId>`
 - env fact discovered during verification: on this dev host the **default incus
   remote is `fixture-remote` (TLS daemon)** and the local unix socket is NOT group-accessible
@@ -294,6 +299,7 @@ Remote Explorer tree (`contribViewsRemote`, verified on stable 1.142.0, spike ex
 
 Phase-1 extension (TypeScript + esbuild, verified on stable 1.142.0, 2026-10-19 —
 resolver + full tree + commands + bootstrap live in a real window):
+
 - authority is `incus+<remote>:<instance>` — the separator must be `:` (not `/`):
   the authority component of a `vscode-remote://` URI ends at the first slash,
   so a slash-embedded instance would vanish from the authority the resolver sees
@@ -320,6 +326,7 @@ resolver + full tree + commands + bootstrap live in a real window):
   as the target user). Resize propagation not implemented (rescue-path tradeoff).
 
 Phase-1 progress UX + reuse hardening (2026-10-19, same day, user-driven):
+
 - **progress toast parity** (Dev Containers/Remote-SSH): notification-location
   `withProgress` renders its TITLE as markdown — embed a `command:` link there:
   `[Connecting to <instance> (show log)](command:remote-incus.showLog "…")`
@@ -338,8 +345,8 @@ Phase-1 progress UX + reuse hardening (2026-10-19, same day, user-driven):
   "reuses" a server with no token file, no log, no install → 60 s port-wait
   and failure (seen live: "still waiting for port"). Fix: on-disk health check
   (code-server binary + server.log + token file) before reuse; failure → kill
-  + fresh start. Verified live: "lost its install (zombie) — killing and
-  starting fresh" → connected.
+  - fresh start. Verified live: "lost its install (zombie) — killing and
+    starting fresh" → connected.
 - **install-first ordering**: `isServerInstalled` (`.incus-install-ok` marker
   written after a successful extract, OR core files for spike-era installs)
   runs BEFORE any tarball work — when the install exists, download/push/
@@ -368,6 +375,7 @@ Phase-1 progress UX + reuse hardening (2026-10-19, same day, user-driven):
 Phase-1 connect-affordance parity (user-requested 2026-10-20, evidence from the
 official Remote Explorer extension 0.5.0 — installed manifest inspected — and
 `jeanp413/open-remote-ssh` source):
+
 - **official pattern**: `connectToRemoteInCurrentWindow` ("Connect in Current
   Window...", `$(arrow-right)`) at `inline@1` + `navigation@1`,
   `connectToRemoteInNewWindow` ("Connect in New Window...", `$(empty-window)`)
@@ -386,6 +394,7 @@ official Remote Explorer extension 0.5.0 — installed manifest inspected — an
   remote nodes render without an icon (chevron only).
 
 Phase-1 single-flow connect (user-driven 2026-10-20, log evidence):
+
 - the tree-connect command pre-ran `ensureServerReady` before
   `vscode.newWindow` — but core **restarts the extension host within ~1 s**
   of the command and runs a fresh `resolver.resolve()` there (bridges are
@@ -401,9 +410,10 @@ Phase-1 single-flow connect (user-driven 2026-10-20, log evidence):
 Dev Containers folder UX (user-requested 2026-10-22; evidence from the
 installed extensions' bundles — remote-explorer 0.5.0, remote-ssh 0.128,
 remote-containers 0.469):
+
 - **official pattern**: targets (SSH hosts / containers) render a nested
   list of FOLDERS ever opened on that target (`viewItem ==
-  remote-explorer.remoteFolder` / `attachedFolder`); folder rows carry
+remote-explorer.remoteFolder` / `attachedFolder`); folder rows carry
   three hover icons — connect in current window (`$(arrow-right)`,
   `inline@1`), connect in new window (`$(empty-window)`, `inline@2`),
   remove-from-history (`inline@3`) — plus context-menu equivalents.
@@ -443,6 +453,7 @@ remote-containers 0.469):
 Incus version & packaging findings (2026-10-20 evening — the user fully
 reinstalled the local daemon from the zabbly repo, CLI 6.0.5→7.5.1; planned
 compat layer in §14):
+
 - `incus list <remote>:<name>` (glued positional filter): CLI 6.0.5 matched;
   CLI 7.5.1 returns NOTHING (hint: "did you forget a space") — the resolver
   pre-flight then misread the healthy instance as deleted ("instance
@@ -519,7 +530,7 @@ explicit next-step authorization.
 
 - Extension source: MIT (copies may come from MIT sources: `jeanp413/open-remote-ssh`,
   `microsoft/vscode` test-resolver sample).
-- **VS Code Server is proprietary**: bundling *download + install logic* for personal
+- **VS Code Server is proprietary**: bundling _download + install logic_ for personal
   developer use is fine; building a hosted service on it is not (server license
   aka.ms/vscode-server-license). The extension never redistributes the binary — it
   fetches from the official URL at runtime.
@@ -531,15 +542,15 @@ explicit next-step authorization.
 
 ## 10. Support matrix (MVP)
 
-| dimension | MVP | later |
-|---|---|---|
-| client OS | Linux | macOS, Windows (upstream client builds exist; CLI discovery TBD) |
-| client version | ≥ 1.140 (engine range `^1.140.0`); proposal d.ts verified byte-identical 1.140→1.142; historically verified on 1.142.0; Task 4 verified scoped behavior on Stable 1.143.1, with window/Ports findings below | proposal-shape change in a future client → extension fix release (runtime guard errors loudly, never silently) |
-| daemon | local unix socket, remote TLS (`--remote`) | restricted remotes/projects |
-| Incus CLI (client) | ≥ 6.0 — verified on 6.0.5 and 7.5.1 (list-filter quirk: §14) | — |
-| Incus server / packaging | ≥ 6.0 — verified 6.0.5 (Ubuntu deb) and 7.5.1 (zabbly); packaging variant changes behavior (§14) | port-forward on ≥ 7.3 |
-| instance arch | x64, arm64 (glibc) intended; Task 4 live checks cover x64 only | alpine-musl x64 |
-| explicit non-goals | musl-arm64 server (doesn't exist upstream) | — |
+| dimension                | MVP                                                                                                                                                                                                         | later                                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| client OS                | Linux                                                                                                                                                                                                       | macOS, Windows (upstream client builds exist; CLI discovery TBD)                                               |
+| client version           | ≥ 1.140 (engine range `^1.140.0`); proposal d.ts verified byte-identical 1.140→1.142; historically verified on 1.142.0; Task 4 verified scoped behavior on Stable 1.143.1, with window/Ports findings below | proposal-shape change in a future client → extension fix release (runtime guard errors loudly, never silently) |
+| daemon                   | local unix socket, remote TLS (`--remote`)                                                                                                                                                                  | restricted remotes/projects                                                                                    |
+| Incus CLI (client)       | ≥ 6.0 — verified on 6.0.5 and 7.5.1 (list-filter quirk: §14)                                                                                                                                                | —                                                                                                              |
+| Incus server / packaging | ≥ 6.0 — verified 6.0.5 (Ubuntu deb) and 7.5.1 (zabbly); packaging variant changes behavior (§14)                                                                                                            | port-forward on ≥ 7.3                                                                                          |
+| instance arch            | x64, arm64 (glibc) intended; Task 4 live checks cover x64 only                                                                                                                                              | alpine-musl x64                                                                                                |
+| explicit non-goals       | musl-arm64 server (doesn't exist upstream)                                                                                                                                                                  | —                                                                                                              |
 
 ## 11. Open questions (recorded, with leaning)
 
@@ -571,8 +582,8 @@ explicit next-step authorization.
    **DONE 2026-10-19** — title-embedded command link, real download/push
    percentages, percent-first messages (see §8).
 5. Diagnostics: output channel, per-bridge structured logs, "collect diagnostics"
-   command; sensible `RemoteAuthorityResolverError` usage. *(output channel +
-   per-bridge logs + collect-diagnostics exist; error-taxonomy refinement open)*
+   command; sensible `RemoteAuthorityResolverError` usage. _(output channel +
+   per-bridge logs + collect-diagnostics exist; error-taxonomy refinement open)_
 6. Tests: Task 3's 80-test correctness gate and Task 4's real shell/relay,
    explicit-target local/TLS handshakes and Stable development-window checks
    are complete within their recorded scope. See [Task 4 results](TASK-04-RESULTS.md).
@@ -586,15 +597,15 @@ explicit next-step authorization.
 
 ## 13. Spike artifact inventory (`spike/`)
 
-| file | role | keep? |
-|---|---|---|
-| `02-install-server.sh` | verified install flow (path-push, sha, extract, no-sshd proof) | reference for Phase-1 module |
-| `03-start-server.sh` | verified token+start+discovery flow | reference |
-| `relay.js` / `relay-child` semantics | the stdio↔TCP relay | becomes bundled asset |
-| `exec-bridge.sh`, `04-relay.py` | socat/poc scaffolding | disposable |
-| `ext/` (extension.js, package.json, VSIX) | resolver proof | becomes Phase-1 skeleton |
-| `redeploy.sh` | dev loop helper | keep while Phase 1 iterates |
-| `.state/` | port/token/commit cache | dev-loop artifact |
+| file                                      | role                                                           | keep?                        |
+| ----------------------------------------- | -------------------------------------------------------------- | ---------------------------- |
+| `02-install-server.sh`                    | verified install flow (path-push, sha, extract, no-sshd proof) | reference for Phase-1 module |
+| `03-start-server.sh`                      | verified token+start+discovery flow                            | reference                    |
+| `relay.js` / `relay-child` semantics      | the stdio↔TCP relay                                            | becomes bundled asset        |
+| `exec-bridge.sh`, `04-relay.py`           | socat/poc scaffolding                                          | disposable                   |
+| `ext/` (extension.js, package.json, VSIX) | resolver proof                                                 | becomes Phase-1 skeleton     |
+| `redeploy.sh`                             | dev loop helper                                                | keep while Phase 1 iterates  |
+| `.state/`                                 | port/token/commit cache                                        | dev-loop artifact            |
 
 ## 14. Incus version & packaging compatibility (design sketch — NOT yet implemented)
 
@@ -605,16 +616,16 @@ not rediscovered.
 
 ### 14.1 Verified version-dependent behaviors
 
-| surface | CLI 6.0.5 | CLI 7.5.1 | universal form |
-|---|---|---|---|
-| `incus list <remote>:<name>` glued filter | matches | no matches ("did you forget a space") | `incus list <remote>: <name>` — verified both; add exact-name find |
-| `incus <op> <remote>:<name>` (exec/file/start/stop/restart) | ok | ok | — |
-| `incus file push` progress meter | prints `<n>% (<speed>)` even when piped | prints NOTHING when piped — 7.x push is SFTP-based (`sftpCreateFile`), the meter is TTY-gated (`shared/cmd/progress.go` `Update()` returns unless stdout is a terminal), and a file push creates NO operation (no progress metadata to poll; verified 2026-10-22, piped and under a pty) | poll the growing target file in-instance (`stat -c %s`, 1 Hz) — the SFTP writer extends it in place; keep the meter parse for 6.x |
+| surface                                                     | CLI 6.0.5                               | CLI 7.5.1                                                                                                                                                                                                                                                                                | universal form                                                                                                                    |
+| ----------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `incus list <remote>:<name>` glued filter                   | matches                                 | no matches ("did you forget a space")                                                                                                                                                                                                                                                    | `incus list <remote>: <name>` — verified both; add exact-name find                                                                |
+| `incus <op> <remote>:<name>` (exec/file/start/stop/restart) | ok                                      | ok                                                                                                                                                                                                                                                                                       | —                                                                                                                                 |
+| `incus file push` progress meter                            | prints `<n>% (<speed>)` even when piped | prints NOTHING when piped — 7.x push is SFTP-based (`sftpCreateFile`), the meter is TTY-gated (`shared/cmd/progress.go` `Update()` returns unless stdout is a terminal), and a file push creates NO operation (no progress metadata to poll; verified 2026-10-22, piped and under a pty) | poll the growing target file in-instance (`stat -c %s`, 1 Hz) — the SFTP writer extends it in place; keep the meter parse for 6.x |
 
-| host stack | in-container signals | cause |
-|---|---|---|
-| Ubuntu-archive incus deb 6.0.5-8, Ubuntu 26.04 host | ALL denied, EACCES incl. root | Ubuntu 25.04+ hardening `kernel.apparmor_restrict_unprivileged_unconfined=1`; Ubuntu packaging lacks the compat sysctl (Launchpad #2109394) |
-| zabbly incus 7.5.1, kernel 7.0.0-38 (client-host; also member member-b) | fine | zabbly ships `/etc/sysctl.d/50-incus.conf` (= 0) |
+| host stack                                                        | in-container signals          | cause                                                                                                                                       |
+| ----------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ubuntu-archive incus deb 6.0.5-8, Ubuntu 26.04 host               | ALL denied, EACCES incl. root | Ubuntu 25.04+ hardening `kernel.apparmor_restrict_unprivileged_unconfined=1`; Ubuntu packaging lacks the compat sysctl (Launchpad #2109394) |
+| zabbly incus 7.5.1, kernel 7.0.0-38 (client-host; also member member-b) | fine                          | zabbly ships `/etc/sysctl.d/50-incus.conf` (= 0)                                                                                            |
 
 Gotcha: server version ≠ instance behavior — `fixture-remote` is a CLUSTER (member
 `fixture-remote`: Ubuntu 24.04/kernel 6.8; member `member-b`: kernel 7.0.0-38); what an
