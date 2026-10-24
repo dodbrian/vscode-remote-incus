@@ -14,9 +14,33 @@ import { firstLine, log } from './logging';
 import { withProgressReport } from './progress';
 
 export class IncusAuthorityResolver implements vscode.RemoteAuthorityResolver {
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly refreshInstances?: () => void,
+  ) {}
 
   async resolve(
+    authority: string,
+    context: vscode.RemoteAuthorityResolverContext,
+  ): Promise<vscode.ResolverResult> {
+    try {
+      return await this.resolveAuthority(authority, context);
+    } catch (err) {
+      log(
+        `resolve(${authority}) failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`,
+      );
+      throw toResolverError(err, authority);
+    }
+  }
+
+  private unavailable(ref: InstanceRef): never {
+    this.refreshInstances?.();
+    throw vscode.RemoteAuthorityResolverError.NotAvailable(
+      `instance "${ref.remote}:${ref.instance}" not found (deleted or renamed) — refresh the Remote Explorer`,
+    );
+  }
+
+  private async resolveAuthority(
     authority: string,
     _context: vscode.RemoteAuthorityResolverContext,
   ): Promise<vscode.ResolverResult> {
@@ -43,21 +67,32 @@ export class IncusAuthorityResolver implements vscode.RemoteAuthorityResolver {
 
       report('checking instance state…');
       const status = await getInstanceStatus(ref);
-      if (status === undefined) {
-        throw new Error(
-          `instance "${remote}:${parsed.instance}" not found (deleted or renamed) — refresh the Remote Explorer`,
+      if (status === undefined) this.unavailable(ref);
+      if (status === 'Starting') {
+        throw vscode.RemoteAuthorityResolverError.TemporarilyNotAvailable(
+          `instance ${remote}:${parsed.instance} is still starting — retrying`,
         );
       }
-      if (status !== 'Running') {
-        report(`starting instance…`);
+      if (status === 'Stopped') {
+        report('starting instance…');
         log(`instance is ${status} — starting …`);
         await startInstance(ref);
-        if ((await getInstanceStatus(ref)) !== 'Running') {
-          // Controllable wait → core re-resolves (DESIGN §6).
+        const afterStart = await getInstanceStatus(ref);
+        if (afterStart === undefined) this.unavailable(ref);
+        if (afterStart === 'Stopped' || afterStart === 'Starting') {
           throw vscode.RemoteAuthorityResolverError.TemporarilyNotAvailable(
-            `instance ${remote}:${parsed.instance} is still starting — retrying`,
+            `instance ${remote}:${parsed.instance} is still starting (state: ${afterStart}) — retrying`,
           );
         }
+        if (afterStart !== 'Running') {
+          throw new Error(
+            `instance ${remote}:${parsed.instance} entered ${afterStart} while starting`,
+          );
+        }
+      } else if (status !== 'Running') {
+        throw new Error(
+          `instance ${remote}:${parsed.instance} is ${status} — make it Running or Stopped before connecting`,
+        );
       }
 
       const session = await ensureServerReady(this.context, ref, report);
@@ -76,12 +111,5 @@ export function toResolverError(err: unknown, authority: string): Error {
     return err;
   }
   const msg = firstLine(err);
-  if (/not found|No such/i.test(msg)) {
-    // Deleted/renamed instance: unresolvable, never auto-recreated.
-    return vscode.RemoteAuthorityResolverError.NotAvailable(
-      `Instance for authority "${authority}" not found`,
-      true,
-    );
-  }
-  return new Error(`Failed to resolve "${authority}": ${msg}`);
+  return new Error(`Failed to resolve "${authority}": ${msg}`, { cause: err });
 }

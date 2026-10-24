@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { IncusAuthorityResolver } from '../src/resolver';
+import { IncusAuthorityResolver, toResolverError } from '../src/resolver';
 import { childProcess, withFixture } from './support/fixture';
-import { context, installedServer, progress } from './support/scenario';
+import { COMMIT, context, installedServer, progress } from './support/scenario';
+import * as vscode from 'vscode';
 import { defined } from './support/assert';
 
 for (const status of ['Running', 'Stopped', 'still-stopped', 'absent', 'daemon-failure'] as const)
@@ -105,3 +106,117 @@ test('C3: unsupported proposed API fails with setup guidance before external wor
     );
     assert.deepEqual(f.calls, []);
   }));
+
+for (const scenario of [
+  { state: undefined, code: 'NotAvailable', starts: 0 },
+  { state: 'Starting', code: 'TemporarilyNotAvailable', starts: 0 },
+  { state: 'Freezing', code: undefined, starts: 0 },
+  { state: 'Frozen', code: undefined, starts: 0 },
+  { state: 'Stopped', after: undefined, code: 'NotAvailable', starts: 1 },
+  { state: 'Stopped', after: 'Starting', code: 'TemporarilyNotAvailable', starts: 1 },
+  { state: 'Stopped', after: 'Error', code: undefined, starts: 1 },
+]) {
+  test(`resolver taxonomy: ${String(scenario.state)} / ${String(scenario.after)}`, (t) =>
+    withFixture(t, async (f) => {
+      progress(f);
+      f.routes.set('vscode.execute', () => Promise.resolve());
+      let checks = 0;
+      let starts = 0;
+      let refreshes = 0;
+      f.routes.set('child_process.execFile', (_cmd, args, _opts, cb) => {
+        if (args[0] === 'list') {
+          const state = checks++ === 0 ? scenario.state : scenario.after;
+          cb(null, JSON.stringify(state ? [{ name: 'same', status: state }] : []), '');
+        } else if (args[0] === 'start') {
+          starts++;
+          cb(null, '', '');
+        } else assert.fail(`unexpected operation: ${String(args)}`);
+      });
+      const resolver = new IncusAuthorityResolver(context(f), () => {
+        refreshes++;
+      });
+      await assert.rejects(resolver.resolve('incus+selected:same', {} as any), (err: any) => {
+        assert.equal(err.code, scenario.code);
+        assert.match(err.message, /selected:same/);
+        return true;
+      });
+      assert.equal(starts, scenario.starts);
+      assert.equal(refreshes, scenario.code === 'NotAvailable' ? 1 : 0);
+    }));
+}
+
+for (const message of [
+  'daemon socket: No such file or directory',
+  'incus executable not found',
+  'TLS handshake failed',
+  'permission denied',
+  'timed out',
+]) {
+  test(`resolver preserves underlying failure: ${message}`, (t) =>
+    withFixture(t, async (f) => {
+      progress(f);
+      f.routes.set('vscode.execute', () => Promise.resolve());
+      f.routes.set('child_process.execFile', (_cmd, _args, _opts, cb) => {
+        cb(new Error(message), '', message + '\nfull diagnostic detail');
+      });
+      await assert.rejects(
+        new IncusAuthorityResolver(context(f)).resolve('incus+selected:same', {} as any),
+        (err: any) => {
+          assert.equal(err.code, undefined);
+          assert.ok(err.cause instanceof Error);
+          assert.match(err.cause.message, /full diagnostic detail/);
+          assert.ok(err.message.includes(message));
+          return true;
+        },
+      );
+    }));
+}
+
+test('resolver mapping preserves explicit taxonomy and cause without guessing from text', () => {
+  const original = new Error('dependency not found\nfull detail');
+  const mapped = toResolverError(original, 'incus+selected:same');
+  assert.equal(mapped.cause, original);
+  assert.match(mapped.message, /dependency not found/);
+});
+
+test('resolver mapping leaves explicit taxonomy errors intact', () => {
+  for (const original of [
+    vscode.RemoteAuthorityResolverError.NotAvailable('instance deleted'),
+    vscode.RemoteAuthorityResolverError.TemporarilyNotAvailable('starting'),
+  ])
+    assert.equal(toResolverError(original, 'incus+selected:same'), original);
+});
+
+for (const stage of ['start', 'bootstrap'] as const) {
+  test(`resolver retains ${stage} failure without retrying`, (t) =>
+    withFixture(t, async (f) => {
+      progress(f);
+      f.routes.set('vscode.execute', () => Promise.resolve());
+      f.state.set('commit', COMMIT);
+      const failedOperations = new Set<string>();
+      f.routes.set('child_process.execFile', (_cmd, args, _opts, cb) => {
+        if (args[0] === 'list') {
+          cb(
+            null,
+            JSON.stringify([{ name: 'same', status: stage === 'start' ? 'Stopped' : 'Running' }]),
+            '',
+          );
+        } else {
+          const operation = JSON.stringify(args);
+          assert.ok(!failedOperations.has(operation), 'failed operation must not be retried');
+          failedOperations.add(operation);
+          cb(new Error('failure'), '', 'permission denied\nfull detail');
+        }
+      });
+      await assert.rejects(
+        new IncusAuthorityResolver(context(f)).resolve('incus+selected:same', {} as any),
+        (err: any) => {
+          assert.equal(err.code, undefined);
+          assert.ok(err.cause instanceof Error);
+          assert.match(err.cause.message, /full detail/);
+          return true;
+        },
+      );
+      assert.ok(failedOperations.size > 0);
+    }));
+}

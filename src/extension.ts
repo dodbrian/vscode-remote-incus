@@ -35,7 +35,9 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.workspace.registerRemoteAuthorityResolver(
       AUTHORITY_PREFIX,
-      new IncusAuthorityResolver(context),
+      new IncusAuthorityResolver(context, () => {
+        tree.refresh();
+      }),
     ),
     vscode.window.registerTreeDataProvider('remote-incus.instances', tree),
   );
