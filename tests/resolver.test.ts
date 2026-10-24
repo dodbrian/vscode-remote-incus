@@ -11,6 +11,10 @@ for (const status of ['Running', 'Stopped', 'still-stopped', 'absent', 'daemon-f
       const operations = installedServer(f);
       const bootstrap = defined(f.routes.get('child_process.execFile'));
       const reports = progress(f);
+      f.expect('vscode.execute', (...args) => {
+        assert.deepEqual(args, ['setContext', 'forwardedPortsViewEnabled', true]);
+        return Promise.resolve();
+      });
       let checks = 0;
       let starts = 0;
       f.routes.set('child_process.execFile', (cmd, args, opts, cb) => {

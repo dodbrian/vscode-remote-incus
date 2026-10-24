@@ -30,6 +30,9 @@ export class IncusAuthorityResolver implements vscode.RemoteAuthorityResolver {
       );
     }
     const parsed = parseAuthority(authority);
+    // Core gates the Ports view on this context, including for managed
+    // connections. Forwarding itself uses core's default remote-agent path.
+    await vscode.commands.executeCommand('setContext', 'forwardedPortsViewEnabled', true);
     // Progress toast with a clickable "(show log)" link — the Dev Containers /
     // Remote-SSH parity UX (DESIGN §7); the slow first bootstrap (download,
     // push, extract) must never be a silent spinner.

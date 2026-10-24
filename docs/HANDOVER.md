@@ -20,7 +20,82 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: mandatory quality gates (2026-10-24)
+## Current stopping point: Ports activation and forwarding (2026-10-24)
+
+The user authorized fixing the missing Ports view and verifying forwarding.
+`src/resolver.ts` now awaits `setContext('forwardedPortsViewEnabled', true)`
+during resolve. Core retains its default forwarding implementation; no custom
+tunnel factory, transport, token or user-policy changes were introduced.
+Resolver regression expectations failed before the fix and pass afterwards.
+
+Live verification used Stable 1.143.1 in a separate temporary development
+profile and an explicitly named idle local fixture. The Ports focus command
+(`~remote.forwardedPorts.focus`) succeeded, and a tunnel opened with the
+proposed workspace tunnel API returned the exact fixture HTTP response through
+a host-local forwarded port. Only the temporary verification manifest enabled
+the `tunnels` proposal; production does not need it. This verifies view-command
+registration and actual forwarding, not a user-observed screenshot or manual
+Ports input interaction.
+
+**Remaining fixture-specific limitation:** an IPv4-only service bound to
+`127.0.0.1` failed through core forwarding because it attempted container
+`::1`. An IPv6 loopback listener on the same port made forwarding pass.
+Follow-up source/runtime checks established the cause: core normalizes
+loopback destinations to `localhost`, and the installed server already uses
+`autoSelectFamily: true`. However, bundled Node adds `dns.ADDRCONFIG` during
+connection lookup. This fixture has only IPv6 on its external interface;
+IPv4 exists only on loopback. Unfiltered `dns.lookup('localhost', {all:true})`
+returns both families, while adding `ADDRCONFIG` returns only `::1`, leaving
+no IPv4 fallback candidate. A bounded direct connection to `127.0.0.1` with
+the same bundled Node succeeded and returned the exact test payload.
+
+IPv4 connectivity is supported; this is a loopback name-resolution edge case
+on the tested IPv6-only-networked fixture, not a general Incus or forwarding
+protocol restriction. IPv4-only forwarding through core subsequently passed
+on the designated TLS/cluster fixture with external IPv4 networking (see
+below). Investigate preserving the explicit IPv4 destination or another
+narrowly scoped remedy before declaring full support.
+Do not change container network configuration to make a test pass.
+The identical-folder finding remains open.
+
+Sources checked through Context7 and the web:
+[core destination normalization](https://github.com/microsoft/vscode/blob/main/src/vs/platform/tunnel/node/tunnelService.ts),
+[server family fallback](https://github.com/microsoft/vscode/blob/main/src/vs/server/node/remoteExtensionHostAgentServer.ts),
+and [historical dual-family fix](https://github.com/microsoft/vscode/issues/191945).
+The installed server bundle was inspected separately to confirm family fallback
+is present in the tested version.
+
+`npm test` (12 passing test-file entries, including typecheck, lint and
+repository formatting) and compile passed. Temporary HTTP listeners, tunnels
+and development windows were cleaned up. The user subsequently authorized
+committing the resolver fix, regression coverage and this handover together.
+No normal-session restart, VSIX installation, push or publication was performed;
+the fix is not deployed to the normal installed extension.
+
+Follow-up on the user-requested fixture-remote fixture: its external interface has
+IPv4 and IPv6 addresses, and it had no active editor relays before testing.
+A temporary unprivileged HTTP service was asserted to listen only on
+`127.0.0.1`. In a separate Stable 1.143.1 development profile, the Ports focus
+command succeeded and a workspace tunnel requested for container
+`127.0.0.1` returned the exact service marker through host `127.0.0.1`.
+This proves actual IPv4-only service forwarding over the TLS/cluster Incus
+transport in that environment. The IPv6-only-networked local fixture's
+address-filtering edge case remains distinct. Normal bootstrap recovered
+preexisting incomplete server state during the test; no manual reset or
+uninstall was performed. The HTTP listener, test tunnel and development
+window were cleaned up; the normal user profile was not restarted or modified.
+
+Recommended next step: verify manual Ports interaction in an isolated
+window (Forward a Port, HTTP response, Change Local Address Port and Stop
+Forwarding Port). Automated view focus and API-created tunnels do not prove
+these controls. Then discuss the identical-folder new-window behavior and
+whether to address the IPv6-only-networked fixture's IPv4-loopback edge case.
+Resolver error-taxonomy polish and packaging remain later work; publishing
+requires the naming/publisher decision and a separate privacy audit.
+No further implementation, deployment or live verification starts without
+explicit user instruction.
+
+## Previous state: mandatory quality gates (2026-10-24)
 
 Task 5 was closed earlier the same day (previous state below). The prior session,
 at the user's request, introduced mandatory linting, code formatting and
