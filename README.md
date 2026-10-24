@@ -47,7 +47,10 @@ Bootstrap requires `/bin/sh`; Bash is optional. The rescue terminal additionally
 requires util-linux `script`. Minimal Alpine x64 images need `libstdc++` and
 `libgcc` for the musl server runtime; installing Bash does not supply those
 libraries. Install prerequisites explicitly; the extension does not install
-system packages.
+system packages. Before launching a new server, bootstrap probes the bundled
+runtime and reports loader or permission failures immediately; it also checks
+for `nohup` and an executable launcher. The rescue terminal names a missing
+`script` utility directly.
 
 ## Server download strategy
 

@@ -20,7 +20,47 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: resolver classification and shell portability (2026-10-25)
+## Current stopping point: early startup prerequisite diagnostics (2026-10-25)
+
+The deployment and terminal acceptance record below is committed as `a795b5d`.
+The user then authorized proceeding with prerequisite diagnostics.
+
+Implemented in `src/bootstrap.ts`: before detaching a new server, the selected
+user checks for `nohup`, an executable server launcher, and successful bundled
+`node --version`. Runtime failures immediately name the loader/permission
+failure with installation or permission guidance; the original exit status
+and multiline diagnostics propagate through the existing Incus/resolver errors.
+Checks run before removing the previous server log, so failed prerequisites
+preserve that diagnostic file and never enter readiness polling. They share
+the existing launch exec, and healthy reuse does not run a new runtime probe.
+This detects basic runtime loading failures, not every later server/module
+requirement or application startup failure.
+
+`src/terminal.ts` checks for util-linux `script` through `/bin/sh` before
+opening the rescue PTY and prints installation guidance if it is missing.
+The existing Bash preference and `/bin/sh` fallback remain in the PTY command.
+No packages are installed automatically.
+
+Failure-first offline regressions execute the generated startup shell script
+against local fixtures: missing C++ libraries, missing/non-executable Node,
+missing/non-executable launcher, missing nohup and successful startup. They
+check preserved logs, original failure statuses and refusal before polling or
+background launch. Rescue-terminal tests execute its outer shell wrapper and
+check missing-script guidance as well as Bash preference/fallback. The existing
+log-removal failure regression now supplies valid runtime prerequisites so it
+still exercises the intended rm failure.
+
+Validation: `npm test` passes all 14 test-file entries, including typecheck,
+lint and format checks; compile and `git diff --check` pass. No test files fail
+or skip.
+
+The user requested committing these diagnostics and proceeding with deployment.
+Deployment and live verification of this change are pending at this commit;
+the previously installed build is the accepted `aee3bc5` / `15ba764` version
+below. Live failure checks must use isolated fixtures and must not remove
+libraries from the user's active Alpine session. No push was requested.
+
+## Previous state: resolver classification and shell portability (2026-10-25)
 
 The user authorized the recommended resolver classification task. Implemented
 in `src/resolver.ts`, with tree-refresh wiring in `src/extension.ts`:

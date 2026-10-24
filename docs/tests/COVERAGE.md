@@ -1,3 +1,17 @@
+# Prerequisite diagnostics follow-up (2026-10-25)
+
+`prerequisites.test.ts` executes the generated startup script under `/bin/sh`
+with local fake runtime/launcher utilities. Missing libraries, missing or
+non-executable runtime/launcher, and missing nohup refuse before background
+launch or readiness polling, preserve the previous startup log, retain exact
+failure statuses and multiline loader diagnostics, and name the required
+remedy. Successful startup still launches the selected executable. The existing
+log-removal failure test supplies working prerequisites to reach its original
+failure point. `shell.test.ts` executes the rescue terminal's outer wrapper,
+covering missing-script installation guidance and retained Bash/sh selection.
+These are offline failure-injection results; the new diagnostics have not been
+live-verified or redeployed.
+
 # Shell portability follow-up (2026-10-25)
 
 `tests/shell.test.ts` executes generated CLI scripts with Bash absent from PATH

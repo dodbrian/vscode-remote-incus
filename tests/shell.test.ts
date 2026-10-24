@@ -41,6 +41,7 @@ for (const failure of [false, true]) {
 for (const bash of ['absent', 'present', 'fails'] as const) {
   test(`shell: rescue terminal with bash ${bash}`, (t) =>
     withFixture(t, (f) => {
+      writeFileSync(`${f.directory}/script`, '#!/bin/sh\nexec /bin/sh -c "$2"\n', { mode: 0o700 });
       writeFileSync(`${f.directory}/stty`, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
       if (bash !== 'absent') {
         writeFileSync(
@@ -56,7 +57,7 @@ for (const bash of ['absent', 'present', 'fails'] as const) {
         assert.equal(args[1], 'offline-shell:owned');
         assert.ok(args.includes('HOME=/home/alice'));
         assert.ok(args.includes('SHELL=/bin/sh'));
-        const inner = defined(args[args.indexOf('-qec') + 1]);
+        const inner = defined(args.at(-1));
         const result = spawnSync('/bin/sh', ['-c', inner], {
           env: { PATH: f.directory },
           input: 'printf sh-shell; exit\n',
@@ -69,3 +70,19 @@ for (const bash of ['absent', 'present', 'fails'] as const) {
       openExecTerminal(ref, identity);
     }));
 }
+
+test('shell: missing rescue utility names the prerequisite before shell startup', (t) =>
+  withFixture(t, (f) => {
+    f.expect('vscode.terminal', (options) => ({ show: () => options.pty.open() }));
+    f.expect('child_process.spawn', (_cmd, args: string[]) => {
+      const command = args.slice(args.indexOf('--') + 1);
+      const result = spawnSync(defined(command[0]), command.slice(1), {
+        env: { PATH: f.directory },
+        encoding: 'utf8',
+      });
+      assert.match(result.stderr ?? '', /rescue terminal requires util-linux.*script/i);
+      assert.equal(result.status, 127);
+      return childProcess();
+    });
+    openExecTerminal(ref, identity);
+  }));

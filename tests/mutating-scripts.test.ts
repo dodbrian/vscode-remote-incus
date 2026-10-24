@@ -50,7 +50,9 @@ for (const failure of [
       assert.ok(script);
       const home = `${f.directory}/home`;
       const bin = `${home}/.vscode-server/bin`;
-      mkdirSync(`${bin}/${COMMIT}`, { recursive: true });
+      mkdirSync(`${bin}/${COMMIT}/bin`, { recursive: true });
+      writeFileSync(`${bin}/${COMMIT}/node`, '#!/bin/sh\nprintf "v24.22.1\\n"\n', { mode: 0o700 });
+      writeFileSync(`${bin}/${COMMIT}/bin/code-server`, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
       mkdirSync(`${home}/.vscode-server/data/Machine`, { recursive: true });
       writeFileSync(`${home}/.vscode-server/data/Machine/.incus-conn-token`, '');
       mkdirSync(`${bin}/old-a`);
@@ -74,6 +76,8 @@ for (const failure of [
                     : 'rm() { case "$*" in *.vscode-server*) return 31;; *) return 0;; esac; };';
       const result = spawnSync('/bin/sh', ['-c', `${prefix}\n${local}`], { encoding: 'utf8' });
       assert.notEqual(result.status, 0, `${failure} was hidden by a subsequent successful command`);
+      if (failure === 'launch-log')
+        assert.equal(result.status, 31, 'log failure must reach rm after prerequisites pass');
     }));
 
 test('S B4: actual token setup mints atomically and preserves a healthy token', (t) =>

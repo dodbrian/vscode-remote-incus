@@ -659,6 +659,17 @@ async function startServer(ref: InstanceRef, identity: Identity, commit: string)
     ref,
     [
       `set -e`,
+      `command -v nohup >/dev/null 2>&1 || { printf '%s\\n' "VS Code server requires 'nohup'; install the instance's core utilities before connecting" >&2; exit 127; }`,
+      `test -x ${sq(bin)} || { printf '%s\\n' ${sq('VS Code server launcher is missing or not executable; repair the server installation: ' + bin)} >&2; exit 1; }`,
+      // Probe as the selected user before detaching or discarding the old log.
+      // Let the bundled loader report exact libraries/ABI/permission failures.
+      `if runtime_output=$(${sq(`${identity.home}/${VS_SERVER_DIR}/bin/${commit}/node`)} --version 2>&1); then`,
+      '  :',
+      'else',
+      '  runtime_status=$?',
+      `  printf '%s\\n' "VS Code server runtime cannot start; install missing runtime libraries or fix executable permissions: $runtime_output" >&2`,
+      '  exit "$runtime_status"',
+      'fi',
       `rm -f ${sq(logFile)}`,
       `nohup ${sq(bin)} \\`,
       `  --host 127.0.0.1 --port 0 \\`,

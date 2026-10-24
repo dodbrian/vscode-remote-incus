@@ -12,7 +12,7 @@
 import * as cp from 'child_process';
 import * as vscode from 'vscode';
 import { Identity } from './bootstrap';
-import { incusSpawn, InstanceRef, target } from './incusCli';
+import { incusSpawn, InstanceRef, sq, target } from './incusCli';
 import { log } from './logging';
 
 export function openExecTerminal(ref: InstanceRef, identity: Identity): void {
@@ -42,6 +42,10 @@ class ExecPty implements vscode.Pseudoterminal {
     // Run the wrapper through POSIX sh even if the inherited SHELL is missing.
     // Select before exec: a failing interactive shell must not launch a second one.
     const inner = `stty rows ${rows} cols ${cols} 2>/dev/null; if command -v bash >/dev/null 2>&1; then exec bash; else exec /bin/sh; fi`;
+    const command = [
+      `command -v script >/dev/null 2>&1 || { printf '%s\\n' "Rescue terminal requires util-linux 'script'; install it inside the instance and retry" >&2; exit 127; }`,
+      `exec script -qec ${sq(inner)} /dev/null`,
+    ].join('\n');
     log(`terminal: opening exec shell on ${target(this.ref)} as ${this.identity.username}`);
     this.child = incusSpawn([
       'exec',
@@ -55,10 +59,9 @@ class ExecPty implements vscode.Pseudoterminal {
       '--env',
       'SHELL=/bin/sh',
       '--',
-      'script',
-      '-qec',
-      inner,
-      '/dev/null',
+      '/bin/sh',
+      '-c',
+      command,
     ]);
     this.child.stdout?.on('data', (d: Buffer) => {
       this.writeEmitter.fire(d.toString());
