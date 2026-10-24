@@ -1,6 +1,6 @@
 /**
  * "Remote - Incus" — attach to Incus containers as a first-class remote
- * connection type (DESIGN.md). Activates via `onResolveRemoteAuthority:incus`
+ * connection type (docs/DESIGN.md). Activates via `onResolveRemoteAuthority:incus`
  * and `onView:remote-incus.instances`.
  */
 import * as vscode from 'vscode';

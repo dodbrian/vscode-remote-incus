@@ -166,4 +166,4 @@ discussion of coverage, gaps and defects before any correctness or live work.
 Manual targets and their identifying logs remain outside tracked artifacts.
 Neither private fixture is a CI dependency. The standalone live harness refuses
 CI and requires explicit target and destructive opt-in; no fixture is created
-or deleted automatically. See tests/README.md for commands and boundaries.
+or deleted automatically. See the [testing guide](README.md) for commands and boundaries.

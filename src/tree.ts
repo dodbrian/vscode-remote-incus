@@ -107,7 +107,7 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
 
   private icon(name: string): vscode.IconPath {
     // Public microsoft/vscode-icons assets, unchanged under CC BY 4.0.
-    // Source revision and attribution: ThirdPartyNotices.md.
+    // Source revision and attribution: docs/ThirdPartyNotices.md.
     return {
       light: vscode.Uri.file(`${this.assetsRoot}/light/${name}.svg`),
       dark: vscode.Uri.file(`${this.assetsRoot}/dark/${name}.svg`),

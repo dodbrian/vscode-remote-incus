@@ -1,7 +1,7 @@
 /**
  * Thin typed wrapper around the `incus` CLI.
  *
- * Ground rules (DESIGN.md §2/§7/§8, spike-verified):
+ * Ground rules (docs/DESIGN.md §2/§7/§8, spike-verified):
  *  - instances are ALWAYS addressed as `<remote>:<instance>` — never assume
  *    `local:` (on the dev host the default remote is a TLS daemon and the unix
  *    socket is not group-accessible);
@@ -184,7 +184,7 @@ export function pushFile(ref: InstanceRef, localPath: string, remotePath: string
 }
 
 // ---------------------------------------------------------------------------
-// daemon state (the source of truth — DESIGN.md §7)
+// daemon state (the source of truth — docs/DESIGN.md §7)
 // ---------------------------------------------------------------------------
 
 export interface RemoteInfo {

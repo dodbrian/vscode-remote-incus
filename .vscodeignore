@@ -8,7 +8,4 @@ esbuild.js
 redeploy.sh
 .gitignore
 *.vsix
-HANDOVER.md
-DESIGN.md
-ALTERNATIVES.md
 tests/**

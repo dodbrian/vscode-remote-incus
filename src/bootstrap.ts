@@ -2,7 +2,7 @@
  * VS Code server bootstrap inside an Incus instance.
  *
  * Phase-1 port of the spike-verified flow (spike/02-install-server.sh +
- * spike/03-start-server.sh), inlined per DESIGN.md §12 — no script shell-outs.
+ * spike/03-start-server.sh), inlined per docs/DESIGN.md §12 — no script shell-outs.
  * Every step is idempotent and interruption-safe; a re-run after any
  * interruption re-enters at the cheapest missing step:
  *

@@ -8,7 +8,7 @@ with a Docker container".
 
 ## Read order
 
-1. `DESIGN.md` — **the canonical architecture document**, frozen after the
+1. [Design](DESIGN.md) — **the canonical architecture document**, frozen after the
    Phase-0 spike. Full design (transport, bootstrap, token, user policy, relay
    lifecycle, error taxonomy), the complete evidence ledger (§8 — including
    all Phase-1 findings), constraints, support matrix (§10 — incl. the
@@ -17,7 +17,7 @@ with a Docker container".
 2. This file — operational context: environment snapshot, dev loop,
    debugging traps, and exactly where to resume.
 
-3. `ALTERNATIVES.md` — related projects, sources, search limits, and
+3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
 ## Current stopping point: Task 5 complete (2026-10-24)
@@ -123,8 +123,8 @@ that prerequisite before Task 2 implementation. Task 1 harness commit:
 - Verification after the review correction: `npm test` **59 passed, 0 failed,
   0 skipped**; `npm run typecheck`, `npm run compile` and `git diff --check`
   passed. Local Node version: 24.21.0.
-- [tests/COVERAGE.md](tests/COVERAGE.md) maps coverage and gaps to C1–C13,
-  B1–B6, T1–T4 and X1–X8. [tests/README.md](tests/README.md) explains the
+- [docs/tests/COVERAGE.md](tests/COVERAGE.md) maps coverage and gaps to C1–C13,
+  B1–B6, T1–T4 and X1–X8. [docs/tests/README.md](tests/README.md) explains the
   offline fixtures and commands. Coverage is partial where explicitly marked;
   mocks do not prove executable shell behavior, real handshakes, rendered UX
   or cross-window locking.
@@ -461,7 +461,7 @@ select explicitly; never "first instance".
    open: `RemoteAuthorityResolverError` usage for the §7 taxonomy (deleted
    instance → NotAvailable unresolvable, starting → TemporarilyNotAvailable, …).
 3. Tests (§12.6): Task 3 correctness and scoped Task 4 real-behavior verification
-   are complete; see `tests/COVERAGE.md` and `TASK-04-RESULTS.md`. Discuss the
+   are complete; see `docs/tests/COVERAGE.md` and `TASK-04-RESULTS.md`. Discuss the
    identical-folder window behavior and unavailable Ports view before further
    work. Insiders, arm64 and additional version/image checks remain unverified;
    expanding that matrix requires separate authorization. Private fixtures are
@@ -488,9 +488,14 @@ transport, token policy, and user policy are frozen after evidence.
 ## Quick file map
 
 ```
-DESIGN.md                  canonical architecture + findings + plan
-HANDOVER.md                current stopping point and historical context
-TASK-04-RESULTS.md         real-behavior evidence, findings and limits
+docs/
+  README.md                documentation index
+  DESIGN.md                canonical architecture + findings + plan
+  HANDOVER.md              current stopping point and historical context
+  TASK-*-RESULTS.md        implementation and verification evidence
+  TASK-05-MEASUREMENTS.json connection optimization measurements
+  tests/                   testing guide and coverage map
+  spike/                   Phase-0 verification guide
 package.json               extension manifest (proposals, views, commands, settings)
 tsconfig.json / esbuild.js build config (bundle → dist/extension.js)
 redeploy.sh                dev loop: build + package + install + relaunch
@@ -508,8 +513,7 @@ src/
   logging.ts               output channel (+ REMOTE_INCUS_DEBUG_LOG mirror)
   types/                   proposal d.ts pinned to vscode 1.142.0
 assets/relay.js            bundled relay (staged in-instance per install)
-tests/                     regression/script suite, fixtures and coverage
-tests/COVERAGE.md          plan-ID coverage, limits, defects and verification
+tests/                     regression/script suite and fixtures
 scripts/                   portable relay check, opt-in live verifier, older harnesses
 spike/                     Phase-0 artifacts (reference only)
 ```

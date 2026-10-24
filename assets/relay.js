@@ -5,7 +5,7 @@
 //   RELAY_HOST / RELAY_PORT come in via `incus exec --env` (always 127.0.0.1).
 //
 // Writes ONLY mirrored bytes to stdout; stderr keeps diagnostics.
-// Teardown semantics (spike-verified, DESIGN.md §6):
+// Teardown semantics (spike-verified, docs/DESIGN.md §6):
 //   stdin EOF        -> client.end()   (server sees FIN)
 //   client close     -> process.exit(0)
 //   stdout EPIPE     -> process.exit(1) (client side died)

@@ -11,6 +11,6 @@ Each file is copied unchanged from the corresponding `icons/light/` or
 
 These icons are licensed under [Creative Commons Attribution 4.0 International
 (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
-The full license is included in [licenses/vscode-icons-CC-BY-4.0.txt](licenses/vscode-icons-CC-BY-4.0.txt).
+The full license is included in [licenses/vscode-icons-CC-BY-4.0.txt](../licenses/vscode-icons-CC-BY-4.0.txt).
 The extension's MIT license does not replace the icons' CC BY 4.0 license.
 No Microsoft endorsement is implied; trademark rights are not granted.

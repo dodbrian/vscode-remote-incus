@@ -1,7 +1,7 @@
 /**
  * Output-channel logging. All modules funnel through here so the output
  * channel ("Remote - Incus") doubles as the per-bridge diagnostics trail
- * (DESIGN.md §12 item 4).
+ * (docs/DESIGN.md §12 item 4).
  *
  * For the dev loop, REMOTE_INCUS_DEBUG_LOG may point at a file the extension
  * mirrors every line into (the redeploy script sets it; the extension host

@@ -1,6 +1,6 @@
 # Phase-0 spike: VS Code server over `incus exec` stdio (no sshd)
 
-Goal: validate the exec-stdio transport design hands-on *before* writing DESIGN.md.
+Goal: validate the exec-stdio transport design hands-on *before* writing the [design](../DESIGN.md).
 Nothing here is production code — it's disposable plumbing.
 
 ## What must be proven
@@ -20,12 +20,15 @@ Nothing here is production code — it's disposable plumbing.
 
 ## Steps
 
+Script paths below are relative to `spike/` in the repository root.
+
 | script | what it does |
 |---|---|
 | `02-install-server.sh` | downloads server tarball **client-side** (air-gap pattern!), pushes via `incus file push -`, extracts as `ubuntu` into `~/.vscode-server/bin/<commit>` |
 | `03-start-server.sh` | writes/ensures `0600` token file, starts server detached via `bin/code-server --host 127.0.0.1 --port 0 --connection-token-file …`, parses the listening port from stdout log, writes `spike/.state/` |
 | `04-relay.py` | local TCP listener on `127.0.0.1:16080`; every connection spawns its own `incus exec … node -e` relay bridging stdio ↔ the in-container server port; prints the `?tkn=` URL to open |
-| `05-checklist.md` | the manual verification list |
+
+The verification requirements are listed above under “What must be proven”.
 
 ## Hygiene
 

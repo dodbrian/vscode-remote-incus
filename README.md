@@ -5,7 +5,7 @@ Incus = community fork of LXD) as a first-class remote connection type — the
 same slot Dev Containers / Remote-SSH occupy in the Remote Explorer.
 
 **Status: Phase 1 work in progress** — architecture is frozen and spike-verified
-(see `DESIGN.md`); the extension is not yet published.
+(see [design](docs/DESIGN.md)); the extension is not yet published.
 
 ## How it works (no sshd required)
 
@@ -24,8 +24,8 @@ same slot Dev Containers / Remote-SSH occupy in the Remote Explorer.
 Canonical Workshop provides LXD development environments through Remote-SSH;
 ssh2incus provides an Incus SSH gateway without per-instance SSH servers.
 Remote - Incus connects through the existing Incus client using exec-stdio,
-without SSH setup or a separate gateway. See `ALTERNATIVES.md` in the source
-repository for the dated comparison, sources, and distribution research.
+without SSH setup or a separate gateway. See the [alternatives comparison](docs/ALTERNATIVES.md)
+for dated findings, sources, and distribution research.
 
 ## Install (VS Code stable)
 
@@ -80,7 +80,7 @@ Task 4 verification is complete; its results have been discussed and the user
 has resolved the discussion gate. Real shell/relay
 checks and explicitly authorized local/TLS integration passed, along with
 user-assisted files, terminals, Restricted Mode, distinct-folder concurrent
-windows and reload/folder reconnect. See [the evidence report](TASK-04-RESULTS.md)
+windows and reload/folder reconnect. See [the evidence report](docs/TASK-04-RESULTS.md)
 for versions, cleanup and exact limits.
 
 Two findings remain: requesting a new window for an already-open remembered
@@ -110,7 +110,7 @@ requires an explicit runtime target, destructive opt-in and the installed
 client's signing-module path. Establish that the fixture is test-owned and idle
 before use. No instance is created/deleted automatically, and target values or
 raw private logs belong outside tracked artifacts. See
-[tests/README.md](tests/README.md) for commands and boundaries. The older
+[testing guide](docs/tests/README.md) for commands and boundaries. The older
 smoke/fresh-install scripts are not CI entry points.
 
 ```
@@ -123,4 +123,10 @@ npm run typecheck
 
 Bundled tree SVGs are by Microsoft and contributors, licensed under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-See `ThirdPartyNotices.md` in the extension package for source and license details.
+See the [third-party notices](docs/ThirdPartyNotices.md) in the extension package
+for source and license details.
+
+## Documentation
+
+See the [documentation index](docs/README.md) for architecture, testing, task plans,
+verification results, and project history.

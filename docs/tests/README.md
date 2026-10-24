@@ -32,6 +32,8 @@ its exact limits are recorded in [COVERAGE.md](COVERAGE.md).
 
 ## Structure
 
+The paths below are relative to `tests/` in the repository root.
+
 - `build.cjs`: discovers top-level `*.test.ts` files, bundles each using esbuild
   into a temporary directory, runs Node's built-in test runner, propagates its
   exit status, and removes build output even on failure.

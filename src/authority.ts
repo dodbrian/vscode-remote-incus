@@ -10,7 +10,7 @@
  * after a slash would leak into the URI path and be invisible to the resolver.
  * Incus remote and instance names cannot contain `:`, so the split is total.
  * The Remote Explorer switcher keys on the authority prefix `incus`
- * (`authority.split('+')[0]`) — verified in the spike (DESIGN.md §8).
+ * (`authority.split('+')[0]`) — verified in the spike (docs/DESIGN.md §8).
  */
 export const AUTHORITY_PREFIX = 'incus';
 
