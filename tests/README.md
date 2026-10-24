@@ -196,3 +196,36 @@ remove them after the development windows exit. Check, with user assistance:
 Record actual observations separately from static/offline assertions. Report
 unavailable checks as unverified. Stable is primary; Insiders is additional
 only when installed. Do not attach raw private logs or token values to reports.
+
+## Task 5 manual startup measurements
+
+The live verifier emits sanitized `METRIC` JSON for tree configuration plus the
+selected remote's instance enumeration, resolver status lookup, and individual
+bootstrap scenarios. These are separate timings, not an end-to-end VS Code
+window measurement. Bootstrap identity is already resolved by the safety
+preflight, so all comparisons use a warm identity cache. Each run starts with
+an empty temporary client archive cache and removes the fixture installation.
+Healthy reuse and installed-but-stopped scenarios retain the same install and
+cache from that run's clean install.
+
+`scripts/startup-metrics.ts` instruments the manual process's Incus execFile
+calls and file-push spawns. `execs` includes transfer-progress stat calls;
+`pushes` and `bytes` count pushed files and payload bytes, excluding protocol
+traffic and client download bytes. Phase entries record time **since the
+preceding milestone**, with the first measured from scenario start. Percentage
+updates are ignored. Instrumentation never records command arguments, output,
+tokens or target identifiers. Measurement hooks are restored after each sample.
+New samples include an `outcome` field and derive phase intervals from rounded cumulative timestamps,
+so phase totals equal wall time. The original retained artifact predates these
+instrumentation refinements and reports rounding residuals explicitly. An
+`outcome: success` marks bootstrap completion; require the corresponding
+authentication PASS and successful cleanup/exit as well.
+
+Use the same explicit target, signing module and destructive opt-in documented
+above. Set `INCUS_TEST_RELAY_REPAIRS=yes` for final verification of missing,
+symlinked, modified and incorrect ownership/mode relay states while two
+authenticated channels remain open. These extra cases are deliberately omitted from the
+before/after timings for the three equivalent primary states. Keep raw logs
+private; publish only sanitized measurements and runtime/state descriptions.
+No timing threshold is a CI gate. Offline tests enforce a deterministic maximum
+operation count on the healthy path and retain safety assertions separately.

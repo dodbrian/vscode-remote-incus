@@ -21,14 +21,15 @@
  *   6. push      — `incus file push` PATH mode; skipped when the remote copy
  *                  already matches (sha256 compared before every push)
  *   7. extract   — as the target user into ~/.vscode-server/bin/<commit>
- *   8. relay     — bundled asset staged to ~/.vscode-server/relay.js
+ *   8. relay     — SHA/UID/GID/0600 probe batched with token preparation;
+ *                  push and verify only when state differs
  *   9. token     — 0600 token file, mint-if-missing, charset [0-9a-zA-Z0-9]
  *                  (the server silently rejects other characters — DESIGN §4)
  *  10. start     — detached (nohup, survives the exec session); a server
  *                  running under a stale commit — or a ZOMBIE whose install
  *                  files were wiped — is killed and started fresh
- *  11. port      — parsed from server.log ("Extension host agent listening
- *                  on <port>"); relays are orphan-swept after fresh starts
+ *  11. readiness — port + token read in one exec; last announcement in
+ *                  server.log wins; relays are orphan-swept after fresh starts
  *                  (DESIGN §6) — never on reuse paths (live bridges belong
  *                  to running sessions, and relays self-exit on EOF)
  */
@@ -338,15 +339,6 @@ async function ensureExtracted(ref: InstanceRef, identity: Identity, commit: str
   ].join('\n'), { uid: identity.uid, home: identity.home, timeoutMs: 300_000 });
 }
 
-/** Relay is tiny — re-stage on every install so asset updates always land. */
-async function stageRelay(context: vscode.ExtensionContext, ref: InstanceRef, identity: Identity, report?: Report): Promise<void> {
-  report?.('staging relay…', 93);
-  const localRelay = path.join(context.asAbsolutePath('.'), 'assets', 'relay.js');
-  await pushFile(ref, localRelay, relayPath(identity.home), {
-    uid: identity.uid, gid: identity.gid, mode: '600',
-  });
-}
-
 /**
  * Token lifecycle (DESIGN §4): file delivery only (never argv/env), 0600,
  * owner = target user, fresh-mint when missing, sticky across server restarts.
@@ -354,10 +346,20 @@ async function stageRelay(context: vscode.ExtensionContext, ref: InstanceRef, id
  * tokens containing anything outside [0-9a-zA-Z_-] (spike finding: it fails
  * only after the health check reports OK, which is brutally confusing).
  */
-async function ensureToken(ref: InstanceRef, identity: Identity, report?: Report): Promise<void> {
+async function prepareSessionFiles(context: vscode.ExtensionContext, ref: InstanceRef, identity: Identity, report?: Report): Promise<void> {
+  const localRelay = path.join(context.asAbsolutePath('.'), 'assets', 'relay.js');
+  const hash = await sha256File(localRelay);
+  const relay = sq(relayPath(identity.home));
+  // Probe every attempt, including unchanged server commits after asset updates.
+  // No cached assumption about remote bytes or metadata survives a connection.
+  const relayMatches = [
+    `test -f ${relay} && test ! -L ${relay}`,
+    `test "$(sha256sum ${relay} 2>/dev/null | cut -d' ' -f1)" = ${sq(hash)}`,
+    `test "$(stat -c '%u:%g:%a' ${relay} 2>/dev/null)" = ${sq(`${identity.uid}:${identity.gid}:600`)}`,
+  ].join(' && ');
   report?.('preparing token…', 95);
   const dir = `${identity.home}/${VS_SERVER_DIR}/data/Machine`;
-  await execInInstance(ref, [
+  const state = await execInInstance(ref, [
     `set -e`,
     `mkdir -p ${sq(dir)}`,
     `if [ ! -s ${sq(tokenPath(identity.home))} ]; then`,
@@ -370,7 +372,29 @@ async function ensureToken(ref: InstanceRef, identity: Identity, report?: Report
     `  echo 'token already exists (sticky reuse)'`,
     `fi`,
     `chmod 600 ${sq(tokenPath(identity.home))}`,
+    `if ${relayMatches}; then`,
+    `  echo relay-current`,
+    `else`,
+    // Unlink the path before push can follow it and overwrite another file.
+    `  if [ -L ${relay} ]; then rm -- ${relay}; fi`,
+    `  test ! -d ${relay}`,
+    `  echo relay-repair`,
+    `fi`,
   ].join('\n'), { uid: identity.uid, home: identity.home });
+  if (state.trim().split('\n').at(-1) === 'relay-current') {
+    log('relay content and metadata match — skipping push');
+    return;
+  }
+  report?.('staging relay…', 95);
+  await pushFile(ref, localRelay, relayPath(identity.home), {
+    uid: identity.uid, gid: identity.gid, mode: '600',
+  });
+  // Essential verification: never return a session after an incomplete repair.
+  try {
+    await execInInstance(ref, relayMatches, { uid: identity.uid, home: identity.home });
+  } catch (err) {
+    throw new Error(`relay verification failed after staging: ${firstLine(err)}`, { cause: err });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -409,14 +433,23 @@ async function startServer(ref: InstanceRef, identity: Identity, commit: string)
   ].join('\n'), { uid: identity.uid, home: identity.home });
 }
 
-async function discoverPort(ref: InstanceRef, identity: Identity, report?: Report): Promise<number> {
+async function discoverSession(ref: InstanceRef, identity: Identity, report?: Report): Promise<{ port: number; token: string }> {
   const file = logPath(identity.home);
   report?.('waiting for port…', 97);
   for (let i = 0; i < PORT_POLL_TRIES; i++) {
-    const out = await execInInstance(ref, `grep -s "Extension host agent listening on" ${sq(file)} || true`, { uid: identity.uid, home: identity.home });
-    const hits = [...out.matchAll(/Extension host agent listening on (\d+)/g)];
+    // One selected-user exec observes both readiness and the token file.
+    // Keep token data confined to captured stdout; never interpolate or log it.
+    const out = await execInInstance(ref, [
+      `grep -s "Extension host agent listening on" ${sq(file)} || true`,
+      `printf '\\nINCUS_TOKEN\\n'`,
+      `cat ${sq(tokenPath(identity.home))}`,
+    ].join('\n'), { uid: identity.uid, home: identity.home });
+    const [announcements, tokenText = ''] = out.split('\nINCUS_TOKEN\n');
+    const hits = [...announcements.matchAll(/Extension host agent listening on (\d+)/g)];
     if (hits.length > 0) {
-      return Number(hits[hits.length - 1][1]);
+      const token = tokenText.trim();
+      if (!token) throw new Error('could not read the connection token from the instance');
+      return { port: Number(hits[hits.length - 1][1]), token };
     }
     await sleep(PORT_POLL_INTERVAL_MS);
   }
@@ -481,7 +514,6 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
   // reuse path must be covered too).
   await probeSignalSupport(ref, identity);
   const commit = await resolveClientCommit();
-  await pruneServerCache(path.join(context.globalStorageUri.fsPath, 'server-cache'), commit);
   const flavor = await probeFlavor(ref, identity);
   report?.('checking for an existing server…');
   // Snapshot installation validity before any repair, including partial installs.
@@ -522,8 +554,7 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
     await ensureTarballInInstance(ref, identity, tar, commit, flavor, report);
     await ensureExtracted(ref, identity, commit, flavor, report);
   }
-  await stageRelay(context, ref, identity, report);
-  await ensureToken(ref, identity, report);
+  await prepareSessionFiles(context, ref, identity, report);
 
   if (reuse) {
     log(`server already running under ${commit.slice(0, 10)}… — reusing`);
@@ -532,23 +563,17 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
     await startServer(ref, identity, commit);
   }
 
-  const port = await discoverPort(ref, identity, report);
+  const { port, token } = await discoverSession(ref, identity, report);
   if (!reuse) {
     await sweepOrphanRelays(ref);
-  }
-  report?.('reading token…', 99);
-  const token = (await execInInstance(ref, `cat ${sq(tokenPath(identity.home))}`, { uid: identity.uid, home: identity.home })).trim();
-  if (!token) {
-    throw new Error('could not read the connection token from the instance');
-  }
-  // Prune is pure hygiene (superseded ~600 MB install dirs); the connection's
-  // correctness does not depend on it, so a transient exec hiccup (seen live
-  // 2026-10-20: prune exec failed once while the connection itself was ready)
-  // is logged and ignored instead of failing a fully-ready connect.
-  try {
-    await pruneOldInstalls(ref, identity, commit);
-  } catch (err: unknown) {
-    log(`install prune skipped: ${firstLine(err)}`);
+    // Hygiene belongs to fresh startup. Pruning failures cannot invalidate
+    // a ready session; healthy reuse preserves active bridges and skips it.
+    await pruneServerCache(path.join(context.globalStorageUri.fsPath, 'server-cache'), commit);
+    try {
+      await pruneOldInstalls(ref, identity, commit);
+    } catch (err: unknown) {
+      log(`install prune skipped: ${firstLine(err)}`);
+    }
   }
   report?.('ready', 100);
   log(`server ready on ${target(ref)}: commit ${commit.slice(0, 10)}…, 127.0.0.1:${port}, user ${identity.username} (uid ${identity.uid})`);

@@ -1,4 +1,5 @@
 /** Manual destructive verification only. No default target, CI use or token logs. */
+import { measureStartup } from './startup-metrics';
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import * as cp from 'node:child_process';
@@ -8,7 +9,7 @@ import * as path from 'node:path';
 import assert from 'node:assert/strict';
 import * as vscode from 'vscode';
 import { ensureServerReady, killServer, resolveIdentity, resetToken, ServerSession } from '../src/bootstrap';
-import { execInInstance, sq } from '../src/incusCli';
+import { execInInstance, sq, getInstanceStatus, listRemotes, getDefaultRemote, listInstances } from '../src/incusCli';
 
 const selected = process.env.INCUS_TEST_TARGET;
 if (process.env.CI || !selected || !/^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$/.test(selected) || process.env.INCUS_TEST_ALLOW_DESTRUCTIVE !== 'yes') {
@@ -143,6 +144,8 @@ async function checks(session: ServerSession) {
     `test "$(stat -c %u ${sq(root + '/bin/' + session.commit + '/node')})" = ${session.identity.uid}`,
     `test "$(stat -c %u ${sq(root + '/bin/' + session.commit + '/bin/code-server')})" = ${session.identity.uid}`,
     `test "$(stat -c %u ${sq(root + '/relay.js')})" = ${session.identity.uid}`,
+    `test "$(stat -c %g ${sq(root + '/relay.js')})" = ${session.identity.gid}`,
+    `test ! -L ${sq(root + '/relay.js')}`,
     `test "$(stat -c %a ${sq(root + '/relay.js')})" = 600`,
     `test "$(stat -c %u ${sq(root + '/data/Machine/.incus-conn-token')})" = ${session.identity.uid}`,
     `test "$(stat -c %a ${sq(root + '/data/Machine/.incus-conn-token')})" = 600`,
@@ -163,12 +166,18 @@ let checkpoint = 'bootstrap';
 let mutated = false;
 let testedCommit = '';
 let testedFlavor = '';
+async function ready() {
+  return measureStartup(stage, () => ensureServerReady(context, ref, message => measureStartup.phase(message)), output);
+}
 async function main() {
   try {
     const version = cp.execFileSync('code', ['--version'], { encoding: 'utf8' }).trim().split('\n');
     assert.match(version[1], /^[0-9a-f]{40}$/);
     (vscode.env as unknown as { appCommit: string }).appCommit = version[1];
     testedCommit = version[1];
+    output(`RUNTIME client=${version[0]} commit=${version[1]} arch=${version[2]} node=${process.version}`);
+    await measureStartup('tree selected-remote enumeration', async () => { await listRemotes(); await getDefaultRemote(); await listInstances(ref.remote); }, output);
+    await measureStartup('resolver running-state lookup', () => getInstanceStatus(ref), output);
     const identity = await resolveIdentity(ref);
     assert.ok(identity.uid !== 0 && identity.home.startsWith('/home/'));
     // User must also establish idleness; this check additionally refuses live relays.
@@ -177,15 +186,16 @@ async function main() {
     stage = 'clean install'; mutated = true;
     await killServer(ref);
     await execInInstance(ref, `rm -rf ${sq(root)}`);
-    let session = await ensureServerReady(context, ref);
+    let session = await ready();
     testedFlavor = session.flavor;
+    output('RUNTIME serverNode=' + (await execInInstance(ref, `${sq(root + '/bin/' + session.commit + '/node')} --version`, { uid: identity.uid, home: identity.home })).trim());
     await checks(session); output('PASS clean install, authenticated negotiation, invalid-token rejection, ownership/modes/content/temp cleanup');
     stage = 'healthy reuse'; checkpoint = 'two signed management channels';
     const a = (await authenticated(session, true, true))!;
     const b = (await authenticated(session, true, true))!;
     const pid = () => execInInstance(ref, "pgrep -f 'out/serv[e]r-main\\.js' || true");
     const before = await pid(); assert.ok(before.trim());
-    const reused = await ensureServerReady(context, ref);
+    const reused = await ready();
     assert.ok(reused.token === session.token); assert.equal(reused.port, session.port); assert.equal(await pid(), before);
     checkpoint = 'management traffic after healthy reuse';
     const beforeTraffic = [a.keepAlives, b.keepAlives];
@@ -196,20 +206,41 @@ async function main() {
       }
     })());
     assert.ok(!a.failed && !b.failed && a.child.exitCode === null && b.child.exitCode === null);
+    // Repairs on an unchanged server commit must preserve existing channels.
+    if (process.env.INCUS_TEST_RELAY_REPAIRS === 'yes') {
+      for (const [label, mutation] of [
+        ['symlink relay', `printf keep-me > ${sq(root + '/data/Machine/relay-sentinel')}; rm ${sq(root + '/relay.js')}; ln -s ${sq(root + '/data/Machine/relay-sentinel')} ${sq(root + '/relay.js')}`],
+        ['missing relay', `rm ${sq(root + '/relay.js')}`],
+        ['changed relay', `printf '// changed\\n' >> ${sq(root + '/relay.js')}`],
+        ['relay metadata', `chmod 644 ${sq(root + '/relay.js')}; chown 0:0 ${sq(root + '/relay.js')}`],
+      ]) {
+        stage = label;
+        await execInInstance(ref, mutation);
+        const repaired = await ready();
+        assert.equal(await pid(), before); assert.equal(repaired.port, session.port);
+        assert.ok(repaired.token === session.token);
+        await checks(repaired);
+        if (label === 'symlink relay') {
+          await execInInstance(ref, `test "$(cat ${sq(root + '/data/Machine/relay-sentinel')})" = keep-me`);
+        }
+        assert.ok(!a.failed && !b.failed && a.child.exitCode === null && b.child.exitCode === null);
+        output(`PASS ${label} repaired with unchanged server and live channels`);
+      }
+    }
     await Promise.all([a.close(), b.close()]);
     await checks(reused); output('PASS healthy reuse preserves server, sticky token and two live management channels');
     stage = 'installed but stopped'; await killServer(ref);
-    session = await ensureServerReady(context, ref); assert.ok(session.token === reused.token); await checks(session); output('PASS installed-but-not-running startup');
+    session = await ready(); assert.ok(session.token === reused.token); await checks(session); output('PASS installed-but-not-running startup');
     stage = 'missing token'; await execInInstance(ref, `rm ${sq(root + '/data/Machine/.incus-conn-token')}`);
-    const old = session.token; session = await ensureServerReady(context, ref); assert.ok(session.token !== old); await checks(session); output('PASS missing-token recovery');
+    const old = session.token; session = await ready(); assert.ok(session.token !== old); await checks(session); output('PASS missing-token recovery');
     stage = 'wiped install'; await execInInstance(ref, `rm -rf ${sq(root)}`);
-    session = await ensureServerReady(context, ref); await checks(session); output('PASS wiped-install recovery');
+    session = await ready(); await checks(session); output('PASS wiped-install recovery');
     stage = 'explicit reset'; const previous = session.token; session = await resetToken(context, ref); assert.ok(session.token !== previous); await checks(session); output('PASS explicit token reset');
     stage = 'stale commit'; await killServer(ref);
     // Harmless process matching the production stale-commit probe; no old server binary.
     const fake = '0123456789abcdef0123456789abcdef01234567';
     await execInInstance(ref, `nohup bash -c ${sq(`exec -a ${sq(root + '/bin/' + fake + '/out/server-main.js')} sleep 120`)} </dev/null >/dev/null 2>&1 &`, { uid: identity.uid, home: identity.home });
-    session = await ensureServerReady(context, ref); await checks(session); output('PASS stale-commit process replacement (synthetic old process, real replacement server)');
+    session = await ready(); await checks(session); output('PASS stale-commit process replacement (synthetic old process, real replacement server)');
   } finally {
     const cleanupErrors: unknown[] = [];
     for (const c of children) c.kill('SIGKILL');

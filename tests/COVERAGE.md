@@ -1,3 +1,29 @@
+# Task 5 verification overlay
+
+See [TASK-05-RESULTS.md](../TASK-05-RESULTS.md) for observed performance,
+equivalent-state boundaries and final remote evidence. The earlier task records
+below are historical; Task 5 is complete and stopped for discussion.
+
+- B5/C5: executable SHA/UID/GID/0600 regular-file probe, missing/changed/metadata
+  repair, symlink unlinking with target preservation, non-destructive directory
+  rejection and post-push verification failure preventing ready. Final remote
+  repairs preserve the matching server and two live authenticated channels.
+- C11/B4: actual combined readiness/token bash read, last announced port and
+  empty-token rejection; delayed/missing logs retain bounded diagnostic tests.
+- C8/C12/C13: healthy reuse skips transfers and hygiene without killing bridges;
+  fresh-start pruning remains nonfatal and preserves current/unrelated cache data.
+- Performance-only offline budgets allow at most seven healthy-reuse or nine
+  installed-stopped execs with warm identity, and no transfers in either state.
+  Safety assertions remain independent; no CI wall-time threshold exists.
+- Manual metrics: process hooks restored on success/failure/output error, nested
+  measurement refusal, sanitized counts, explicit outcomes and exact phase totals.
+- Review gate: 88 passed, no skips/failures; typecheck, compile, standalone manual
+  harness typecheck, portable relay and failure-cleanup checks pass. Remote
+  before/final signed handshake and recovery runs pass bounded teardown.
+
+Task 4 window findings, broader matrices and unresolved policies remain outside
+this optimization's claims. No deployment, commit, push or next task occurred.
+
 # Regression coverage through Task 4
 
 See [TASK-03-RESULTS.md](../TASK-03-RESULTS.md) for the current behavior and

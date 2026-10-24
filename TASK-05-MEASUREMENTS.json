@@ -1,0 +1,793 @@
+{
+  "date": "2026-10-24",
+  "runtime": {
+    "client": "VS Code Stable 1.143.1",
+    "commit": "e646868227c3e3a9e3f24277c8c7220be42c0be7",
+    "hostNode": "24.21.0",
+    "serverNode": "24.22.1",
+    "architecture": "x86_64/glibc",
+    "containerOS": "Ubuntu 24.04.5 LTS",
+    "incusClient": "7.5.1",
+    "incusServer": "7.5.1",
+    "transport": "TLS HTTPS management, non-interactive exec-stdio",
+    "location": "same remote cluster fixture and member in both runs; identifiers omitted",
+    "uid": 1000,
+    "gid": 1000
+  },
+  "states": {
+    "clean install": "absent installation, empty temporary client archive cache",
+    "healthy reuse": "complete matching installation and relay, sticky token, running server with two signed channels",
+    "installed but stopped": "same complete matching installation, relay, cache and token, server explicitly killed",
+    "identity": "warm in both runs after safety preflight"
+  },
+  "units": {
+    "ms": "observed wall milliseconds; one sample per state/run",
+    "execs": "Incus execFile calls including progress stats; tree includes config/list primitives",
+    "pushes": "Incus file-push spawns",
+    "bytes": "pushed file payload bytes, excludes protocol overhead and client downloads",
+    "phases": "elapsed since previous milestone; baseline percent events coalesced into next milestone",
+    "phaseRoundingResidualMs": "total wall ms minus summed rounded phase ms; baseline rounded individual percentage events before coalescing"
+  },
+  "before": [
+    {
+      "scenario": "tree selected-remote enumeration",
+      "ms": 1761,
+      "execs": 3,
+      "pushes": 0,
+      "bytes": 0,
+      "phases": [
+        {
+          "phase": "end",
+          "ms": 1761
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "resolver running-state lookup",
+      "ms": 1614,
+      "execs": 1,
+      "pushes": 0,
+      "bytes": 0,
+      "phases": [
+        {
+          "phase": "end",
+          "ms": 1614
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "clean install",
+      "ms": 141096,
+      "execs": 64,
+      "pushes": 2,
+      "bytes": 222357564,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2287
+        },
+        {
+          "phase": "pushing to instance…",
+          "ms": 12881
+        },
+        {
+          "phase": "extracting server…",
+          "ms": 108698
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 8394
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 1245
+        },
+        {
+          "phase": "starting server…",
+          "ms": 1157
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1229
+        },
+        {
+          "phase": "reading token…",
+          "ms": 2450
+        },
+        {
+          "phase": "ready",
+          "ms": 2353
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 402
+    },
+    {
+      "scenario": "healthy reuse",
+      "ms": 14277,
+      "execs": 10,
+      "pushes": 1,
+      "bytes": 1111,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 3436
+        },
+        {
+          "phase": "server already installed",
+          "ms": 3540
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 0
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 1178
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 2373
+        },
+        {
+          "phase": "reading token…",
+          "ms": 1105
+        },
+        {
+          "phase": "ready",
+          "ms": 2645
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "installed but stopped",
+      "ms": 12857,
+      "execs": 11,
+      "pushes": 1,
+      "bytes": 1111,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2276
+        },
+        {
+          "phase": "server already installed",
+          "ms": 2227
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 0
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 1222
+        },
+        {
+          "phase": "starting server…",
+          "ms": 1101
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1114
+        },
+        {
+          "phase": "reading token…",
+          "ms": 2347
+        },
+        {
+          "phase": "ready",
+          "ms": 2570
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "missing token",
+      "ms": 15805,
+      "execs": 13,
+      "pushes": 1,
+      "bytes": 1111,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2273
+        },
+        {
+          "phase": "server already installed",
+          "ms": 5096
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 0
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 1290
+        },
+        {
+          "phase": "starting server…",
+          "ms": 1226
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1208
+        },
+        {
+          "phase": "reading token…",
+          "ms": 2367
+        },
+        {
+          "phase": "ready",
+          "ms": 2346
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": -1
+    },
+    {
+      "scenario": "wiped install",
+      "ms": 135417,
+      "execs": 67,
+      "pushes": 2,
+      "bytes": 222357564,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2321
+        },
+        {
+          "phase": "verifying cached tarball…",
+          "ms": 5564
+        },
+        {
+          "phase": "pushing to instance…",
+          "ms": 1367
+        },
+        {
+          "phase": "extracting server…",
+          "ms": 109472
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 8467
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 1092
+        },
+        {
+          "phase": "starting server…",
+          "ms": 1185
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1126
+        },
+        {
+          "phase": "reading token…",
+          "ms": 2454
+        },
+        {
+          "phase": "ready",
+          "ms": 2368
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 1
+    },
+    {
+      "scenario": "stale commit",
+      "ms": 16416,
+      "execs": 12,
+      "pushes": 1,
+      "bytes": 1111,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2418
+        },
+        {
+          "phase": "server already installed",
+          "ms": 4714
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 0
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 1184
+        },
+        {
+          "phase": "starting server…",
+          "ms": 1239
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1209
+        },
+        {
+          "phase": "reading token…",
+          "ms": 3408
+        },
+        {
+          "phase": "ready",
+          "ms": 2244
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    }
+  ],
+  "after": [
+    {
+      "scenario": "tree selected-remote enumeration",
+      "ms": 1718,
+      "execs": 3,
+      "pushes": 0,
+      "bytes": 0,
+      "phases": [
+        {
+          "phase": "end",
+          "ms": 1718
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "resolver running-state lookup",
+      "ms": 1574,
+      "execs": 1,
+      "pushes": 0,
+      "bytes": 0,
+      "phases": [
+        {
+          "phase": "end",
+          "ms": 1574
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "clean install",
+      "ms": 146360,
+      "execs": 66,
+      "pushes": 2,
+      "bytes": 222357564,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 1
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2279
+        },
+        {
+          "phase": "pushing to instance…",
+          "ms": 11749
+        },
+        {
+          "phase": "extracting server…",
+          "ms": 115568
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 8565
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 1206
+        },
+        {
+          "phase": "starting server…",
+          "ms": 2336
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1178
+        },
+        {
+          "phase": "ready",
+          "ms": 3478
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "healthy reuse",
+      "ms": 8123,
+      "execs": 7,
+      "pushes": 0,
+      "bytes": 0,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2349
+        },
+        {
+          "phase": "server already installed",
+          "ms": 3469
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 1
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1140
+        },
+        {
+          "phase": "ready",
+          "ms": 1164
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "missing relay",
+      "ms": 10829,
+      "execs": 9,
+      "pushes": 1,
+      "bytes": 1111,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2313
+        },
+        {
+          "phase": "server already installed",
+          "ms": 3702
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 0
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 1236
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 2354
+        },
+        {
+          "phase": "ready",
+          "ms": 1224
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "changed relay",
+      "ms": 12689,
+      "execs": 9,
+      "pushes": 1,
+      "bytes": 1111,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 3455
+        },
+        {
+          "phase": "server already installed",
+          "ms": 3411
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 1
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 1163
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 3438
+        },
+        {
+          "phase": "ready",
+          "ms": 1221
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "relay metadata",
+      "ms": 10763,
+      "execs": 9,
+      "pushes": 1,
+      "bytes": 1111,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2312
+        },
+        {
+          "phase": "server already installed",
+          "ms": 3524
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 0
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 1220
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 2306
+        },
+        {
+          "phase": "ready",
+          "ms": 1399
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 2
+    },
+    {
+      "scenario": "installed but stopped",
+      "ms": 12494,
+      "execs": 9,
+      "pushes": 0,
+      "bytes": 0,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 3334
+        },
+        {
+          "phase": "server already installed",
+          "ms": 2414
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 1
+        },
+        {
+          "phase": "starting server…",
+          "ms": 1087
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1090
+        },
+        {
+          "phase": "ready",
+          "ms": 4568
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 0
+    },
+    {
+      "scenario": "missing token",
+      "ms": 15348,
+      "execs": 11,
+      "pushes": 0,
+      "bytes": 0,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2280
+        },
+        {
+          "phase": "server already installed",
+          "ms": 4989
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 0
+        },
+        {
+          "phase": "starting server…",
+          "ms": 1473
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1114
+        },
+        {
+          "phase": "ready",
+          "ms": 5491
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 1
+    },
+    {
+      "scenario": "wiped install",
+      "ms": 143673,
+      "execs": 68,
+      "pushes": 2,
+      "bytes": 222357564,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2413
+        },
+        {
+          "phase": "verifying cached tarball…",
+          "ms": 5386
+        },
+        {
+          "phase": "pushing to instance…",
+          "ms": 1437
+        },
+        {
+          "phase": "extracting server…",
+          "ms": 116864
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 9542
+        },
+        {
+          "phase": "staging relay…",
+          "ms": 1125
+        },
+        {
+          "phase": "starting server…",
+          "ms": 2199
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1117
+        },
+        {
+          "phase": "ready",
+          "ms": 3591
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": -1
+    },
+    {
+      "scenario": "stale commit",
+      "ms": 12487,
+      "execs": 10,
+      "pushes": 0,
+      "bytes": 0,
+      "phases": [
+        {
+          "phase": "connecting to instance…",
+          "ms": 0
+        },
+        {
+          "phase": "checking for an existing server…",
+          "ms": 2347
+        },
+        {
+          "phase": "server already installed",
+          "ms": 4144
+        },
+        {
+          "phase": "preparing token…",
+          "ms": 0
+        },
+        {
+          "phase": "starting server…",
+          "ms": 1225
+        },
+        {
+          "phase": "waiting for port…",
+          "ms": 1216
+        },
+        {
+          "phase": "ready",
+          "ms": 3554
+        },
+        {
+          "phase": "end",
+          "ms": 0
+        }
+      ],
+      "phaseRoundingResidualMs": 1
+    }
+  ]
+}

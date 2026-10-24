@@ -46,17 +46,18 @@ test('C7: API commit wins, invalid API falls back, missing commit fails', t => w
   await assert.rejects(resolveClientCommit(), /could not determine/);
 }));
 
-test('C5 C8 C11 C12 C13 B5: installed healthy reuse skips all tarball work and kills, deduplicates, prunes non-fatally', t => withFixture(t, async f => {
+test('C5 C8 C11 C12 C13 B5: installed healthy reuse skips all tarball work and kills, deduplicates, skips cleanup', t => withFixture(t, async f => {
   const operations = installedServer(f, { pruneError: true });
   const target = ref(); const ctx = context(f); const reports: string[] = [];
   const [a, b] = await Promise.all([ensureServerReady(ctx, target, m => reports.push(m)), ensureServerReady(ctx, target)]);
   assert.deepEqual(a, b); assert.equal(a.port, 4567); assert.equal(a.token, TOKEN);
-  assert.equal(operations.filter(a => a[0] === 'file').length, 1);
-  assert.ok(!operations.some(a => /nohup|pkill|tar -x|sha256sum/.test(a.at(-1)!)));
+  assert.equal(operations.filter(a => a[0] === 'file').length, 0);
+  assert.ok(!operations.some(a => /nohup|pkill|tar -x|sha256sum.*vscode-server-linux/.test(a.at(-1)!)));
+  assert.ok(!operations.some(a => a.at(-1)!.includes('cd ')));
   assert.equal(reports.at(-1), 'ready');
   f.state.set('commit', 'b'.repeat(40));
   assert.equal((await ensureServerReady(ctx, target)).commit, 'b'.repeat(40));
-  assert.equal(operations.filter(a => a[0] === 'file').length, 2);
+  assert.equal(operations.filter(a => a[0] === 'file').length, 0);
 }));
 
 for (const mode of ['absent', 'stale', 'unhealthy'] as const) test(`C9 C10: ${mode} process launches selected server and sweeps obsolete relays`, t => withFixture(t, async f => {
@@ -112,7 +113,7 @@ async function settleTurn(): Promise<void> { await new Promise<void>(resolve => 
 test('C11: delayed logs eventually succeed; no announcement fails with diagnostics', t => withFixture(t, async f => {
   for (const announce of [true, false]) {
     let polls = 0;
-    installedServer(f, { hook: (_args, script) => script.startsWith('grep -s') ? (++polls >= 3 && announce ? 'Extension host agent listening on 9876' : '') : undefined });
+    installedServer(f, { hook: (_args, script) => script.startsWith('grep -s') ? (++polls >= 3 && announce ? 'Extension host agent listening on 9876\nINCUS_TOKEN\n' + TOKEN : '') : undefined });
     const pending = ensureServerReady(context(f), ref());
     let done = false;
     const observed = pending.then(value => { done = true; return value; }, error => { done = true; throw error; });
@@ -169,6 +170,34 @@ test('C13: local cache pruning preserves current commit and unrelated data', t =
   const old = `${dir}/vscode-server-linux-x64-${'d'.repeat(40)}.tar.gz`;
   const unrelated = `${dir}/notes.txt`;
   for (const file of [keep, old, unrelated]) writeFileSync(file, 'fixture');
-  installedServer(f); await ensureServerReady(context(f), ref());
+  installedServer(f, { running: '' }); await ensureServerReady(context(f), ref());
   assert.equal(existsSync(keep), true); assert.equal(existsSync(unrelated), true); assert.equal(existsSync(old), false);
+}));
+
+for (const broken of [false, true]) test(`B5: relay repair is verified before ready (verification failure=${broken})`, t => withFixture(t, async f => {
+  const ops = installedServer(f, { relayCurrent: false, relayVerifyError: broken });
+  const pending = ensureServerReady(context(f), ref());
+  if (broken) await assert.rejects(pending, /relay verification failed/);
+  else await pending;
+  assert.equal(ops.filter(a => a[0] === 'file').length, 1);
+  assert.ok(ops.some(a => a.at(-1)!.startsWith('test -f') && a.at(-1)!.includes('sha256sum')));
+  if (broken) assert.ok(!ops.some(a => a.at(-1)!.startsWith('grep -s')));
+}));
+
+test('C13: fresh startup tolerates install prune failure', t => withFixture(t, async f => {
+  const ops = installedServer(f, { running: '', pruneError: true });
+  const session = await ensureServerReady(context(f), ref());
+  assert.equal(session.port, 4567);
+  assert.ok(ops.some(a => a.at(-1)!.includes('cd ')));
+}));
+
+for (const [running, budget] of [[COMMIT, 7], ['', 9]] as const) test(`performance: installed server (${running ? 'healthy' : 'stopped'}) stays within exec budget without transfers`, t => withFixture(t, async f => {
+  const ops = installedServer(f, { running });
+  const target = ref(); const ctx = context(f);
+  await resolveIdentity(target); ops.length = 0;
+  await ensureServerReady(ctx, target);
+  // Deterministic budgets with warm identity, independent of daemon speed.
+  // Safety tests independently protect identity, signals, health and lifecycle.
+  assert.ok(ops.length <= budget);
+  assert.ok(ops.every(a => a[0] === 'exec'));
 }));

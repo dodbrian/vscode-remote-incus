@@ -45,3 +45,59 @@ test('S B4: actual token setup mints atomically and preserves a healthy token', 
   assert.equal(spawnSync('bash', ['-c', script]).status, 0);
   assert.ok(readFileSync(token, 'utf8') === original, 'sticky token must be unchanged'); assert.equal(statSync(token).mode & 0o777, 0o600);
 }));
+
+test('S B5: relay probe requires matching bytes, UID, GID, mode and regular path', t => withFixture(t, async f => {
+  const fs = await import('node:fs');
+  const ops = installedServer(f);
+  await ensureServerReady(context(f), { remote: `relay-state-${++id}`, instance: 'same' });
+  const home = `${f.directory}/home`;
+  const relay = `${home}/.vscode-server/relay.js`;
+  const script = ops.map(a => a.at(-1)!).find(s => s.includes('fresh token minted'))!
+    .replaceAll('/home/alice', home).replaceAll('1001:1002:600', `${process.getuid!()}:${process.getgid!()}:600`);
+  const probe = (source = script) => {
+    const result = spawnSync('bash', ['-c', source], { encoding: 'utf8' });
+    assert.equal(result.status, 0);
+    return result.stdout.trim().split('\n').at(-1);
+  };
+  assert.equal(probe(), 'relay-repair');
+  fs.copyFileSync('assets/relay.js', relay); fs.chmodSync(relay, 0o600);
+  assert.equal(probe(), 'relay-current');
+  fs.chmodSync(relay, 0o644); assert.equal(probe(), 'relay-repair');
+  fs.chmodSync(relay, 0o600);
+  assert.equal(probe(script.replace(`${process.getuid!()}:${process.getgid!()}:600`, `${process.getuid!()}:${process.getgid!() + 1}:600`)), 'relay-repair');
+  assert.equal(probe(script.replace(`${process.getuid!()}:${process.getgid!()}:600`, `${process.getuid!() + 1}:${process.getgid!()}:600`)), 'relay-repair');
+  fs.appendFileSync(relay, '// modified'); assert.equal(probe(), 'relay-repair');
+  const other = `${home}/unrelated.js`;
+  fs.writeFileSync(other, 'unrelated data');
+  fs.unlinkSync(relay); fs.symlinkSync(other, relay);
+  assert.equal(probe(), 'relay-repair');
+  assert.equal(fs.existsSync(relay), false, 'repair must unlink before push follows the link');
+  fs.copyFileSync('assets/relay.js', relay); fs.chmodSync(relay, 0o600);
+  assert.equal(fs.readFileSync(other, 'utf8'), 'unrelated data');
+  assert.equal(probe(), 'relay-current');
+  fs.unlinkSync(relay); fs.mkdirSync(relay);
+  const directoryResult = spawnSync('bash', ['-c', script], { encoding: 'utf8' });
+  assert.notEqual(directoryResult.status, 0, 'a directory must reject before file push');
+  assert.ok(fs.statSync(relay).isDirectory(), 'do not recursively delete an unexpected directory');
+}));
+
+test('S C11 B4: combined readiness read uses last port and rejects an empty token', t => withFixture(t, async f => {
+  const fs = await import('node:fs');
+  const home = `${f.directory}/home`;
+  const machine = `${home}/.vscode-server/data/Machine`;
+  fs.mkdirSync(machine, { recursive: true });
+  fs.writeFileSync(`${machine}/server.log`, 'Extension host agent listening on 1234\nExtension host agent listening on 9876\n');
+  fs.writeFileSync(`${machine}/.incus-conn-token`, 'C'.repeat(43));
+  installedServer(f, { hook: (args, script) => {
+    if (!script.startsWith('grep -s')) return undefined;
+    assert.ok(args.includes('1001')); assert.ok(args.includes('HOME=/home/alice'));
+    const result = spawnSync('bash', ['-c', script.replaceAll('/home/alice', home)], { encoding: 'utf8' });
+    assert.equal(result.status, 0);
+    return result.stdout;
+  } });
+  const target = { remote: `readiness-${++id}`, instance: 'same' };
+  const session = await ensureServerReady(context(f), target);
+  assert.equal(session.port, 9876); assert.ok(session.token === 'C'.repeat(43));
+  fs.writeFileSync(`${machine}/.incus-conn-token`, '');
+  await assert.rejects(ensureServerReady(context(f), target), /connection token/);
+}));

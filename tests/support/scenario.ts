@@ -33,7 +33,7 @@ export function progress(f: Fixture): { message: string; increment?: number }[] 
 // fail loudly. These outputs model remote state; they do not execute shell.
 export function installedServer(f: Fixture, options: {
   running?: string; healthy?: boolean; signal?: string; token?: string;
-  pruneError?: boolean; port?: string; installed?: boolean; remoteSha?: string; pushedSha?: string; extractionError?: boolean; hook?: (args: string[], script: string) => string | undefined;
+  relayCurrent?: boolean; relayVerifyError?: boolean; pruneError?: boolean; port?: string; installed?: boolean; remoteSha?: string; pushedSha?: string; extractionError?: boolean; hook?: (args: string[], script: string) => string | undefined;
 } = {}): string[][] {
   f.state.set('commit', COMMIT);
   const operations: string[][] = [];
@@ -50,12 +50,13 @@ export function installedServer(f: Fixture, options: {
         else if (script.startsWith('if [ -f')) output = options.installed === false ? 'no' : 'yes';
         else if (script.startsWith('sha256sum')) output = script.includes('2>/dev/null') ? options.remoteSha ?? '' : options.pushedSha ?? '';
         else if (script.includes('tar -xzf')) { if (options.extractionError) throw new Error('extract failed'); output = ''; }
-        else if (script.includes('fresh token minted')) output = '';
+        else if (script.includes('fresh token minted')) output = options.relayCurrent === false ? 'relay-repair' : 'relay-current';
+        else if (script.startsWith('test -f') && script.includes('sha256sum')) { if (options.relayVerifyError) throw new Error('relay verification failed'); output = ''; }
         else if (script.startsWith('pgrep')) output = options.running === '' ? '' : `10 /home/alice/.vscode-server/bin/${options.running ?? f.state.get('commit')}/out/server-main.js`;
         else if (script.startsWith('test -x')) output = options.healthy === false ? 'no' : 'yes';
         else if (script.startsWith('pkill')) output = '';
         else if (script.includes('nohup')) output = 'launched pid 42';
-        else if (script.startsWith('grep -s')) output = options.port ?? 'Extension host agent listening on 1234\nExtension host agent listening on 4567';
+        else if (script.startsWith('grep -s')) output = (options.port ?? 'Extension host agent listening on 1234\nExtension host agent listening on 4567') + '\nINCUS_TOKEN\n' + (options.token ?? TOKEN);
         else if (script.startsWith('cat ') && script.includes('server.log')) output = 'fixture startup diagnostic';
         else if (script.startsWith('cat ')) output = options.token ?? TOKEN;
         else if (script.includes('cd ')) { if (options.pruneError) throw new Error('prune unavailable'); output = ''; }
