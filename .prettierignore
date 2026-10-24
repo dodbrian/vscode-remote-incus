@@ -1,0 +1,8 @@
+# Generated / vendored / scratch — never formatted
+dist/
+node_modules/
+spike/
+licenses/
+src/types/
+package-lock.json
+*.vsix

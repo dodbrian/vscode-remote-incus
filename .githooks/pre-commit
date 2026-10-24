@@ -1,0 +1,6 @@
+#!/bin/sh
+# Mandatory quality gate for every commit: strict type checks, linting
+# (warnings are errors) and formatting verification.
+# Bypass with `git commit --no-verify` — discouraged, not for shipped code.
+set -e
+exec npm run check
