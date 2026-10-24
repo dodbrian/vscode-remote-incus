@@ -20,7 +20,75 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: Task 5 complete (2026-10-24)
+## Current stopping point: mandatory quality gates (2026-10-24)
+
+Task 5 was closed earlier the same day (previous state below). The prior session,
+at the user's request, introduced mandatory linting, code formatting and
+strict language checks, conformed the entire codebase to them, and
+live-verified the running extension afterwards. No feature work; transport,
+token and user policies are untouched.
+
+- Gates (`1b2034c`): ESLint 10 flat config (`eslint.config.mjs`) with
+  typescript-eslint strictTypeChecked + stylisticTypeChecked via
+  projectService; Prettier owns formatting (single quotes, width 100,
+  `.prettierrc.json`) with eslint-config-prettier disabling conflicting
+  rules; strict tsconfig flags across all three projects — src, tests and
+  a new `scripts/tsconfig.json` (dev scripts were never type-checked
+  before): noUncheckedIndexedAccess, noUnusedParameters, noImplicitOverride,
+  noImplicitReturns, noFallthroughCasesInSwitch,
+  forceConsistentCasingInFileNames.
+- Warnings are errors everywhere: `npm run lint` passes `--max-warnings 0`;
+  `npm run check` = typecheck + lint + format:check, and it gates
+  `npm test` and `npm run package`; a `pre-commit` hook (`.githooks/`,
+  installed automatically by `npm install` via the `prepare` script through
+  `core.hooksPath`) runs the same check on every commit; `.vscode/` settings
+  format on save and apply ESLint fixes.
+- Conformance landed in reviewable order, each commit green: `769c7f9`
+  (src), `1c4e93a` (tests; adds `tests/support/assert.ts` with a
+  `defined()` helper — the replacement for every non-null assertion),
+  `85b4bee` (scripts), then the gates themselves, `0faf905` (docs + README
+  gates section). Final state: 127 offline tests, `test:relay` 5/5,
+  compile and a live `./redeploy.sh` all pass.
+- Deliberate behavior deltas, all in failure/edge paths with unchanged
+  messages: the auto-fallback download failure now throws
+  `AggregateError([containerFailure], msg, { cause })` (was `Error` with an
+  AggregateError cause); verify-\* scripts record cleanup failures for the
+  final assert instead of throwing inside `finally`;
+  `withProgressReport`/`measureStartup`/`withRef` accept sync callbacks
+  (some command handlers are sync now).
+- Rule tuning and carve-outs are documented inline in `eslint.config.mjs`
+  (interpolating uids/ports into shell commands → allowNumber; boolean
+  `||` falsy logic → ignorePrimitives; the test fixture's opaque-any
+  boundary; captured state mutated across awaits defeats
+  no-unnecessary-condition).
+  Only two code suppressions exist, each with a justification comment: the
+  resolver's runtime guard for the proposed API and require.cache
+  invalidation in one test.
+- Formatting scope decided by the user (2026-10-24): Prettier covers the
+  whole repo INCLUDING docs/. Doc edits must stay prettier-clean; list
+  continuation lines reflow to column 0 (rendering is preserved via lazy
+  continuation) — reword lines that read badly instead of fighting the
+  formatter.
+- Prior-session live check after the overhaul (stable 1.143.1, commit `e646868227…`):
+  healthy-reuse resolve, both bridges spawned, zero errors in
+  `/tmp/remote-incus-dev/fixture-container/ext.log`. The user requested the redeploy to
+  verify the result themselves.
+
+Handover completion check (2026-10-24): the gate definitions and commit IDs
+above were checked against the current checkout. `npm test` passed (the current
+runner reported 12 passing test-file entries); typecheck, lint, repository-wide
+format checking, compile and `git diff --check` passed. The relay verifier passed
+all five scenarios and bounded cleanup after rerunning outside the sandbox;
+the sandbox initially denied its temporary loopback listener with `EPERM`.
+The earlier 127-test count and live deployment results are retained as
+prior-session evidence, not new live verification. Only this handover was edited;
+no live Incus checks, redeploy or session restart were performed during completion.
+
+Nothing was pushed or published. The Task 4 Ports and identical-folder
+findings remain open exactly as recorded below. No new task, optimization
+round or production change starts without explicit user instruction.
+
+## Previous state (2026-10-24, Task 5 closure)
 
 The implementation is deployed and manually accepted: the user reported “much
 better” and authorized task closure and cleanup. See
