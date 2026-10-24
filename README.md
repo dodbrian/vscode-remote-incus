@@ -83,11 +83,20 @@ user-assisted files, terminals, Restricted Mode, distinct-folder concurrent
 windows and reload/folder reconnect. See [the evidence report](docs/TASK-04-RESULTS.md)
 for versions, cleanup and exact limits.
 
-Two findings remain: requesting a new window for an already-open remembered
-folder focuses its existing window, and the Ports view is unavailable, leaving
-actual VS Code port forwarding unverified. No production fixes were made in
-Task 4. The findings remain open; further work requires explicit next-step
-authorization.
+The Ports view is now enabled; actual forwarding passed with an IPv4-only
+service on the TLS/cluster fixture and an IPv6-loopback service locally.
+Manual Ports controls remain to be tested. A local fixture with IPv6-only
+external networking exposed a separate IPv4-loopback address-resolution edge
+case; see [the handover](docs/HANDOVER.md) for the diagnosis.
+
+“Connect in New Window” opens a separate workspace containing the chosen or
+last-used remote folder. Each request has its own workspace identity, so an
+already-open folder gets a second window. “Connect in Current Window” continues
+to open the folder directly. Instances without folder history open an empty
+remote window. The small workspace files live in the extension's local storage
+(`window-workspaces`), remain available for reload/reopening, and do not modify
+the remote project. Successful files are retained rather than automatically
+pruned; failed open requests remove their generated workspace.
 
 ## Development
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import * as vscode from 'vscode';
 import { withFixture } from './support/fixture';
 import { context, progress } from './support/scenario';
@@ -204,15 +204,39 @@ test('X2 X3 X8: command delegation without bootstrap; new-window URI; canceled d
     }
     const folder = '/space # ?/ä';
     history.record(authority, folder);
-    f.expect('vscode.execute', (id, uri, newWindow) => {
-      assert.equal(id, 'vscode.openFolder');
-      assert.equal(uri.authority, authority);
-      assert.equal(uri.path, folder);
-      assert.equal(newWindow, true);
-      assert.match(uri.toString(), /%23/);
-      assert.match(uri.toString(), /%3F/);
-    });
-    await defined(callbacks.get('remote-incus.connectToInstanceInNewWindow'))(node());
+    const folderNode = new FolderNode(node(), folder, new vscode.ThemeIcon('folder'));
+    const workspaces = new Set<string>();
+    for (const kind of ['Instance', 'Folder']) {
+      const targetNode = kind === 'Instance' ? node() : folderNode;
+      f.expect('vscode.execute', (id, uri, options) => {
+        assert.equal(id, 'vscode.openFolder');
+        assert.equal(uri.authority, authority);
+        assert.equal(uri.path, folder);
+        assert.equal(options, undefined);
+      });
+      await defined(callbacks.get(`remote-incus.connectTo${kind}`))(targetNode);
+      for (let repeat = 0; repeat < 2; repeat++) {
+        f.expect('vscode.execute', (id, uri, options) => {
+          assert.equal(id, 'vscode.openFolder');
+          assert.equal(uri.scheme, 'file');
+          assert.deepEqual(options, { forceNewWindow: true });
+          assert.ok(
+            !workspaces.has(uri.fsPath),
+            'each request must have its own workspace identity',
+          );
+          workspaces.add(uri.fsPath);
+          const data = JSON.parse(readFileSync(uri.fsPath, 'utf8'));
+          const expected = vscode.Uri.from({ scheme: 'vscode-remote', authority, path: folder });
+          assert.deepEqual(data, {
+            folders: [{ uri: expected.toString() }],
+            remoteAuthority: authority,
+          });
+          assert.match(defined(data.folders[0]).uri, /%23/);
+          assert.match(defined(data.folders[0]).uri, /%3F/);
+        });
+        await defined(callbacks.get(`remote-incus.connectTo${kind}InNewWindow`))(targetNode);
+      }
+    }
     for (const id of ['uninstallServer', 'resetToken']) {
       f.expect('vscode.warning', () => undefined);
       await defined(callbacks.get(`remote-incus.${id}`))(node());
@@ -222,6 +246,30 @@ test('X2 X3 X8: command delegation without bootstrap; new-window URI; canceled d
     );
     assert.deepEqual(history.folders(authority), []);
     // No process expectations: any pre-bootstrap, identity or daemon call fails.
+  }));
+
+test('X3: failed new-window open removes its workspace and reports the error', (t) =>
+  withFixture(t, async (f) => {
+    const ctx = context(f);
+    const history = new FolderHistory(ctx);
+    registerCommands(ctx, new InstancesTree(history, 'assets'), history);
+    const callbacks = f.state.get('commands') as Map<string, (node: any) => Promise<void>>;
+    const folder = '/project';
+    let workspace = '';
+    f.expect('vscode.execute', (_id, uri) => {
+      workspace = uri.fsPath;
+      assert.ok(existsSync(workspace));
+      throw new Error('window open refused');
+    });
+    f.expect('vscode.error', (message) => {
+      assert.match(message, /window open refused/);
+    });
+    await defined(callbacks.get('remote-incus.connectToFolderInNewWindow'))(
+      new FolderNode(node(), folder, new vscode.ThemeIcon('folder')),
+    );
+    assert.ok(workspace);
+    assert.equal(existsSync(workspace), false);
+    assert.deepEqual(readdirSync(`${f.directory}/window-workspaces`), []);
   }));
 
 test('X7: progress increments monotonic, show-log affordance and first-line cause', (t) =>

@@ -1,3 +1,24 @@
+# Window integration follow-up (2026-10-24)
+
+`explorer.test.ts` now checks both current-window folder entry points and
+repeated instance/folder new-window requests. Each new-window request must
+use a distinct local workspace identity, preserve the exact remote URI and
+remote authority (including significant path characters), and avoid all
+bootstrap/daemon calls. Failed window opens remove their generated workspace
+and surface the error. These tests use real temporary workspace files.
+
+A separate Stable 1.143.1 development profile verified the original remote
+folder plus two new workspaces concurrently: distinct workspace/session
+identities and successful reads of the exact marker from all three windows.
+The two production command entry points were invoked with actual tree nodes.
+This proves managed-host behavior for the tested runtime, not other clients
+or platforms. Historical Task 4 findings below remain the original baseline.
+
+Ports context activation is covered by resolver expectations. Automated live
+IPv4-only service forwarding passed on the TLS/cluster fixture; manual Ports
+controls remain deferred. See [HANDOVER.md](../HANDOVER.md) for the separate
+IPv6-only-networked fixture's address-resolution limitation.
+
 # Current coverage through Task 5
 
 Task 5 is deployed and manually accepted. See

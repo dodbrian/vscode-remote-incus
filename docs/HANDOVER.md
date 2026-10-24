@@ -20,7 +20,62 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: Ports activation and forwarding (2026-10-24)
+## Current stopping point: identical-folder new windows (2026-10-24)
+
+The user authorized fixing identical-folder new-window behavior and explicitly
+approved opening the folder in a separate workspace. Manual Ports testing is
+deferred by the user until later; do not start it automatically.
+
+Implemented in `src/commands.ts` and new `src/workspace.ts`: folder-row and
+remembered-folder instance new-window commands create a unique client-local
+workspace containing exactly the chosen remote folder plus its
+`remoteAuthority`, then open it with `forceNewWindow`. This bypasses core's
+existing-folder window match. Current-window delegation and empty-history
+instance connections retain their existing behavior. No bootstrap is added
+to the commands; transport, token and user policies are unchanged.
+
+Successful workspace files are retained under extension global storage in
+`window-workspaces` for reload/reopening and VS Code recents. Each request
+gets a unique directory (0700) and workspace file (0600). Failed opens remove
+their generated directory and report the error. No remote project files or
+settings are written. The title shows a workspace containing the folder,
+which is the user-approved UX tradeoff. Automatic pruning is not implemented
+because it could break retained workspace references.
+
+Verification: offline tests cover repeated folder/instance requests, unique
+workspace identities, exact remote authority and URI with significant path
+characters, unchanged current-window delegation and failure cleanup. A separate
+Stable 1.143.1 development profile invoked both production command entry points
+with actual tree nodes against the designated idle TLS/cluster fixture. The
+original folder and two separate workspaces all had distinct session identities
+and concurrently read the exact remote marker from the same path containing
+spaces, hash, question mark and Unicode. After closing all test windows, reopening
+a retained workspace reconnected to the exact folder and read its marker.
+
+The first live attempt omitted workspace `remoteAuthority`, so its new window
+had no remote filesystem provider (also observed by the user's screenshot).
+Adding the metadata fixed it; the failed attempt is not counted as a pass.
+No general cross-platform or other-client-version claim is made.
+
+`npm test` (12 passing test-file entries, including typecheck, lint and full
+format checking), compile and `git diff --check` pass. The isolated windows,
+temporary remote workspace, profile and test artifacts were cleaned up.
+The normal installed extension and user session were not redeployed or
+restarted. The user accepted the result and authorized committing the fix,
+regression coverage and documentation together. The prior Ports fix is
+`3c80096`. No push or publication was requested.
+
+Recommended next implementation task: refine resolver error classification
+against DESIGN §7, with offline regressions for deleted/unavailable instances,
+retryable starting states and underlying daemon/transport failures. This is
+a recommendation only; no next task is authorized by this handover.
+Manual Ports controls and normal-profile acceptance of the new-window UX can
+be checked at the user's chosen time after a separately requested redeploy.
+The IPv6-only-networked fixture's IPv4 loopback-resolution edge case remains
+a separate follow-up. Packaging follows naming/publisher decisions and a
+publication privacy audit. No deployment or further live task is implied.
+
+## Previous state: Ports activation and forwarding (2026-10-24)
 
 The user authorized fixing the missing Ports view and verifying forwarding.
 `src/resolver.ts` now awaits `setContext('forwardedPortsViewEnabled', true)`

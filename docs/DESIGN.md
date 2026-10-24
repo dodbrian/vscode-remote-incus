@@ -526,6 +526,35 @@ discussed the results and resolved the Task 4 discussion gate. The findings
 remain open; implementation, optimization and further live work still require
 explicit next-step authorization.
 
+### Identical-folder window follow-up (2026-10-24)
+
+The user authorized the fix and explicitly chose a separate workspace for
+new-window folder requests. Core finds an existing folder window before
+applying `forceNewWindow`, so a boolean-to-options change cannot solve this.
+`src/workspace.ts` now creates a unique client-local `.code-workspace` file
+containing exactly the target remote URI and its `remoteAuthority`, then opens
+that workspace with `forceNewWindow`. The authority field is essential: a
+local workspace file containing only remote folder URIs opens without the
+remote filesystem provider in the tested runtime. This follows the distinct
+workspace identity used by VS Code's Duplicate As Workspace action.
+
+Both folder-row and remembered-folder instance commands use this path.
+Current-window commands and instances without folder history retain their
+existing delegation. Each successful request retains its private workspace
+file under extension global storage for reopening; failed requests remove
+only their generated directory. Automatic pruning is deliberately absent
+because it could invalidate a workspace retained in VS Code's recents.
+No remote project file, transport, token or user policy changes.
+
+A separate Stable 1.143.1 development profile verified three distinct windows
+on the exact same TLS/cluster fixture folder: original folder, instance-action
+workspace and folder-action workspace. All three concurrently read the exact
+remote marker; the path contained spaces, hash, question mark and Unicode.
+The first attempt omitted remote authority metadata and failed; it is not
+counted as a pass. See [HANDOVER.md](HANDOVER.md) for current status and limits.
+Manual Ports interaction is deferred by the user; successful automated IPv4
+forwarding is recorded in the handover.
+
 ## 9. Distribution & licensing constraints
 
 - Extension source: MIT (copies may come from MIT sources: `jeanp413/open-remote-ssh`,

@@ -11,6 +11,7 @@ import { InstanceRef, restartInstance, startInstance, stopInstance, target } fro
 import { firstLine, log, showLog } from './logging';
 import { openExecTerminal } from './terminal';
 import { FolderNode, InstanceNode, InstancesTree } from './tree';
+import { openRemoteFolderInNewWindow } from './workspace';
 
 /** Error toast with the same "show log" affordance the progress toast carries. */
 function showErrorWithLog(err: unknown): void {
@@ -41,23 +42,24 @@ export function registerCommands(
   });
   reg(
     'remote-incus.connectToInstance',
-    (node) => node instanceof InstanceNode && connectToInstance(node, tree, history, false),
+    (node) =>
+      node instanceof InstanceNode && connectToInstance(context, node, tree, history, false),
   );
   reg(
     'remote-incus.connectToInstanceInNewWindow',
-    (node) => node instanceof InstanceNode && connectToInstance(node, tree, history, true),
+    (node) => node instanceof InstanceNode && connectToInstance(context, node, tree, history, true),
   );
   reg(
     'remote-incus.connectToFolder',
     (node) =>
       node instanceof FolderNode &&
-      openFolder(node.node.authority, node.folderPath, history, tree, false),
+      openFolder(context, node.node.authority, node.folderPath, history, tree, false),
   );
   reg(
     'remote-incus.connectToFolderInNewWindow',
     (node) =>
       node instanceof FolderNode &&
-      openFolder(node.node.authority, node.folderPath, history, tree, true),
+      openFolder(context, node.node.authority, node.folderPath, history, tree, true),
   );
   reg('remote-incus.removeFolderFromHistory', (node) => {
     if (node instanceof FolderNode) removeFolderFromHistory(node, history, tree);
@@ -150,6 +152,7 @@ async function withRef(
  * falls back to the empty-window host connect.
  */
 async function connectToInstance(
+  context: vscode.ExtensionContext,
   node: InstanceNode,
   tree: InstancesTree,
   history: FolderHistory,
@@ -157,7 +160,7 @@ async function connectToInstance(
 ): Promise<void> {
   const [lastFolder] = history.folders(node.authority);
   if (lastFolder) {
-    await openFolder(node.authority, lastFolder, history, tree, newWindow);
+    await openFolder(context, node.authority, lastFolder, history, tree, newWindow);
     return;
   }
   try {
@@ -178,13 +181,12 @@ async function connectToInstance(
 }
 
 /**
- * Folder-level open in one step — exactly the official shell mechanics
- * (remote-explorer 0.5.0): `vscode.openFolder(<vscode-remote:// authority/path>)`
- * for the current window, with `forceNewWindow: true` for a new one. Core
- * resolves the authority and opens the folder; the resolver never sees the
- * path.
+ * Current-window requests open the remote folder directly. New-window requests
+ * use a distinct workspace identity, since core otherwise focuses an existing
+ * window containing the same folder even with forceNewWindow.
  */
 async function openFolder(
+  context: vscode.ExtensionContext,
   authority: string,
   folderPath: string,
   history: FolderHistory,
@@ -197,7 +199,11 @@ async function openFolder(
     );
     history.record(authority, folderPath);
     const uri = vscode.Uri.from({ scheme: 'vscode-remote', authority, path: folderPath });
-    await vscode.commands.executeCommand('vscode.openFolder', uri, ...(newWindow ? [true] : []));
+    if (newWindow) {
+      await openRemoteFolderInNewWindow(context, uri);
+    } else {
+      await vscode.commands.executeCommand('vscode.openFolder', uri);
+    }
     // The (other) window's resolve may have started a stopped instance —
     // cheaply repair stale state icons in THIS window's tree.
     tree.refresh();
