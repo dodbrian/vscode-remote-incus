@@ -113,7 +113,7 @@ async function settleTurn(): Promise<void> { await new Promise<void>(resolve => 
 test('C11: delayed logs eventually succeed; no announcement fails with diagnostics', t => withFixture(t, async f => {
   for (const announce of [true, false]) {
     let polls = 0;
-    installedServer(f, { hook: (_args, script) => script.startsWith('grep -s') ? (++polls >= 3 && announce ? 'Extension host agent listening on 9876\nINCUS_TOKEN\n' + TOKEN : '') : undefined });
+    installedServer(f, { running: '', hook: (_args, script) => script.startsWith('grep -s') ? (++polls >= 3 && announce ? 'Extension host agent listening on 9876\nINCUS_TOKEN\n' + TOKEN : '') : undefined });
     const pending = ensureServerReady(context(f), ref());
     let done = false;
     const observed = pending.then(value => { done = true; return value; }, error => { done = true; throw error; });
@@ -191,7 +191,7 @@ test('C13: fresh startup tolerates install prune failure', t => withFixture(t, a
   assert.ok(ops.some(a => a.at(-1)!.includes('cd ')));
 }));
 
-for (const [running, budget] of [[COMMIT, 7], ['', 9]] as const) test(`performance: installed server (${running ? 'healthy' : 'stopped'}) stays within exec budget without transfers`, t => withFixture(t, async f => {
+for (const [running, budget] of [[COMMIT, 3], ['', 7]] as const) test(`performance: installed server (${running ? 'healthy' : 'stopped'}) stays within exec budget without transfers`, t => withFixture(t, async f => {
   const ops = installedServer(f, { running });
   const target = ref(); const ctx = context(f);
   await resolveIdentity(target); ops.length = 0;
@@ -200,4 +200,34 @@ for (const [running, budget] of [[COMMIT, 7], ['', 9]] as const) test(`performan
   // Safety tests independently protect identity, signals, health and lifecycle.
   assert.ok(ops.length <= budget);
   assert.ok(ops.every(a => a[0] === 'exec'));
+}));
+
+test('batched inspection preserves UID boundaries and waits for both snapshots before repair', t => withFixture(t, async f => {
+  const ops = installedServer(f);
+  const dispatch = f.routes.get('child_process.execFile')!;
+  let release!: () => void;
+  f.routes.set('child_process.execFile', (cmd, args, opts, cb) => {
+    const script = args.at(-1) as string;
+    if (script.startsWith('pgrep')) {
+      assert.ok(!args.includes('--user'));
+      release = () => dispatch(cmd, args, opts, cb);
+    } else {
+      if (script.includes('INCUS_INSTALL')) {
+        assert.ok(args.includes('1001') && args.includes('HOME=/home/alice'));
+        assert.ok(!script.includes('server-main.js'), 'parallel probe must not resemble a running server');
+      }
+      dispatch(cmd, args, opts, cb);
+    }
+  });
+  const pending = ensureServerReady(context(f), ref());
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  assert.equal(typeof release, 'function');
+  assert.ok(!ops.some(a => /fresh token minted|nohup|pkill/.test(a.at(-1)!)));
+  release(); await pending;
+}));
+
+test('malformed inspection cannot become server absence or allow setup', t => withFixture(t, async f => {
+  const ops = installedServer(f, { hook: (_args, script) => script.startsWith('pgrep') ? 'malformed' : undefined });
+  await assert.rejects(ensureServerReady(context(f), ref()), /invalid server inspection/);
+  assert.ok(!ops.some(a => a[0] === 'file' || /fresh token minted|nohup|pkill/.test(a.at(-1)!)));
 }));

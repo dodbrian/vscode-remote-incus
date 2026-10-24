@@ -32,7 +32,7 @@ for (const failure of ['token-mkdir', 'token-mv', 'token-generator', 'launch-log
 
 test('S B4: actual token setup mints atomically and preserves a healthy token', t => withFixture(t, async f => {
   const { readFileSync, statSync, existsSync, chmodSync } = await import('node:fs');
-  const ops = installedServer(f);
+  const ops = installedServer(f, { running: '' });
   await ensureServerReady(context(f), { remote: `token-success-${++id}`, instance: 'same' });
   const script = ops.map(a => a.at(-1)!).find(s => s.includes('fresh token minted'))!.replaceAll('/home/alice', `${f.directory}/home`);
   const token = `${f.directory}/home/.vscode-server/data/Machine/.incus-conn-token`;
@@ -48,7 +48,7 @@ test('S B4: actual token setup mints atomically and preserves a healthy token', 
 
 test('S B5: relay probe requires matching bytes, UID, GID, mode and regular path', t => withFixture(t, async f => {
   const fs = await import('node:fs');
-  const ops = installedServer(f);
+  const ops = installedServer(f, { running: '' });
   await ensureServerReady(context(f), { remote: `relay-state-${++id}`, instance: 'same' });
   const home = `${f.directory}/home`;
   const relay = `${home}/.vscode-server/relay.js`;
@@ -88,7 +88,7 @@ test('S C11 B4: combined readiness read uses last port and rejects an empty toke
   fs.mkdirSync(machine, { recursive: true });
   fs.writeFileSync(`${machine}/server.log`, 'Extension host agent listening on 1234\nExtension host agent listening on 9876\n');
   fs.writeFileSync(`${machine}/.incus-conn-token`, 'C'.repeat(43));
-  installedServer(f, { hook: (args, script) => {
+  installedServer(f, { running: '', hook: (args, script) => {
     if (!script.startsWith('grep -s')) return undefined;
     assert.ok(args.includes('1001')); assert.ok(args.includes('HOME=/home/alice'));
     const result = spawnSync('bash', ['-c', script.replaceAll('/home/alice', home)], { encoding: 'utf8' });
@@ -100,4 +100,21 @@ test('S C11 B4: combined readiness read uses last port and rejects an empty toke
   assert.equal(session.port, 9876); assert.ok(session.token === 'C'.repeat(43));
   fs.writeFileSync(`${machine}/.incus-conn-token`, '');
   await assert.rejects(ensureServerReady(context(f), target), /connection token/);
+}));
+
+test('S: healthy combined preparation/read returns the real last port and sticky token', t => withFixture(t, async f => {
+  const fs = await import('node:fs');
+  const home = `${f.directory}/home`; const machine = `${home}/.vscode-server/data/Machine`;
+  fs.mkdirSync(machine, { recursive: true });
+  fs.writeFileSync(`${machine}/server.log`, 'Extension host agent listening on 1234\nExtension host agent listening on 9876\n');
+  fs.writeFileSync(`${machine}/.incus-conn-token`, 'C'.repeat(43));
+  fs.copyFileSync('assets/relay.js', `${home}/.vscode-server/relay.js`); fs.chmodSync(`${home}/.vscode-server/relay.js`, 0o600);
+  installedServer(f, { hook: (_args, script) => {
+    if (!script.includes('fresh token minted')) return undefined;
+    const local = script.replaceAll('/home/alice', home).replaceAll('1001:1002:600', `${process.getuid!()}:${process.getgid!()}:600`);
+    const result = spawnSync('bash', ['-c', local], { encoding: 'utf8' });
+    assert.equal(result.status, 0); return result.stdout;
+  } });
+  const session = await ensureServerReady(context(f), { remote: `combined-${++id}`, instance: 'same' });
+  assert.equal(session.port, 9876); assert.ok(session.token === 'C'.repeat(43));
 }));

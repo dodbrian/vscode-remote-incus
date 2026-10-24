@@ -6,8 +6,8 @@ set -e
 cd "$(dirname "$0")"
 
 node esbuild.js --production
-npx --yes @vscode/vsce@latest package --allow-missing-repository -o remote-incus.vsix >/dev/null
-code --install-extension remote-incus.vsix >/dev/null
+./node_modules/.bin/vsce package --allow-missing-repository --no-rewrite-relative-links -o remote-incus.vsix >/dev/null
+code --install-extension remote-incus.vsix --force >/dev/null
 pkill -f "/usr/share/cod[e]" || true
 # Launching into a half-dead instance pops the "Another instance of Code is
 # running but not responding" modal (seen live 2026-10-20) — wait until every

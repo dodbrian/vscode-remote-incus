@@ -71,6 +71,8 @@ export const target = (ref: InstanceRef): string => `${ref.remote}:${ref.instanc
 export interface ExecOptions {
   /** numeric uid for `--user` (omit to run as root) */
   uid?: number;
+  /** explicit group for file creation; ordinary bootstrap exec keeps its existing default */
+  group?: number;
   /** set the HOME env inside the instance (required for user sessions) */
   home?: string;
   env?: Record<string, string>;
@@ -81,6 +83,7 @@ export interface ExecOptions {
 export async function execInInstance(ref: InstanceRef, script: string, opts: ExecOptions = {}): Promise<string> {
   const args = ['exec', target(ref), '--mode', 'non-interactive'];
   if (opts.uid !== undefined) { args.push('--user', String(opts.uid)); }
+  if (opts.group !== undefined) { args.push('--group', String(opts.group)); }
   if (opts.home) { args.push('--env', `HOME=${opts.home}`); }
   for (const [k, v] of Object.entries(opts.env ?? {})) { args.push('--env', `${k}=${v}`); }
   args.push('--', 'bash', '-c', script);

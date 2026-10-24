@@ -1,7 +1,7 @@
 // Minimal vscode stub so pure modules (authority, incusCli, bootstrap helpers)
 // can be smoke-tested under plain node.
 exports.workspace = {
-  getConfiguration: () => ({ get: (_k, d) => d }),
+  getConfiguration: () => ({ get: (key, d) => key === 'downloadStrategy' ? (process.env.INCUS_TEST_DOWNLOAD_STRATEGY || d) : d }),
 };
 exports.env = { appCommit: undefined, remoteAuthority: undefined, version: '0.0.0' };
 exports.EventEmitter = class {

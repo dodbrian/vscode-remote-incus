@@ -197,35 +197,67 @@ Record actual observations separately from static/offline assertions. Report
 unavailable checks as unverified. Stable is primary; Insiders is additional
 only when installed. Do not attach raw private logs or token values to reports.
 
-## Task 5 manual startup measurements
+## Task 5 startup and download verification
 
-The live verifier emits sanitized `METRIC` JSON for tree configuration plus the
-selected remote's instance enumeration, resolver status lookup, and individual
-bootstrap scenarios. These are separate timings, not an end-to-end VS Code
-window measurement. Bootstrap identity is already resolved by the safety
-preflight, so all comparisons use a warm identity cache. Each run starts with
-an empty temporary client archive cache and removes the fixture installation.
-Healthy reuse and installed-but-stopped scenarios retain the same install and
-cache from that run's clean install.
+Task 5 is deployed and manually accepted. Consolidated results, measurement
+boundaries and remaining limits are in [TASK-05-RESULTS.md](../TASK-05-RESULTS.md)
+and [TASK-05-MEASUREMENTS.json](../TASK-05-MEASUREMENTS.json).
 
-`scripts/startup-metrics.ts` instruments the manual process's Incus execFile
-calls and file-push spawns. `execs` includes transfer-progress stat calls;
-`pushes` and `bytes` count pushed files and payload bytes, excluding protocol
-traffic and client download bytes. Phase entries record time **since the
-preceding milestone**, with the first measured from scenario start. Percentage
-updates are ignored. Instrumentation never records command arguments, output,
-tokens or target identifiers. Measurement hooks are restored after each sample.
-New samples include an `outcome` field and derive phase intervals from rounded cumulative timestamps,
-so phase totals equal wall time. The original retained artifact predates these
-instrumentation refinements and reports rounding residuals explicitly. An
-`outcome: success` marks bootstrap completion; require the corresponding
-authentication PASS and successful cleanup/exit as well.
+The current flow uses three healthy-reuse execs and seven installed-stopped
+execs with warm identity. Tests protect the inspection barrier, numeric UID/HOME
+and root boundaries, process-search self-matching, actual bash readiness/token
+framing and common recovery. Performance budgets allow fewer calls; no CI wall-
+time threshold replaces correctness checks.
 
-Use the same explicit target, signing module and destructive opt-in documented
-above. Set `INCUS_TEST_RELAY_REPAIRS=yes` for final verification of missing,
-symlinked, modified and incorrect ownership/mode relay states while two
-authenticated channels remain open. These extra cases are deliberately omitted from the
-before/after timings for the three equivalent primary states. Keep raw logs
-private; publish only sanitized measurements and runtime/state descriptions.
-No timing threshold is a CI gate. Offline tests enforce a deterministic maximum
-operation count on the healthy path and retain safety assertions separately.
+`tests/container-download.test.ts` executes actual download bash with only curl
+stubbed. It covers metadata/schema/URL failures, expected SHA, archive reuse,
+missing/failing curl, corruption, SIGTERM, safe symlinks, atomic publication and
+partial cleanup. Default auto, strict explicit overrides, mirrors, one visible
+fallback, cached offline fallback, both-route errors and uncertain cleanup are
+covered. Publisher SHA must match before client cache publication/reuse as well
+as push/extraction. The curl fixture requires `--disable` first, so user curlrc
+options cannot add retries. Legacy scenarios explicitly choose client; auto
+tests remove that override to test the real public/runtime default.
+
+### Manual live checks
+
+All live checks require an explicitly authorized idle disposable fixture and
+`INCUS_TEST_TARGET=remote:instance` plus `INCUS_TEST_ALLOW_DESTRUCTIVE=yes`.
+They refuse CI and never choose/create an instance automatically. Use private
+runtime values and keep raw logs outside Git. Never run them against the active
+manual session left open for the user.
+
+Bundle each TypeScript entry with esbuild, `--platform=node` and
+`--alias:vscode=./scripts/vscode-stub.js` as shown above. The test-only stub maps
+`INCUS_TEST_DOWNLOAD_STRATEGY`; production reads normal VS Code configuration.
+
+| Verifier | Coverage and additional requirements |
+| --- | --- |
+| `scripts/verify-live.ts` | Full signed handshake, positive/negative authentication, ownership, reuse, recovery and teardown. Requires `INCUS_TEST_VSDA_PATH`. Leave strategy unset for auto, or set auto/client/container explicitly. `INCUS_TEST_RELAY_REPAIRS=yes` adds symlink/content/metadata repairs with two live channels. |
+| `scripts/verify-auto-fallback.ts` | Linux x64, auto only, signing module required. Prefills a verified client archive, injects one curl exit 22 only through the download exec's PATH, and requires one visible switch, real upload/extraction, signed authentication and surviving channels. Cache preparation is outside timing. |
+| `scripts/verify-container-download-failures.ts` | Requires no install/archive. Controlled corruption, exit 22 and actual SIGTERM/exit 143 must leave no accepted archive/install/partial. Uses a scoped fake curl, not a system binary replacement. |
+| `scripts/verify-container-curl-config.ts` | Requires no install/archive. Proves ordinary curl reads an injected invalid CURL_HOME config, then verifies managed download SHA/metadata with it present. The control checks diagnostics because curl can warn and continue. |
+
+Run verifiers sequentially and require bounded successful teardown between them.
+The last two checks need client metadata access but no signing module. Owned
+fake-downloader/config directories and archives are removed in finally; normal
+PATH, curl config and Incus settings are not edited. These checks do not simulate
+a real 180-second outage or certify unrelated policies/platforms.
+
+### Measurement semantics
+
+`scripts/startup-metrics.ts` temporarily instruments Incus execFile calls and
+file-push spawns, restoring hooks after success/failure. It records no argv,
+stdout, target or token. `execs` includes progress stat calls; pushed bytes
+exclude CDN downloads and protocol overhead. Phases are elapsed since the
+preceding milestone; rounded cumulative timestamps make totals equal wall time.
+The earliest baseline rounded individual percentage events before coalescing,
+so its retained rounding residual is explicit.
+
+A success metric marks bootstrap completion; require subsequent authentication
+PASS and final cleanup/exit as well. Tree configuration/selected-remote listing
+and resolver status are separate timings, not rendered tree/window benchmarks.
+Safety preflight warms identity. Each full run starts with an empty private
+client context and absent install; reuse/stopped cases retain the matching
+installation and cache from that run. Preserve equivalent states and distinguish
+observed wall times from deterministic call counts in any later comparisons.

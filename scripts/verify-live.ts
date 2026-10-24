@@ -15,6 +15,9 @@ const selected = process.env.INCUS_TEST_TARGET;
 if (process.env.CI || !selected || !/^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$/.test(selected) || process.env.INCUS_TEST_ALLOW_DESTRUCTIVE !== 'yes') {
   throw new Error('Requires explicit remote:instance in INCUS_TEST_TARGET and INCUS_TEST_ALLOW_DESTRUCTIVE=yes; fixture must be test-owned and idle.');
 }
+if (process.env.INCUS_TEST_DOWNLOAD_STRATEGY && !['auto', 'client', 'container'].includes(process.env.INCUS_TEST_DOWNLOAD_STRATEGY)) {
+  throw new Error('INCUS_TEST_DOWNLOAD_STRATEGY must be auto, client or container');
+}
 const signingPath = process.env.INCUS_TEST_VSDA_PATH;
 if (!signingPath) throw new Error('Requires the installed stable client signing module path in INCUS_TEST_VSDA_PATH');
 type Signing = {
@@ -257,6 +260,8 @@ async function main() {
             await execInInstance(ref, `rm -f ${sq('/tmp/vscode-server-' + flavor + '-' + testedCommit + '.tar.gz')}`);
           }
         }
+        const partials = await execInInstance(ref, `find /tmp -maxdepth 1 -name ${sq(`vscode-server-*-` + testedCommit + `.tar.gz.partial-*`)} -print`);
+        assert.equal(partials.trim(), '', 'container download partials must be absent');
         for (let n = 0; ; n++) {
           const remaining = (await execInInstance(ref, "pgrep -f 'out/serv[e]r-main\\.js|\\.vscode-serve[r]/relay\\.js' || true")).trim();
           if (!remaining) break;

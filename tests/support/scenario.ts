@@ -35,6 +35,9 @@ export function installedServer(f: Fixture, options: {
   running?: string; healthy?: boolean; signal?: string; token?: string;
   relayCurrent?: boolean; relayVerifyError?: boolean; pruneError?: boolean; port?: string; installed?: boolean; remoteSha?: string; pushedSha?: string; extractionError?: boolean; hook?: (args: string[], script: string) => string | undefined;
 } = {}): string[][] {
+  // Legacy scenarios explicitly exercise the offline client route. Auto tests
+  // remove/override this setting after setup to exercise the public default.
+  if (!f.configuration.has('remote-incus.downloadStrategy')) f.configuration.set('remote-incus.downloadStrategy', 'client');
   f.state.set('commit', COMMIT);
   const operations: string[][] = [];
   f.routes.set('child_process.execFile', (command, args: string[], _opts, callback) => {
@@ -45,14 +48,25 @@ export function installedServer(f: Fixture, options: {
       let output = options.hook?.(args, script);
       if (output === undefined) {
         if (script.startsWith('getent passwd')) output = passwd;
-        else if (script.startsWith('kill -0')) output = options.signal ?? 'yes';
+        else if (script.startsWith('kill -0')) {
+          const signal = options.signal ?? 'yes';
+          const installed = options.hook?.(args, script.slice(script.indexOf('if [ -f'))) ?? (options.installed === false ? 'no' : 'yes');
+          output = signal === 'yes' ? 'yes\nINCUS_FLAVOR\nx86_64\nglibc\nINCUS_INSTALL\n' + installed : signal;
+        }
         else if (script.startsWith('uname -m')) output = 'x86_64\nglibc';
         else if (script.startsWith('if [ -f')) output = options.installed === false ? 'no' : 'yes';
         else if (script.startsWith('sha256sum')) output = script.includes('2>/dev/null') ? options.remoteSha ?? '' : options.pushedSha ?? '';
         else if (script.includes('tar -xzf')) { if (options.extractionError) throw new Error('extract failed'); output = ''; }
-        else if (script.includes('fresh token minted')) output = options.relayCurrent === false ? 'relay-repair' : 'relay-current';
+        else if (script.includes('fresh token minted')) {
+          output = options.relayCurrent === false ? 'relay-repair' : 'relay-current';
+          if (options.relayCurrent !== false && script.includes('INCUS_SESSION')) output += '\nINCUS_SESSION\n' + (options.port ?? 'Extension host agent listening on 4567') + '\nINCUS_TOKEN\n' + (options.token ?? TOKEN);
+        }
         else if (script.startsWith('test -f') && script.includes('sha256sum')) { if (options.relayVerifyError) throw new Error('relay verification failed'); output = ''; }
-        else if (script.startsWith('pgrep')) output = options.running === '' ? '' : `10 /home/alice/.vscode-server/bin/${options.running ?? f.state.get('commit')}/out/server-main.js`;
+        else if (script.startsWith('pgrep')) {
+          const process = options.running === '' ? '' : `10 /home/alice/.vscode-server/bin/${options.running ?? f.state.get('commit')}/out/server-main.js`;
+          const health = options.hook?.(args, script.slice(script.indexOf('test -x'))) ?? (options.healthy === false ? 'no' : 'yes');
+          output = process + '\nINCUS_HEALTH\n' + health;
+        }
         else if (script.startsWith('test -x')) output = options.healthy === false ? 'no' : 'yes';
         else if (script.startsWith('pkill')) output = '';
         else if (script.includes('nohup')) output = 'launched pid 42';

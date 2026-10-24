@@ -20,42 +20,30 @@ with a Docker container".
 3. `ALTERNATIVES.md` — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: additional Task 5 experiments (2026-10-24)
+## Current stopping point: Task 5 complete (2026-10-24)
 
-The user authorized the proposed controlled experiments after parallel research.
-They are complete and **stopped for discussion**. Read
-[TASK-05-EXPERIMENTS.md](TASK-05-EXPERIMENTS.md) and its JSON samples. Experimental
-sources are under `scripts/experiments/task5`; the batching patch is unapplied.
-The runtime implementation and normal Incus configuration remain unchanged.
-The obsolete transfer-ceiling comment was corrected without changing behavior.
+The implementation is deployed and manually accepted: the user reported “much
+better” and authorized task closure and cleanup. See
+[TASK-05-RESULTS.md](TASK-05-RESULTS.md) and
+[TASK-05-MEASUREMENTS.json](TASK-05-MEASUREMENTS.json) for the consolidated result,
+measurements, verification and limits. Superseded reports and experimental
+prototypes were removed; reusable verifiers and regression tests remain.
 
-All 18 matrix calls authenticated and preserved the live server/channels.
-Transfer variants verified the same complete archive and metadata. Recovery and
-bounded teardown passed; private configuration/proxy/build material was removed.
-88 tests, typecheck and compile pass. No deployment, normal-user restart, commit,
-push, default container-internet requirement or next task followed. Adoption of
-any candidate is a separate discussion, not an automatic optimization round.
+Healthy reuse takes three execs; installed-stopped takes seven. Default auto
+tries verified container download then visibly falls back once to client;
+explicit client/container remain available. Known publisher SHA is checked before
+client cache publication/reuse. Managed curl ignores curlrc, and uncertain cleanup
+blocks fallback. Normal keepalive and existing identity/GID policies are unchanged.
 
-## Current stopping point (2026-10-24, Task 5)
+127 tests, typecheck, compile, manual-verifier typechecks and scoped live checks
+passed. The installed production bundle was byte-verified, and the normal-profile
+resolver completed a fresh connection in about 30 seconds before user approval.
+Leave the running user session intact; do not uninstall/reset/restart it as cleanup.
+Task 4's Ports and identical-folder findings remain outside Task 5.
 
-Task 5 was explicitly authorized after Task 4 discussion. Implementation and
-measurements are complete; the user subsequently authorized review and refinement.
-That review and scoped verification are complete. **Stopped for discussion.** No deployment,
-commit, push, next task or further optimization round is authorized.
-
-[TASK-05-RESULTS.md](TASK-05-RESULTS.md) is the evidence and limitation record;
-[TASK-05-MEASUREMENTS.json](TASK-05-MEASUREMENTS.json) preserves the original
-before/after observations. Healthy reuse measured 14.277 → 8.123 s with four
-fewer CLI invocations; no clean-install speedup was observed. These are one-pair
-bootstrap observations, not full-window timing guarantees.
-
-Relay checks share token preparation, readiness shares token reading, and
-healthy reuse skips pruning. Review refinement safely unlinks relay symlinks
-before repair and scopes measurement hooks to each sample. Unresolved policies
-and Task 4 window findings remain open. 88 tests, typecheck, compile and the
-repeated remote handshake/repair/recovery run pass, including safe symlink repair
-with two live channels and bounded teardown. Builds stay local to this worktree.
-No production instance, normal-user window or local fixture was mutated.
+Checkpoints `e03dcf8` and `2a99945` exist. The user authorized committing the
+final implementation and cleanup to close Task 5. Nothing was pushed or published.
+No further deploy, optimization round or next task starts without user instruction.
 
 ## Current state (2026-10-23, Task 4 verification)
 

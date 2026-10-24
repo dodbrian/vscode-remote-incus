@@ -17,9 +17,10 @@
  *   4. install?  — core files must be complete with no in-progress marker;
  *                  assess process health before any repair, then skip tarball
  *                  steps entirely for a complete installation
- *   5. download  — client-side, cached under globalStorage, sha256 recorded
- *   6. push      — `incus file push` PATH mode; skipped when the remote copy
- *                  already matches (sha256 compared before every push)
+ *   5. download  — auto container-first with one visible client fallback, or explicit
+ *                  client/container download with checksum verification
+ *   6. push      — client strategy uses `incus file push` PATH mode; skipped
+ *                  when the remote copy matches (sha256 checked before push)
  *   7. extract   — as the target user into ~/.vscode-server/bin/<commit>
  *   8. relay     — SHA/UID/GID/0600 probe batched with token preparation;
  *                  push and verify only when state differs
@@ -42,6 +43,7 @@ import { pipeline } from 'stream/promises';
 import * as vscode from 'vscode';
 import { execInInstance, InstanceRef, pushFile, sq, target } from './incusCli';
 import { firstLine, log } from './logging';
+import { ContainerDownloadCleanupError, ContainerDownloadError, DEFAULT_URL_TEMPLATE, downloadInContainer } from './serverDownload';
 import { Report } from './progress';
 
 export const VS_SERVER_DIR = '.vscode-server';
@@ -50,7 +52,6 @@ const tokenPath = (home: string): string => `${home}/${VS_SERVER_DIR}/data/Machi
 const logPath = (home: string): string => `${home}/${VS_SERVER_DIR}/data/Machine/server.log`;
 const relayPath = (home: string): string => `${home}/${VS_SERVER_DIR}/relay.js`;
 
-const DEFAULT_URL_TEMPLATE = 'https://update.code.visualstudio.com/commit:{commit}/server-{flavor}/stable';
 const PORT_POLL_INTERVAL_MS = 500;
 const PORT_POLL_TRIES = 120; // 60 s
 
@@ -133,8 +134,7 @@ async function doResolveIdentity(ref: InstanceRef, override: string): Promise<Id
  * 2026-10-20: a death loop of ptyHost/exthost restarts masquerading as a
  * terminal bug). Probe before anything else and refuse loudly.
  */
-async function probeSignalSupport(ref: InstanceRef, identity: Identity): Promise<void> {
-  const out = await execInInstance(ref, 'kill -0 $$ && echo yes || echo no', { uid: identity.uid, home: identity.home });
+function assertSignalSupport(out: string, identity: Identity): void {
   if (out.trim() === 'yes') { return; }
   throw new Error([
     `signal syscalls are blocked inside this instance (kill -0 self denied for uid ${identity.uid})`,
@@ -152,6 +152,10 @@ export type ServerFlavor = 'linux-x64' | 'linux-arm64' | 'linux-alpine';
 
 export async function probeFlavor(ref: InstanceRef, identity: Identity): Promise<ServerFlavor> {
   const out = await execInInstance(ref, 'uname -m; ldd --version 2>&1 | head -1', { uid: identity.uid, home: identity.home });
+  return parseFlavor(out);
+}
+
+function parseFlavor(out: string): ServerFlavor {
   const [arch = '', lddLine = ''] = out.split('\n').map((s) => s.trim());
   if (/musl/i.test(lddLine)) {
     if (arch === 'x86_64') { return 'linux-alpine'; }
@@ -202,7 +206,7 @@ async function pruneServerCache(cacheDir: string, keepCommit: string): Promise<v
 // tarball download (client-side, cached — DESIGN §3 step 2)
 // ---------------------------------------------------------------------------
 
-export async function downloadTarball(context: vscode.ExtensionContext, commit: string, flavor: ServerFlavor, report?: Report): Promise<{ file: string; sha256: string }> {
+export async function downloadTarball(context: vscode.ExtensionContext, commit: string, flavor: ServerFlavor, report?: Report, publisherSha256?: string): Promise<{ file: string; sha256: string }> {
   const template = vscode.workspace.getConfiguration('remote-incus').get<string>('downloadUrlTemplate') || DEFAULT_URL_TEMPLATE;
   const url = template.replace('{commit}', commit).replace('{flavor}', flavor);
   const cacheDir = path.join(context.globalStorageUri.fsPath, 'server-cache');
@@ -216,6 +220,11 @@ export async function downloadTarball(context: vscode.ExtensionContext, commit: 
     report?.('verifying cached tarball…');
     const actual = await sha256File(file);
     if (actual === expected) {
+      if (publisherSha256 && actual !== publisherSha256) {
+        await fs.promises.rm(file, { force: true });
+        await fs.promises.rm(shaFile, { force: true });
+        throw new Error('cached client archive does not match trusted server metadata SHA-256');
+      }
       return { file, sha256: actual };
     }
     log('cache entry corrupted (sha256 mismatch) — re-downloading');
@@ -252,6 +261,9 @@ export async function downloadTarball(context: vscode.ExtensionContext, commit: 
       fs.createWriteStream(partial, { mode: 0o644 }),
     );
     const sha256 = await sha256File(partial);
+    if (publisherSha256 && sha256 !== publisherSha256) {
+      throw new Error('client archive does not match trusted server metadata SHA-256');
+    }
     await fs.promises.writeFile(shaFile, `${sha256}\n`);
     await fs.promises.rename(partial, file); // atomic: cache only ever sees complete files
     log(`download complete: ${(received / 1e6).toFixed(0)} MB, sha256 ${sha256.slice(0, 12)}…`);
@@ -301,18 +313,56 @@ async function ensureTarballInInstance(ref: InstanceRef, identity: Identity, tar
   }
 }
 
+async function obtainServerArchive(context: vscode.ExtensionContext, ref: InstanceRef, identity: Identity, commit: string, flavor: ServerFlavor, report?: Report): Promise<void> {
+  const config = vscode.workspace.getConfiguration('remote-incus');
+  const strategy = config.get<string>('downloadStrategy', 'auto');
+  if (!['auto', 'client', 'container'].includes(strategy)) {
+    throw new Error('invalid remote-incus.downloadStrategy; choose auto, client or container');
+  }
+  const customMirror = (config.get<string>('downloadUrlTemplate') || DEFAULT_URL_TEMPLATE) !== DEFAULT_URL_TEMPLATE;
+  let containerFailure: ContainerDownloadError | undefined;
+  if (strategy === 'container' || (strategy === 'auto' && !customMirror)) {
+    try {
+      await downloadInContainer(ref, identity, commit, flavor, report);
+      return;
+    } catch (cause) {
+      if (strategy === 'container' || !(cause instanceof ContainerDownloadError) || cause instanceof ContainerDownloadCleanupError) throw cause;
+      containerFailure = cause;
+      log(`container download failed; switching to client download and transfer: ${firstLine(cause)}`);
+      report?.('container download failed — switching to client download and transfer…');
+    }
+  } else if (strategy === 'auto' && customMirror) {
+    log('custom mirror configured — using client download and transfer');
+    report?.('custom mirror configured — using client download and transfer…');
+  }
+  try {
+    const tar = await downloadTarball(context, commit, flavor, report, containerFailure?.expectedSha256);
+    await ensureTarballInInstance(ref, identity, tar, commit, flavor, report);
+  } catch (cause) {
+    if (containerFailure) {
+      throw new Error(`automatic server download failed; client route: ${firstLine(cause)}`, { cause: new AggregateError([containerFailure, cause]) });
+    }
+    throw cause;
+  }
+}
+
 async function isServerInstalled(ref: InstanceRef, identity: Identity, commit: string): Promise<boolean> {
+  return (await execInInstance(ref, installationProbe(identity, commit), { uid: identity.uid, home: identity.home })).trim() === 'yes';
+}
+
+function installationProbe(identity: Identity, commit: string): string {
   const dir = `${identity.home}/${VS_SERVER_DIR}/bin/${commit}`;
-  const out = await execInInstance(ref, [
+  // Root pgrep can run concurrently: never put the plain process name in argv.
+  const main = `${sq(`${dir}/out`)}/'server'-main.js`;
+  return [
     `if [ -f ${sq(`${dir}/.incus-installing`)} ]; then`,
     `  echo no`,
-    `elif [ -x ${sq(`${dir}/bin/code-server`)} ] && [ -f ${sq(`${dir}/out/server-main.js`)} ] && [ -x ${sq(`${dir}/node`)} ]; then`,
+    `elif [ -x ${sq(`${dir}/bin/code-server`)} ] && [ -f ${main} ] && [ -x ${sq(`${dir}/node`)} ]; then`,
     `  echo yes`,
     `else`,
     `  echo no`,
     `fi`,
-  ].join('\n'), { uid: identity.uid, home: identity.home });
-  return out.trim() === 'yes';
+  ].join('\n');
 }
 
 async function ensureExtracted(ref: InstanceRef, identity: Identity, commit: string, flavor: ServerFlavor, report?: Report): Promise<void> {
@@ -346,7 +396,7 @@ async function ensureExtracted(ref: InstanceRef, identity: Identity, commit: str
  * tokens containing anything outside [0-9a-zA-Z_-] (spike finding: it fails
  * only after the health check reports OK, which is brutally confusing).
  */
-async function prepareSessionFiles(context: vscode.ExtensionContext, ref: InstanceRef, identity: Identity, report?: Report): Promise<void> {
+async function prepareSessionFiles(context: vscode.ExtensionContext, ref: InstanceRef, identity: Identity, readSession: boolean, report?: Report): Promise<ReadySession | undefined> {
   const localRelay = path.join(context.asAbsolutePath('.'), 'assets', 'relay.js');
   const hash = await sha256File(localRelay);
   const relay = sq(relayPath(identity.home));
@@ -374,6 +424,7 @@ async function prepareSessionFiles(context: vscode.ExtensionContext, ref: Instan
     `chmod 600 ${sq(tokenPath(identity.home))}`,
     `if ${relayMatches}; then`,
     `  echo relay-current`,
+    ...(readSession ? [`  printf '\\nINCUS_SESSION\\n'`, sessionReadScript(identity)] : []),
     `else`,
     // Unlink the path before push can follow it and overwrite another file.
     `  if [ -L ${relay} ]; then rm -- ${relay}; fi`,
@@ -381,9 +432,10 @@ async function prepareSessionFiles(context: vscode.ExtensionContext, ref: Instan
     `  echo relay-repair`,
     `fi`,
   ].join('\n'), { uid: identity.uid, home: identity.home });
-  if (state.trim().split('\n').at(-1) === 'relay-current') {
+  const [relayState, session = ''] = state.split('\nINCUS_SESSION\n');
+  if (relayState.trim().split('\n').at(-1) === 'relay-current') {
     log('relay content and metadata match — skipping push');
-    return;
+    return readSession ? parseSession(session) : undefined;
   }
   report?.('staging relay…', 95);
   await pushFile(ref, localRelay, relayPath(identity.home), {
@@ -401,17 +453,35 @@ async function prepareSessionFiles(context: vscode.ExtensionContext, ref: Instan
 // server lifecycle
 // ---------------------------------------------------------------------------
 
-/** Commit of a currently running server, if any (root view of /proc). */
-async function findRunningServerCommit(ref: InstanceRef): Promise<string | undefined> {
-  // Bracketed pattern: `pkill`/`pgrep -f` match their own invoking cmdline —
-  // the bash -c payload must never contain the plain name (spike finding).
-  // The regex demands EXACTLY 40 hex chars in a bin/<…>/ path — malformed
-  // commit dirs can never be mistaken for a server version (verified).
-  const out = await execInInstance(ref, `pgrep -af 'serv[e]r-main\\.js' || true`);
-  const commits = [...out.matchAll(/bin\/([0-9a-f]{40})\//g)].map((m) => m[1].toLowerCase());
+/** Both snapshots finish before any repair can mask missing state. */
+async function inspectServer(ref: InstanceRef, identity: Identity, commit: string) {
+  const [selected, root] = await Promise.all([
+    execInInstance(ref, [
+      'kill -0 $$ && echo yes || { echo no; exit 0; }',
+      `printf '\\nINCUS_FLAVOR\\n'`,
+      'uname -m; ldd --version 2>&1 | head -1',
+      `printf '\\nINCUS_INSTALL\\n'`,
+      installationProbe(identity, commit),
+    ].join('\n'), { uid: identity.uid, home: identity.home }),
+    execInInstance(ref, [
+      `pgrep -af 'serv[e]r-main\\.js' || true`,
+      `printf '\\nINCUS_HEALTH\\n'`,
+      `test -x ${sq(`${identity.home}/${VS_SERVER_DIR}/bin/${commit}/bin/code-server`)} &&`,
+      `test -f ${sq(logPath(identity.home))} &&`,
+      `test -s ${sq(tokenPath(identity.home))} && echo yes || echo no`,
+    ].join('\n')),
+  ]);
+  const [signal, rest] = selected.split('\nINCUS_FLAVOR\n');
+  assertSignalSupport(signal, identity);
+  const [flavorText, installed] = (rest ?? '').split('\nINCUS_INSTALL\n');
+  const [processes, healthy] = root.split('\nINCUS_HEALTH\n');
+  if (!['yes', 'no'].includes(installed?.trim()) || !['yes', 'no'].includes(healthy?.trim())) {
+    throw new Error('invalid server inspection response from instance');
+  }
+  const commits = [...processes.matchAll(/bin\/([0-9a-f]{40})\//g)].map(m => m[1].toLowerCase());
   const unique = [...new Set(commits)];
-  log(`running server check: ${unique.length === 0 ? 'none' : `commit ${unique.join(', ')}${commits.length > 1 ? ` (${commits.length} processes)` : ''}`}`);
-  return unique[0];
+  log(`running server check: ${unique.length ? unique.join(', ') : 'none'}`);
+  return { flavor: parseFlavor(flavorText), installed: installed.trim() === 'yes', running: unique[0], healthy: healthy.trim() === 'yes' };
 }
 
 export async function killServer(ref: InstanceRef): Promise<void> {
@@ -433,24 +503,34 @@ async function startServer(ref: InstanceRef, identity: Identity, commit: string)
   ].join('\n'), { uid: identity.uid, home: identity.home });
 }
 
-async function discoverSession(ref: InstanceRef, identity: Identity, report?: Report): Promise<{ port: number; token: string }> {
+interface ReadySession { port: number; token: string }
+
+function sessionReadScript(identity: Identity): string {
+  return [
+    `grep -s "Extension host agent listening on" ${sq(logPath(identity.home))} || true`,
+    `printf '\\nINCUS_TOKEN\\n'`,
+    `cat ${sq(tokenPath(identity.home))}`,
+  ].join('\n');
+}
+
+function parseSession(out: string): ReadySession | undefined {
+  const [announcements, tokenText = ''] = out.split('\nINCUS_TOKEN\n');
+  const hits = [...announcements.matchAll(/Extension host agent listening on (\d+)/g)];
+  if (!hits.length) return undefined;
+  const token = tokenText.trim();
+  if (!token) throw new Error('could not read the connection token from the instance');
+  return { port: Number(hits[hits.length - 1][1]), token };
+}
+
+async function discoverSession(ref: InstanceRef, identity: Identity, report?: Report): Promise<ReadySession> {
   const file = logPath(identity.home);
   report?.('waiting for port…', 97);
   for (let i = 0; i < PORT_POLL_TRIES; i++) {
     // One selected-user exec observes both readiness and the token file.
     // Keep token data confined to captured stdout; never interpolate or log it.
-    const out = await execInInstance(ref, [
-      `grep -s "Extension host agent listening on" ${sq(file)} || true`,
-      `printf '\\nINCUS_TOKEN\\n'`,
-      `cat ${sq(tokenPath(identity.home))}`,
-    ].join('\n'), { uid: identity.uid, home: identity.home });
-    const [announcements, tokenText = ''] = out.split('\nINCUS_TOKEN\n');
-    const hits = [...announcements.matchAll(/Extension host agent listening on (\d+)/g)];
-    if (hits.length > 0) {
-      const token = tokenText.trim();
-      if (!token) throw new Error('could not read the connection token from the instance');
-      return { port: Number(hits[hits.length - 1][1]), token };
-    }
+    const out = await execInInstance(ref, sessionReadScript(identity), { uid: identity.uid, home: identity.home });
+    const session = parseSession(out);
+    if (session) return session;
     await sleep(PORT_POLL_INTERVAL_MS);
   }
   const dump = await execInInstance(ref, `cat ${sq(file)} 2>/dev/null || true`, { uid: identity.uid, home: identity.home });
@@ -509,40 +589,15 @@ export async function ensureServerReady(context: vscode.ExtensionContext, ref: I
 async function doEnsureServerReady(context: vscode.ExtensionContext, ref: InstanceRef, report?: Report): Promise<ServerSession> {
   report?.('connecting to instance…');
   const identity = await resolveIdentity(ref);
-  // Fail fast on instances where signals are blocked — BEFORE any transfer
-  // work and on every path (a death-looping server still "runs", so the
-  // reuse path must be covered too).
-  await probeSignalSupport(ref, identity);
   const commit = await resolveClientCommit();
-  const flavor = await probeFlavor(ref, identity);
   report?.('checking for an existing server…');
-  // Snapshot installation validity before any repair, including partial installs.
-  const installed = await isServerInstalled(ref, identity, commit);
-  // Assess the existing process before bootstrap can recreate its state.
-  const running = await findRunningServerCommit(ref);
-  let reuse = false;
-  if (running) {
-    if (running !== commit) {
-      log(`server on ${target(ref)} runs stale commit ${running.slice(0, 10)}… — restarting under ${commit.slice(0, 10)}…`);
-      await killServer(ref);
-    } else {
-      // A live process alone is not a healthy server: a wiped ~/.vscode-server
-      // (recreated instance, manual cleanup) leaves the process running from
-      // memory with its install dir, token file and log GONE — reusing it
-      // means polling a nonexistent log forever (seen live 2026-10-19).
-      // Verify the on-disk state before trusting the reuse.
-      const healthy = (await execInInstance(ref, [
-        `test -x ${sq(`${identity.home}/${VS_SERVER_DIR}/bin/${running}/bin/code-server`)} &&`,
-        `test -f ${sq(logPath(identity.home))} &&`,
-        `test -s ${sq(tokenPath(identity.home))} && echo yes || echo no`,
-      ].join(' '))).trim() === 'yes';
-      if (healthy && installed) {
-        reuse = true;
-      } else {
-        log(`running server on ${target(ref)} lost its install (zombie) — killing and starting fresh`);
-        await killServer(ref);
-      }
-    }
+  const { flavor, installed, running, healthy } = await inspectServer(ref, identity, commit);
+  const reuse = running === commit && installed && healthy;
+  if (running && !reuse) {
+    log(running !== commit
+      ? `server runs stale commit ${running.slice(0, 10)}… — restarting`
+      : 'running server lost required state (zombie) — restarting');
+    await killServer(ref);
   }
   if (installed) {
     // The most common case: nothing to transfer at all — not even the local
@@ -550,11 +605,10 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
     log(`server install for ${commit.slice(0, 10)}… already present — skipping download/push/extract`);
     report?.('server already installed', 90);
   } else {
-    const tar = await downloadTarball(context, commit, flavor, report);
-    await ensureTarballInInstance(ref, identity, tar, commit, flavor, report);
+    await obtainServerArchive(context, ref, identity, commit, flavor, report);
     await ensureExtracted(ref, identity, commit, flavor, report);
   }
-  await prepareSessionFiles(context, ref, identity, report);
+  const ready = await prepareSessionFiles(context, ref, identity, reuse, report);
 
   if (reuse) {
     log(`server already running under ${commit.slice(0, 10)}… — reusing`);
@@ -563,7 +617,7 @@ async function doEnsureServerReady(context: vscode.ExtensionContext, ref: Instan
     await startServer(ref, identity, commit);
   }
 
-  const { port, token } = await discoverSession(ref, identity, report);
+  const { port, token } = ready ?? await discoverSession(ref, identity, report);
   if (!reuse) {
     await sweepOrphanRelays(ref);
     // Hygiene belongs to fresh startup. Pruning failures cannot invalidate

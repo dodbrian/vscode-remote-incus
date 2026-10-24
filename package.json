@@ -255,7 +255,23 @@
           "type": "string",
           "default": "https://update.code.visualstudio.com/commit:{commit}/server-{flavor}/stable",
           "scope": "application",
-          "description": "Template for the VS Code server tarball download ({commit}, {flavor}). Override for offline mirrors."
+          "description": "Client-route URL template for the VS Code server tarball ({commit}, {flavor}). Override for mirrors; auto uses client transfer directly for custom mirrors."
+        },
+        "remote-incus.downloadStrategy": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "client",
+            "container"
+          ],
+          "enumDescriptions": [
+            "Try verified container download first, then visibly fall back once to client download and transfer. Custom mirrors use client transfer directly.",
+            "Always download on the client and transfer through Incus; no container internet or curl required.",
+            "Only download in the container using curl and the expected Microsoft SHA-256. Failures do not fall back. Custom mirrors require auto or client."
+          ],
+          "default": "auto",
+          "scope": "application",
+          "description": "How to obtain a missing VS Code server archive. Complete installations skip download work for either strategy."
         }
       }
     }

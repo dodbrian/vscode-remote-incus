@@ -1,20 +1,24 @@
-import * as batch from 'task5-batched-bootstrap';
-/** Manual destructive verification only. No default target, CI use or token logs. */
-import { measureStartup } from '../../startup-metrics';
+/** Manual auto-fallback verification. Owned idle Linux x64 fixture only. */
+import { measureStartup } from './startup-metrics';
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import * as cp from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import assert from 'node:assert/strict';
 import * as vscode from 'vscode';
-import { ensureServerReady, killServer, resolveIdentity, ServerSession } from '../../../src/bootstrap';
-import { execInInstance, sq, getInstanceStatus } from '../../../src/incusCli';
+import { downloadTarball, ensureServerReady, killServer, resolveIdentity, probeFlavor, ServerSession } from '../src/bootstrap';
+import { execInInstance, sq } from '../src/incusCli';
 
 const selected = process.env.INCUS_TEST_TARGET;
 if (process.env.CI || !selected || !/^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$/.test(selected) || process.env.INCUS_TEST_ALLOW_DESTRUCTIVE !== 'yes') {
   throw new Error('Requires explicit remote:instance in INCUS_TEST_TARGET and INCUS_TEST_ALLOW_DESTRUCTIVE=yes; fixture must be test-owned and idle.');
 }
+if (process.env.INCUS_TEST_DOWNLOAD_STRATEGY && !['auto', 'client', 'container'].includes(process.env.INCUS_TEST_DOWNLOAD_STRATEGY)) {
+  throw new Error('INCUS_TEST_DOWNLOAD_STRATEGY must be auto, client or container');
+}
+if (process.env.INCUS_TEST_DOWNLOAD_STRATEGY && process.env.INCUS_TEST_DOWNLOAD_STRATEGY !== 'auto') throw new Error('Fallback check requires auto strategy');
 const signingPath = process.env.INCUS_TEST_VSDA_PATH;
 if (!signingPath) throw new Error('Requires the installed stable client signing module path in INCUS_TEST_VSDA_PATH');
 type Signing = {
@@ -26,15 +30,9 @@ try { signing = createRequire(path.join(process.cwd(), 'package.json'))(signingP
 catch { throw new Error('Unable to load the installed stable client signing module'); }
 const [remote, instance] = selected.split(':');
 const ref = { remote, instance };
-const experimentRoot = process.env.INCUS_EXPERIMENT_ROOT!;
-const directory = path.join(experimentRoot, 'cache');
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'incus-live-verification-'));
 const context = { globalStorageUri: { fsPath: directory }, asAbsolutePath: (p: string) => path.resolve(p), subscriptions: [] } as unknown as vscode.ExtensionContext;
-const print = console.log.bind(console);
-const samples: unknown[] = [];
-const output = (line: string) => {
- print(line);
- if (line.startsWith('METRIC ')) { samples.push(JSON.parse(line.slice(7))); fs.writeFileSync(path.join(experimentRoot, 'reconnect-results.json'), JSON.stringify(samples, null, 2)); }
-};
+const output = console.log.bind(console);
 // Production diagnostic strings include target identifiers. Keep this run private
 // and emit only fixed scenario labels; never serialize sessions or caught errors.
 console.log = () => {};
@@ -172,101 +170,47 @@ let checkpoint = 'bootstrap';
 let mutated = false;
 let testedCommit = '';
 let testedFlavor = '';
-async function stopProxy() {
-  const lines = cp.execFileSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' }).split('\n');
-  for (const line of lines) {
-    if (line.includes('incus remote proxy ') && line.includes(path.join(experimentRoot, 'on', 'keepalive') + '/')) {
-      const pid = Number(line.trim().split(/\s+/)[0]);
-      try { process.kill(pid, 'SIGTERM'); } catch (e: any) { if (e.code !== 'ESRCH') throw e; }
-    }
-  }
-  await new Promise(r => setTimeout(r, 250));
-}
-async function seedArchive() {
-  const metadata = JSON.parse(fs.readFileSync(path.join(experimentRoot, 'metadata.json'), 'utf8'));
-  const archive = fs.readFileSync(path.join(experimentRoot, 'archive-path'), 'utf8');
-  const partial = `/tmp/incus-transfer-recovery-${process.pid}.partial`;
-  const id = await resolveIdentity(ref);
-  try {
-    cp.execFileSync(process.env.INCUS_TRANSFER_HELPER!, [], {
-      env: { ...process.env, INCUS_TRANSFER_MODE: 'http', INCUS_TRANSFER_LOCAL: archive, INCUS_TRANSFER_REMOTE: partial,
-        INCUS_TRANSFER_UID: String(id.uid), INCUS_TRANSFER_GID: String(id.gid), INCUS_TRANSFER_MODE_BITS: '600' },
-      timeout: 300000, stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const digest = await execInInstance(ref, `sha256sum ${sq(partial)}`, { uid: id.uid, home: id.home });
-    assert.equal(digest.split(' ')[0], metadata.sha256hash);
-    await execInInstance(ref, `mv -- ${sq(partial)} ${sq('/tmp/vscode-server-linux-x64-' + testedCommit + '.tar.gz')}`, { uid: id.uid, home: id.home });
-  } finally { await execInInstance(ref, `rm -f -- ${sq(partial)}`, { uid: id.uid, home: id.home }); }
-}
+const native = createRequire(path.join(process.cwd(), 'package.json'))('node:child_process') as typeof cp;
+const originalExec = native.execFile;
+let fakeFolder = '';
 async function main() {
   try {
-    process.env.INCUS_CONF = path.join(experimentRoot, 'off');
     const version = cp.execFileSync('code', ['--version'], { encoding: 'utf8' }).trim().split('\n');
-    assert.match(version[1], /^[0-9a-f]{40}$/);
-    (vscode.env as unknown as { appCommit: string }).appCommit = version[1]; testedCommit = version[1];
-    assert.ok(fs.existsSync(path.join(experimentRoot, 'seed-ready')));
-    const identity = await resolveIdentity(ref); assert.ok(identity.uid !== 0);
+    testedCommit = version[1]; assert.match(testedCommit, /^[a-f0-9]{40}$/);
+    (vscode.env as unknown as { appCommit: string }).appCommit = testedCommit;
+    const id = await resolveIdentity(ref); assert.ok(id.uid !== 0);
+    assert.equal(await probeFlavor(ref, id), 'linux-x64', 'this fixture verifier requires Linux x64');
     assert.equal((await execInInstance(ref, "pgrep -f '\\.vscode-serve[r]/relay\\.js|out/serv[e]r-main\\.js' || true")).trim(), '');
-    const root = identity.home + '/.vscode-server';
-    stage = 'prepare'; mutated = true;
-    await killServer(ref); await execInInstance(ref, `rm -rf ${sq(root)}`);
-    let session = await ensureServerReady(context, ref); testedFlavor = session.flavor;
-    await checks(session); output('PASS seeded setup, ownership, hash and signed authentication');
-    assert.deepEqual(await batch.resolveIdentity(ref), identity);
-    const a = (await authenticated(session, true, true))!;
-    const b = (await authenticated(session, true, true))!;
-    const pid = () => execInInstance(ref, "pgrep -f 'out/serv[e]r-main\\.js' || true");
-    const before = await pid();
-    for (let round = 0; round < 3; round++) {
-      for (const mode of ['off', 'on-cold', 'on-warm']) {
-        const implementations = round % 2 ? ['batched', 'current'] : ['current', 'batched'];
-        for (const implementation of implementations) {
-          if (mode === 'on-cold') await stopProxy();
-          process.env.INCUS_CONF = path.join(experimentRoot, mode === 'off' ? 'off' : 'on');
-          if (mode === 'on-warm') await getInstanceStatus(ref);
-          stage = `${implementation}/${mode}/${round + 1}`;
-          const ensure = implementation === 'current' ? ensureServerReady : batch.ensureServerReady;
-          const observed = await measureStartup(stage, () => ensure(context, ref, message => measureStartup.phase(message)), output);
-          assert.ok(observed.token === session.token); assert.equal(observed.port, session.port);
-          await authenticated(observed);
-          process.env.INCUS_CONF = path.join(experimentRoot, 'off');
-          assert.equal(await pid(), before);
-          assert.ok(!a.failed && !b.failed && a.child.exitCode === null && b.child.exitCode === null);
-        }
+    await execInInstance(ref, `test ! -e ${sq(id.home + '/.vscode-server')}`);
+    stage = 'prepare verified client cache';
+    await downloadTarball(context, testedCommit, 'linux-x64'); testedFlavor = 'linux-x64';
+    fakeFolder = (await execInInstance(ref, 'mktemp -d /tmp/incus-auto-fallback-XXXXXX', { uid: id.uid, home: id.home })).trim();
+    assert.match(fakeFolder, /^\/tmp\/incus-auto-fallback-[A-Za-z0-9]+$/);
+    await execInInstance(ref, `printf '#!/bin/sh\\nexit 22\\n' > ${sq(fakeFolder + '/curl')}; chmod 700 ${sq(fakeFolder + '/curl')}`, { uid: id.uid, home: id.home });
+    let attempts = 0;
+    native.execFile = ((command: string, args: string[], ...rest: any[]) => {
+      if (command === 'incus' && args.at(-1)?.includes('curl --disable --fail')) {
+        attempts++; args = [...args]; args.splice(args.indexOf('--'), 0, '--env', `PATH=${fakeFolder}:/usr/bin:/bin`);
       }
-    }
-    const traffic = [a.keepAlives, b.keepAlives];
-    await bounded((async () => {
-      while (a.keepAlives <= traffic[0] || b.keepAlives <= traffic[1]) {
-        assert.ok(!a.failed && !b.failed); await new Promise(r => setTimeout(r, 100));
-      }
-    })());
-    output('PASS matrix: all authenticated results preserve PID/port/token and two live channels');
-    // Relay repair is a prototype fallback, not another optimized fast path.
-    stage = 'batched missing-relay fallback';
-    await execInInstance(ref, `rm -- ${sq(root + '/relay.js')}`);
-    const repaired = await batch.ensureServerReady(context, ref); await checks(repaired);
-    assert.equal(await pid(), before); assert.ok(!a.failed && !b.failed);
-    output('PASS batched relay-repair fallback preserves active channels');
+      return (originalExec as any)(command, args, ...rest);
+    }) as typeof native.execFile;
+    stage = 'auto fallback'; mutated = true;
+    const messages: string[] = [];
+    const session = await measureStartup(stage, () => ensureServerReady(context, ref, message => { messages.push(message); measureStartup.phase(message); }), output);
+    native.execFile = originalExec;
+    assert.equal(attempts, 1); assert.equal(messages.filter(m => m.includes('switching to client')).length, 1);
+    await checks(session);
+    output('PASS one failed container attempt, one visible client fallback, verified archive and signed authentication');
+    const a = (await authenticated(session, true, true))!; const b = (await authenticated(session, true, true))!;
+    stage = 'auto healthy reuse after fallback';
+    const reused = await measureStartup(stage, () => ensureServerReady(context, ref), output);
+    assert.equal(reused.port, session.port); assert.ok(reused.token === session.token);
+    const initial = a.keepAlives;
+    await bounded((async () => { while (a.keepAlives <= initial) { assert.ok(!a.failed && !b.failed); await new Promise(r => setTimeout(r, 100)); } })());
     await Promise.all([a.close(), b.close()]);
-    // Exercise persistent proxy with long-lived authenticated relay channels.
-    process.env.INCUS_CONF = path.join(experimentRoot, 'on');
-    const c = (await authenticated(repaired, true, true))!; const d = (await authenticated(repaired, true, true))!;
-    await batch.ensureServerReady(context, ref);
-    await bounded((async () => { const initial = c.keepAlives; while (c.keepAlives <= initial) { assert.ok(!c.failed && !d.failed); await new Promise(r => setTimeout(r, 100)); } })());
-    await Promise.all([c.close(), d.close()]);
-    output('PASS keepalive proxy preserves parallel signed channels');
-    process.env.INCUS_CONF = path.join(experimentRoot, 'off');
-    stage = 'batched stopped fallback'; await killServer(ref); session = await batch.ensureServerReady(context, ref); await checks(session);
-    output('PASS batched installed-stopped fallback');
-    stage = 'batched missing-token fallback'; await execInInstance(ref, `rm -- ${sq(root + '/data/Machine/.incus-conn-token')}`);
-    const old = session.token; session = await batch.ensureServerReady(context, ref); assert.ok(session.token !== old); await checks(session);
-    output('PASS batched missing-token fallback');
-    stage = 'batched wiped-install fallback'; await seedArchive(); await execInInstance(ref, `rm -rf ${sq(root)}`);
-    session = await batch.ensureServerReady(context, ref); await checks(session);
-    output('PASS batched wiped-install fallback with verified preseeded archive');
+    output('PASS auto healthy reuse keeps token, port and both signed channels');
   } finally {
-    process.env.INCUS_CONF = path.join(experimentRoot, 'off');
+    native.execFile = originalExec;
     const cleanupErrors: unknown[] = [];
     for (const c of children) c.kill('SIGKILL');
     try { await bounded(Promise.all([...closed.values()])); } catch (e) { cleanupErrors.push(e); }
@@ -282,6 +226,8 @@ async function main() {
             await execInInstance(ref, `rm -f ${sq('/tmp/vscode-server-' + flavor + '-' + testedCommit + '.tar.gz')}`);
           }
         }
+        const partials = await execInInstance(ref, `find /tmp -maxdepth 1 -name ${sq(`vscode-server-*-` + testedCommit + `.tar.gz.partial-*`)} -print`);
+        assert.equal(partials.trim(), '', 'container download partials must be absent');
         for (let n = 0; ; n++) {
           const remaining = (await execInInstance(ref, "pgrep -f 'out/serv[e]r-main\\.js|\\.vscode-serve[r]/relay\\.js' || true")).trim();
           if (!remaining) break;
@@ -290,7 +236,10 @@ async function main() {
         }
       } catch (e) { cleanupErrors.push(e); }
     }
-    try { await stopProxy(); } catch(e) { cleanupErrors.push(e); }
+    if (fakeFolder) {
+      try { const id = await resolveIdentity(ref); await execInInstance(ref, `rm -rf -- ${sq(fakeFolder)}`, { uid: id.uid, home: id.home }); await execInInstance(ref, `test ! -e ${sq(fakeFolder)}`); }
+      catch (e) { cleanupErrors.push(e); }
+    }
     fs.rmSync(directory, { recursive: true, force: true });
     assert.equal(children.size, 0);
     assert.equal(cleanupErrors.length, 0, 'cleanup must succeed');

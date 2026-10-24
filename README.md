@@ -15,9 +15,9 @@ same slot Dev Containers / Remote-SSH occupy in the Remote Explorer.
   ports are required; the VS Code server listens only on instance loopback.
 - The transport is `incus exec … -- node relay.js`: the child's stdio is the
   byte transport, wrapped as a VS Code managed remote connection.
-- The VS Code server is downloaded client-side (cache + sha256-verified),
-  pushed with `incus file push`, and started detached as the instance's
-  primary unprivileged user.
+- By default, server setup tries verified container download, then visibly
+  falls back once to client download and `incus file push` if needed. The
+  server starts detached as the instance's primary unprivileged user.
 
 ## Similar projects
 
@@ -42,6 +42,37 @@ Then install the VSIX: `code --install-extension remote-incus.vsix`.
 Target requirements: incus ≥ 6.0, Linux client, instances with glibc (x64/arm64).
 Task 4 verified Linux x64 with Stable 1.143.1 and Incus 7.5.1; arm64 and
 Insiders were not exercised in that verification.
+
+## Server download strategy
+
+`remote-incus.downloadStrategy` defaults to `auto`. No selection is required
+before installation: setup tries container download first and visibly switches
+to client download/transfer once if that route fails. A matching installation
+skips downloading altogether.
+
+| Setting | Behavior |
+| --- | --- |
+| `auto` (default) | Container first, one visible client fallback; custom mirrors use client transfer directly. |
+| `client` | Always download on the client and transfer through Incus. |
+| `container` | Container download only; failure is reported without fallback. |
+
+To force a route, explicitly set `remote-incus.downloadStrategy` to `client` or
+`container`. Container downloading requires existing curl and outbound HTTPS to
+Microsoft's update/CDN endpoints. No package is installed automatically, and
+attempts have bounded timeouts. Managed curl ignores `.curlrc` options so they cannot introduce implicit retries or override those limits. Client transfer supports containers without
+internet access; explicit client mode also avoids waiting for a failed container
+attempt in environments known to be offline.
+
+Container archives use client-obtained commit/SHA metadata, private partials and
+hash verification before publication. If that route fails after obtaining a
+trusted digest, the client fallback must match it before publishing or reusing its cache too. When metadata is
+unavailable, fallback retains the existing client-side hash and transfer checks.
+If partial cleanup cannot be confirmed, setup stops instead of starting another
+transfer against uncertain state. Both-route failure is reported without looping.
+Custom `downloadUrlTemplate` mirrors work with `auto` or `client`; explicit
+container mode rejects unsupported mirrors.
+
+The extension does not enable or change Incus keepalive configuration.
 
 ## Verification status
 

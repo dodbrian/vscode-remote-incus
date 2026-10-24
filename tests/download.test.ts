@@ -29,3 +29,24 @@ for (const failure of ['http', 'body', 'stream'] as const) test(`B1: ${failure} 
   const file = `${f.directory}/server-cache/vscode-server-linux-x64-${COMMIT}.tar.gz`;
   assert.equal(existsSync(file), false); assert.equal(existsSync(`${file}.partial`), false); assert.equal(existsSync(`${file}.sha256`), false);
 }));
+
+for (const cached of [false, true]) test(`publisher digest rejects client bytes before cache publication/reuse; cached=${cached}`, t => withFixture(t, async f => {
+  const dir = `${f.directory}/server-cache`; mkdirSync(dir);
+  const file = `${dir}/vscode-server-linux-x64-${COMMIT}.tar.gz`;
+  const wrong = createHash('sha256').update('wrong').digest('hex');
+  if (cached) { writeFileSync(file, 'wrong'); writeFileSync(file + '.sha256', wrong); }
+  else f.expect('fetch', async () => new Response('wrong'));
+  await assert.rejects(downloadTarball(context(f), COMMIT, 'linux-x64', undefined, 'a'.repeat(64)), /trusted server metadata SHA-256/);
+  assert.equal(existsSync(file), false);
+  assert.equal(existsSync(file + '.sha256'), false);
+  assert.equal(existsSync(file + '.partial'), false);
+}));
+
+test('publisher-matching archive is published with its verified sidecar', t => withFixture(t, async f => {
+  const digest = createHash('sha256').update('archive').digest('hex');
+  f.expect('fetch', async () => new Response('archive'));
+  const result = await downloadTarball(context(f), COMMIT, 'linux-x64', undefined, digest);
+  assert.equal(result.sha256, digest);
+  assert.equal(readFileSync(result.file, 'utf8'), 'archive');
+  assert.equal(readFileSync(result.file + '.sha256', 'utf8').trim(), digest);
+}));

@@ -1,28 +1,28 @@
-# Task 5 verification overlay
+# Current coverage through Task 5
 
-See [TASK-05-RESULTS.md](../TASK-05-RESULTS.md) for observed performance,
-equivalent-state boundaries and final remote evidence. The earlier task records
-below are historical; Task 5 is complete and stopped for discussion.
+Task 5 is deployed and manually accepted. See
+[TASK-05-RESULTS.md](../TASK-05-RESULTS.md) for consolidated evidence and limits.
+127 offline tests pass with no failures/skips; typecheck and compile pass.
+Manual verifiers remain separate from daemon/network-free CI tests.
 
-- B5/C5: executable SHA/UID/GID/0600 regular-file probe, missing/changed/metadata
-  repair, symlink unlinking with target preservation, non-destructive directory
-  rejection and post-push verification failure preventing ready. Final remote
-  repairs preserve the matching server and two live authenticated channels.
-- C11/B4: actual combined readiness/token bash read, last announced port and
-  empty-token rejection; delayed/missing logs retain bounded diagnostic tests.
-- C8/C12/C13: healthy reuse skips transfers and hygiene without killing bridges;
-  fresh-start pruning remains nonfatal and preserves current/unrelated cache data.
-- Performance-only offline budgets allow at most seven healthy-reuse or nine
-  installed-stopped execs with warm identity, and no transfers in either state.
-  Safety assertions remain independent; no CI wall-time threshold exists.
-- Manual metrics: process hooks restored on success/failure/output error, nested
-  measurement refusal, sanitized counts, explicit outcomes and exact phase totals.
-- Review gate: 88 passed, no skips/failures; typecheck, compile, standalone manual
-  harness typecheck, portable relay and failure-cleanup checks pass. Remote
-  before/final signed handshake and recovery runs pass bounded teardown.
+- C5/C6/C7/C8/C10/C11/C12: parallel selected-user and root inspection, pre-repair
+  barrier, process-search self-matching prevention, common recovery and actual
+  combined preparation/readiness bash. No duplicate fallback inspection.
+- B4/B5/C8/C13: sticky token, SHA/UID/GID/0600 relay freshness, safe symlink
+  repair, verification before dialing, healthy-channel preservation and fresh-
+  start nonfatal pruning. Three/seven-exec budgets allow future reductions
+  without replacing safety assertions or imposing wall-time thresholds.
+- Archive strategies: public/runtime auto default, explicit overrides, mirror
+  bypass, metadata/URL/SHA gates, atomic partial publication and signal cleanup,
+  one visible fallback, both-route errors, cleanup uncertainty and preservation
+  of publisher SHA before client cache publication/reuse. Managed curl ignores
+  curlrc. Tests cover fresh/cached mismatches and successful publication.
+- Real signed-handshake, relay/channel, repair/recovery and failure-cleanup
+  evidence is retained in the final report. User acceptance confirms perceived
+  improvement, not an exhaustive new UI/forwarding or policy certification.
 
-Task 4 window findings, broader matrices and unresolved policies remain outside
-this optimization's claims. No deployment, commit, push or next task occurred.
+Task 4 window findings, broader support matrices and unresolved policies remain
+outside this result. Earlier records below are historical.
 
 # Regression coverage through Task 4
 

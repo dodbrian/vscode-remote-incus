@@ -75,7 +75,8 @@ addressed below as first-class requirements.
 
 ## 3. Server bootstrap (frozen)
 
-Default mode is **fully air-gapped** — the container never needs internet:
+The client route supports **air-gapped containers**. Default auto mode first
+tries container HTTPS download and falls back to this route if needed:
 
 1. Extension resolves the server commit **from the local client** (`code --version`,
    line 2) — server and client must match by commit.
@@ -98,17 +99,18 @@ supported; armhf dropped upstream after VS Code 1.122. Requirements since VS Cod
 1.99: kernel ≥ 4.18, glibc ≥ 2.28, libstdc++ ≥ 3.4.25 — pre-flight via the bundled
 `bin/helpers/check-requirements.sh` for clean refusals.
 
-Additional authorized experiments in [TASK-05-EXPERIMENTS.md](TASK-05-EXPERIMENTS.md)
-compare native keepalive, an unapplied batching prototype and alternative transfer
-paths. They do not change the implementation below. The historical roughly
-2 MB/s observation is not a WebSocket protocol limit; later methods transferred
-the same verified archive substantially faster.
+Task 5 is complete and manually accepted; consolidated evidence and limitations
+are in [TASK-05-RESULTS.md](TASK-05-RESULTS.md). The historical roughly 2 MB/s CLI
+observation is not a protocol ceiling. Experimental comparisons informed the
+implementation; their disposable prototypes were removed at task closure.
 
 ### Task 5 implementation flow (2026-10-24)
 
-The current implementation first checks identity, selected-user signal support,
-client commit, architecture, installation completeness and pre-repair process
-health. Complete installations skip archive download, hashing, transfer and
+After resolving identity and the current client commit, two read-only execs run
+in parallel: selected UID/HOME signal, architecture/libc and install checks;
+and root-view process plus health-file checks. Both snapshots finish before any
+repair, kill or setup mutation. The install probe splits the server-main filename
+in its argv so concurrent pgrep cannot identify the probe itself as a server. Complete installations skip archive download, hashing, transfer and
 extraction. This check remains independent of the client archive cache.
 
 Token preparation and the relay probe share one selected-user exec. The probe
@@ -121,11 +123,15 @@ anew on each bootstrap; no new cross-session cache is introduced.
 Token minting, sticky reuse and permission repair retain the established
 regression contract (which supersedes the early rotation sketch below).
 
-Port announcements and token contents are read in one selected-user exec. The
+On healthy reuse with a matching relay, token/relay preparation also reads port
+announcements and token contents, making three execs in two sequential waves.
+Relay repair uses the same inspection snapshot and a separate verified push/read,
+without re-entering bootstrap or repeating probes. Fresh startup keeps the same
+inspection flow and uses separate launch/readiness operations. The
 last announcement wins, and an empty token rejects. Fresh starts still remove
 the old log before launch. Waiting retains the existing bounded client-side
-polling and diagnostic log dump; in-instance polling was considered but deferred
-because measured startup needed only one readiness read. Token contents remain
+polling and diagnostic log dump. Launch/wait batching could remove another
+boundary even with one poll, but it is outside this implementation. Token contents remain
 captured in memory, absent from argv, environment, logs and persistent client
 state. No `.devport` file is written by this implementation.
 
@@ -134,6 +140,35 @@ pruning. Healthy reconnect preserves active bridges and skips this hygiene.
 The transport, within-host in-flight deduplication and unresolved identity/GID
 policies are unchanged. Measurements and remaining limits are in
 [TASK-05-RESULTS.md](TASK-05-RESULTS.md).
+
+### Selectable archive acquisition
+
+`remote-incus.downloadStrategy` defaults to `auto`: one verified container
+attempt, then one visible client fallback after an expected route failure.
+`client` and `container` are explicit overrides. Installed matching servers skip
+all archive work for all three modes. Auto with a custom URL template goes
+straight to the client route without requesting Microsoft metadata.
+
+Container metadata has a 15-second deadline, rejects redirects and requires the
+exact commit, valid SHA and supported HTTPS CDN. Existing curl ignores automatic curlrc loading (`--disable` first), and follows HTTPS-only
+redirects with 10-second connect/180-second total limits inside a 210-second exec.
+Only file creation explicitly supplies the selected GID; normal bootstrap and
+bridge GID behavior is unchanged. Exclusive 0600 UUID partials have EXIT/INT/TERM
+cleanup, full hash/ownership verification and exact-path atomic publication.
+
+Expected container-route errors carry any verified publisher SHA into the client
+fallback. Client archives must match that digest before cache publication/reuse
+as well as push/extraction, and
+mismatching cached bytes/sidecars are removed. If metadata cannot be obtained,
+the client route retains its existing local-cache/hash/path-push/post-push gates.
+The client route also retains existing mirror support. Both failures are retained
+as causes if neither route succeeds; neither route is retried in a loop.
+
+The switch is reported in progress and logs before client work. A typed cleanup
+failure blocks fallback when partial cleanup cannot be confirmed. Unexpected
+program/reporting errors also propagate rather than masquerading as route
+failures. Explicit container mode never switches routes. This changes the earlier
+manual-selection policy at the user's request; no keepalive setting is changed.
 
 ## 4. Connection token policy (frozen)
 
