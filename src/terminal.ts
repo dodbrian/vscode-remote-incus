@@ -31,8 +31,10 @@ class ExecPty implements vscode.Pseudoterminal {
 
   private child: cp.ChildProcess | undefined;
 
-  constructor(private readonly ref: InstanceRef, private readonly identity: Identity) {
-  }
+  constructor(
+    private readonly ref: InstanceRef,
+    private readonly identity: Identity,
+  ) {}
 
   open(initialDimensions?: vscode.TerminalDimensions): void {
     const cols = initialDimensions?.columns ?? 80;
@@ -41,21 +43,33 @@ class ExecPty implements vscode.Pseudoterminal {
     const inner = `stty rows ${rows} cols ${cols} 2>/dev/null; exec bash`;
     log(`terminal: opening exec shell on ${target(this.ref)} as ${this.identity.username}`);
     this.child = incusSpawn([
-      'exec', target(this.ref),
-      '--user', String(this.identity.uid),
-      '--env', `HOME=${this.identity.home}`,
-      '--env', 'TERM=xterm-256color',
-      '--', 'script', '-qec', inner, '/dev/null',
+      'exec',
+      target(this.ref),
+      '--user',
+      String(this.identity.uid),
+      '--env',
+      `HOME=${this.identity.home}`,
+      '--env',
+      'TERM=xterm-256color',
+      '--',
+      'script',
+      '-qec',
+      inner,
+      '/dev/null',
     ]);
-    this.child.stdout?.on('data', (d: Buffer) => this.writeEmitter.fire(d.toString()));
-    this.child.stderr?.on('data', (d: Buffer) => this.writeEmitter.fire(d.toString()));
+    this.child.stdout?.on('data', (d: Buffer) => {
+      this.writeEmitter.fire(d.toString());
+    });
+    this.child.stderr?.on('data', (d: Buffer) => {
+      this.writeEmitter.fire(d.toString());
+    });
     this.child.on('error', (err) => {
       log(`terminal exec failed: ${err.message}`);
       this.writeEmitter.fire(`\r\n[remote-incus] exec failed: ${err.message}\r\n`);
       this.closeEmitter.fire();
     });
     this.child.on('exit', (code, signal) => {
-      log(`terminal exec exited: code=${code} signal=${signal}`);
+      log(`terminal exec exited: code=${code ?? 'null'} signal=${signal ?? 'null'}`);
       this.closeEmitter.fire();
     });
   }

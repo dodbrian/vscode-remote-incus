@@ -14,7 +14,9 @@ import { FolderNode, InstanceNode, InstancesTree } from './tree';
 
 /** Error toast with the same "show log" affordance the progress toast carries. */
 function showErrorWithLog(err: unknown): void {
-  void vscode.window.showErrorMessage(`Remote - Incus: ${firstLine(err)} ([show log](command:remote-incus.showLog))`);
+  void vscode.window.showErrorMessage(
+    `Remote - Incus: ${firstLine(err)} ([show log](command:remote-incus.showLog))`,
+  );
 }
 
 /** Full multi-line error text for the log; toasts take firstLine() instead. */
@@ -22,34 +24,104 @@ function fullMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-export function registerCommands(context: vscode.ExtensionContext, tree: InstancesTree, history: FolderHistory): void {
+export function registerCommands(
+  context: vscode.ExtensionContext,
+  tree: InstancesTree,
+  history: FolderHistory,
+): void {
   const reg = (id: string, fn: (node?: InstanceNode | FolderNode) => unknown): void => {
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
   };
 
-  reg('remote-incus.refresh', () => tree.refresh());
-  reg('remote-incus.showLog', () => showLog(false));
-  reg('remote-incus.connectToInstance', (node) => node instanceof InstanceNode && connectToInstance(node, tree, history, false));
-  reg('remote-incus.connectToInstanceInNewWindow', (node) => node instanceof InstanceNode && connectToInstance(node, tree, history, true));
-  reg('remote-incus.connectToFolder', (node) => node instanceof FolderNode && openFolder(node.node.authority, node.folderPath, history, tree, false));
-  reg('remote-incus.connectToFolderInNewWindow', (node) => node instanceof FolderNode && openFolder(node.node.authority, node.folderPath, history, tree, true));
-  reg('remote-incus.removeFolderFromHistory', (node) => node instanceof FolderNode && removeFolderFromHistory(node, history, tree));
-  reg('remote-incus.startInstance', (node) => node instanceof InstanceNode && withRef(node, tree, (ref) => withProgress(`Starting ${ref.instance} …`, () => startInstance(ref))));
-  reg('remote-incus.stopInstance', (node) => node instanceof InstanceNode && withRef(node, tree, (ref) => withProgress(`Stopping ${ref.instance} …`, () => stopInstance(ref))));
-  reg('remote-incus.restartInstance', (node) => node instanceof InstanceNode && withRef(node, tree, (ref) => withProgress(`Restarting ${ref.instance} …`, () => restartInstance(ref))));
-  reg('remote-incus.openTerminal', (node) => node instanceof InstanceNode && withRef(node, tree, async (ref, identity) => openExecTerminal(ref, identity)));
-  reg('remote-incus.killServer', (node) => node instanceof InstanceNode && killServerCommand(node, tree));
-  reg('remote-incus.uninstallServer', (node) => node instanceof InstanceNode && uninstallServerCommand(node, tree));
-  reg('remote-incus.resetToken', (node) => node instanceof InstanceNode && resetTokenCommand(context, node, tree));
+  reg('remote-incus.refresh', () => {
+    tree.refresh();
+  });
+  reg('remote-incus.showLog', () => {
+    showLog(false);
+  });
+  reg(
+    'remote-incus.connectToInstance',
+    (node) => node instanceof InstanceNode && connectToInstance(node, tree, history, false),
+  );
+  reg(
+    'remote-incus.connectToInstanceInNewWindow',
+    (node) => node instanceof InstanceNode && connectToInstance(node, tree, history, true),
+  );
+  reg(
+    'remote-incus.connectToFolder',
+    (node) =>
+      node instanceof FolderNode &&
+      openFolder(node.node.authority, node.folderPath, history, tree, false),
+  );
+  reg(
+    'remote-incus.connectToFolderInNewWindow',
+    (node) =>
+      node instanceof FolderNode &&
+      openFolder(node.node.authority, node.folderPath, history, tree, true),
+  );
+  reg('remote-incus.removeFolderFromHistory', (node) => {
+    if (node instanceof FolderNode) removeFolderFromHistory(node, history, tree);
+  });
+  reg(
+    'remote-incus.startInstance',
+    (node) =>
+      node instanceof InstanceNode &&
+      withRef(node, tree, (ref) =>
+        withProgress(`Starting ${ref.instance} …`, () => startInstance(ref)),
+      ),
+  );
+  reg(
+    'remote-incus.stopInstance',
+    (node) =>
+      node instanceof InstanceNode &&
+      withRef(node, tree, (ref) =>
+        withProgress(`Stopping ${ref.instance} …`, () => stopInstance(ref)),
+      ),
+  );
+  reg(
+    'remote-incus.restartInstance',
+    (node) =>
+      node instanceof InstanceNode &&
+      withRef(node, tree, (ref) =>
+        withProgress(`Restarting ${ref.instance} …`, () => restartInstance(ref)),
+      ),
+  );
+  reg(
+    'remote-incus.openTerminal',
+    (node) =>
+      node instanceof InstanceNode &&
+      withRef(node, tree, (ref, identity) => {
+        openExecTerminal(ref, identity);
+      }),
+  );
+  reg(
+    'remote-incus.killServer',
+    (node) => node instanceof InstanceNode && killServerCommand(node, tree),
+  );
+  reg(
+    'remote-incus.uninstallServer',
+    (node) => node instanceof InstanceNode && uninstallServerCommand(node, tree),
+  );
+  reg(
+    'remote-incus.resetToken',
+    (node) => node instanceof InstanceNode && resetTokenCommand(context, node, tree),
+  );
   reg('remote-incus.collectDiagnostics', () => collectDiagnostics(context));
 }
 
 async function withProgress<T>(title: string, fn: () => Promise<T>): Promise<T> {
-  return await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title }, fn);
+  return await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title },
+    fn,
+  );
 }
 
 /** Resolve the clicked node into a ref + identity, then run, refresh, surface errors. */
-async function withRef(node: InstanceNode, tree: InstancesTree, fn: (ref: InstanceRef, identity: Identity) => Promise<unknown>): Promise<void> {
+async function withRef(
+  node: InstanceNode,
+  tree: InstancesTree,
+  fn: (ref: InstanceRef, identity: Identity) => unknown,
+): Promise<void> {
   try {
     const ref = node.ref;
     const identity = await resolveIdentity(ref);
@@ -77,14 +149,21 @@ async function withRef(node: InstanceNode, tree: InstancesTree, fn: (ref: Instan
  * URI path and is transparent to the resolver); only a never-opened instance
  * falls back to the empty-window host connect.
  */
-async function connectToInstance(node: InstanceNode, tree: InstancesTree, history: FolderHistory, newWindow: boolean): Promise<void> {
+async function connectToInstance(
+  node: InstanceNode,
+  tree: InstancesTree,
+  history: FolderHistory,
+  newWindow: boolean,
+): Promise<void> {
   const [lastFolder] = history.folders(node.authority);
   if (lastFolder) {
     await openFolder(node.authority, lastFolder, history, tree, newWindow);
     return;
   }
   try {
-    log(`connect: opening ${newWindow ? 'a new window' : 'the current window'} on authority ${formatAuthority(node.ref)}`);
+    log(
+      `connect: opening ${newWindow ? 'a new window' : 'the current window'} on authority ${formatAuthority(node.ref)}`,
+    );
     await vscode.commands.executeCommand('vscode.newWindow', {
       remoteAuthority: formatAuthority(node.ref),
       reuseWindow: !newWindow,
@@ -105,9 +184,17 @@ async function connectToInstance(node: InstanceNode, tree: InstancesTree, histor
  * resolves the authority and opens the folder; the resolver never sees the
  * path.
  */
-async function openFolder(authority: string, folderPath: string, history: FolderHistory, tree: InstancesTree, newWindow: boolean): Promise<void> {
+async function openFolder(
+  authority: string,
+  folderPath: string,
+  history: FolderHistory,
+  tree: InstancesTree,
+  newWindow: boolean,
+): Promise<void> {
   try {
-    log(`connect: opening folder ${folderPath} on authority ${authority}${newWindow ? ' (new window)' : ''}`);
+    log(
+      `connect: opening folder ${folderPath} on authority ${authority}${newWindow ? ' (new window)' : ''}`,
+    );
     history.record(authority, folderPath);
     const uri = vscode.Uri.from({ scheme: 'vscode-remote', authority, path: folderPath });
     await vscode.commands.executeCommand('vscode.openFolder', uri, ...(newWindow ? [true] : []));
@@ -120,14 +207,20 @@ async function openFolder(authority: string, folderPath: string, history: Folder
   }
 }
 
-async function removeFolderFromHistory(node: FolderNode, history: FolderHistory, tree: InstancesTree): Promise<void> {
+function removeFolderFromHistory(
+  node: FolderNode,
+  history: FolderHistory,
+  tree: InstancesTree,
+): void {
   history.remove(node.node.authority, node.folderPath);
   tree.refresh();
 }
 
 async function killServerCommand(node: InstanceNode, tree: InstancesTree): Promise<void> {
   try {
-    await withProgress(`Killing the VS Code server on ${node.ref.instance} …`, () => killServer(node.ref));
+    await withProgress(`Killing the VS Code server on ${node.ref.instance} …`, () =>
+      killServer(node.ref),
+    );
     tree.refresh();
   } catch (err) {
     log(`kill server failed: ${fullMessage(err)}`);
@@ -140,22 +233,36 @@ async function uninstallServerCommand(node: InstanceNode, tree: InstancesTree): 
   const answer = await vscode.window.showWarningMessage(
     `Uninstall the VS Code server from "${ref.instance}"? Server data (per-instance extensions, workspace state) is removed. The container itself is not touched.`,
     { modal: true },
-    'Uninstall');
-  if (answer !== 'Uninstall') { return; }
+    'Uninstall',
+  );
+  if (answer !== 'Uninstall') {
+    return;
+  }
   await withRef(node, tree, async (r, identity) => {
-    await withProgress(`Uninstalling the VS Code server from ${r.instance} …`, () => uninstallServer(r, identity));
+    await withProgress(`Uninstalling the VS Code server from ${r.instance} …`, () =>
+      uninstallServer(r, identity),
+    );
   });
 }
 
-async function resetTokenCommand(context: vscode.ExtensionContext, node: InstanceNode, tree: InstancesTree): Promise<void> {
+async function resetTokenCommand(
+  context: vscode.ExtensionContext,
+  node: InstanceNode,
+  tree: InstancesTree,
+): Promise<void> {
   const ref = node.ref;
   const answer = await vscode.window.showWarningMessage(
     `Reset the server & connection token on "${ref.instance}"? The server restarts and all connected windows detach.`,
     { modal: true },
-    'Reset');
-  if (answer !== 'Reset') { return; }
+    'Reset',
+  );
+  if (answer !== 'Reset') {
+    return;
+  }
   try {
-    await withProgress(`Resetting token and restarting the server on ${ref.instance} …`, () => resetToken(context, ref));
+    await withProgress(`Resetting token and restarting the server on ${ref.instance} …`, () =>
+      resetToken(context, ref),
+    );
     tree.refresh();
   } catch (err) {
     log(`reset token failed: ${fullMessage(err)}`);
@@ -167,10 +274,16 @@ async function collectDiagnostics(context: vscode.ExtensionContext): Promise<voi
   const { incus, getDefaultRemote, listRemotes, listInstances } = await import('./incusCli');
   log('--- diagnostics ---');
   log(`VS Code ${vscode.version}, client commit ${vscode.env.appCommit ?? 'unknown'}`);
-  log(`extension ${context.extension.id} ${context.extension.packageJSON?.version}`);
+  log(
+    `extension ${context.extension.id} ${(context.extension.packageJSON as { version?: string } | undefined)?.version ?? 'unknown'}`,
+  );
   log(`current window authority: ${vscode.env.remoteAuthority ?? '(local window)'}`);
-  log(`incus CLI: ${(await incus(['version']).catch((e: unknown) => `unavailable: ${firstLine(e)}`)).trim()}`);
-  log(`default remote: ${await getDefaultRemote().catch((e: unknown) => `unavailable: ${firstLine(e)}`)}`);
+  log(
+    `incus CLI: ${(await incus(['version']).catch((e: unknown) => `unavailable: ${firstLine(e)}`)).trim()}`,
+  );
+  log(
+    `default remote: ${await getDefaultRemote().catch((e: unknown) => `unavailable: ${firstLine(e)}`)}`,
+  );
   try {
     for (const r of await listRemotes()) {
       log(`remote ${r.name}: ${r.address} (auth ${r.authType || 'none'})`);

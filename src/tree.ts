@@ -30,20 +30,28 @@ interface Session {
 
 function getSession(): Session | undefined {
   const authority = vscode.env.remoteAuthority;
-  if (!authority?.startsWith(`${AUTHORITY_PREFIX}+`)) { return undefined; }
-  const folder = (vscode.workspace.workspaceFolders ?? [])
-    .find((f) => f.uri.scheme === 'vscode-remote' && f.uri.authority === authority)?.uri.path;
+  if (!authority?.startsWith(`${AUTHORITY_PREFIX}+`)) {
+    return undefined;
+  }
+  const folder = (vscode.workspace.workspaceFolders ?? []).find(
+    (f) => f.uri.scheme === 'vscode-remote' && f.uri.authority === authority,
+  )?.uri.path;
   return { authority, folder };
 }
 
 export class RemoteNode extends vscode.TreeItem {
-  constructor(readonly info: RemoteInfo, readonly isDefault: boolean) {
+  constructor(
+    readonly info: RemoteInfo,
+    readonly isDefault: boolean,
+  ) {
     super(info.name, vscode.TreeItemCollapsibleState.Expanded);
     this.contextValue = 'remote';
     // No iconPath: remotes render with just the chevron, like folders in the
     // official Remote Explorer (user decision 2026-10-22, Dev Containers UX).
     this.description = `${info.address}${isDefault ? ' (default)' : ''}`;
-    this.tooltip = new vscode.MarkdownString(`**${info.name}** — \`${info.address}\` (auth: ${info.authType || 'none'})`);
+    this.tooltip = new vscode.MarkdownString(
+      `**${info.name}** — \`${info.address}\` (auth: ${info.authType || 'none'})`,
+    );
   }
 }
 
@@ -51,9 +59,17 @@ export class InstanceNode extends vscode.TreeItem {
   readonly ref: InstanceRef;
   readonly authority: string;
 
-  constructor(remote: string, inst: { name: string; status: string; os?: string; release?: string },
-    opts: { online: boolean; hasFolders: boolean; icon: vscode.IconPath }) {
-    super(inst.name, opts.hasFolders ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None);
+  constructor(
+    remote: string,
+    inst: { name: string; status: string; os?: string; release?: string },
+    opts: { online: boolean; hasFolders: boolean; icon: vscode.IconPath },
+  ) {
+    super(
+      inst.name,
+      opts.hasFolders
+        ? vscode.TreeItemCollapsibleState.Expanded
+        : vscode.TreeItemCollapsibleState.None,
+    );
     this.ref = { remote, instance: inst.name };
     this.authority = formatAuthority(this.ref);
     this.contextValue = inst.status === 'Running' ? 'instance-running' : 'instance-stopped';
@@ -64,15 +80,21 @@ export class InstanceNode extends vscode.TreeItem {
     // at the right edge ($(arrow-right) current window, $(empty-window) new
     // window) and the context menu. A stopped instance is still started by the
     // connect flow itself (Start & Connect, DESIGN §7).
-    this.description = inst.status === 'Running' || inst.status === 'Stopped' ? undefined : inst.status;
+    this.description =
+      inst.status === 'Running' || inst.status === 'Stopped' ? undefined : inst.status;
     this.tooltip = new vscode.MarkdownString(
-      `**${inst.name}** (${remote})\n\n- state: \`${inst.status}\``
-      + (inst.os ? `\n- image OS: ${inst.os}${inst.release ? ` ${inst.release}` : ''}` : ''));
+      `**${inst.name}** (${remote})\n\n- state: \`${inst.status}\`` +
+        (inst.os ? `\n- image OS: ${inst.os}${inst.release ? ` ${inst.release}` : ''}` : ''),
+    );
   }
 }
 
 export class FolderNode extends vscode.TreeItem {
-  constructor(readonly node: InstanceNode, readonly folderPath: string, icon: vscode.IconPath) {
+  constructor(
+    readonly node: InstanceNode,
+    readonly folderPath: string,
+    icon: vscode.IconPath,
+  ) {
     // Full path as the label, like the official remote views' `${path}`
     // resource label formatter (Dev Containers UX, 2026-10-22).
     super(folderPath, vscode.TreeItemCollapsibleState.None);
@@ -91,8 +113,10 @@ export class MessageNode extends vscode.TreeItem {
 }
 
 export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
-  constructor(private readonly history: FolderHistory, private readonly assetsRoot: string) {
-  }
+  constructor(
+    private readonly history: FolderHistory,
+    private readonly assetsRoot: string,
+  ) {}
 
   private readonly onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.onDidChange.event;
@@ -136,7 +160,8 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
               hasFolders,
               // Dev Containers uses theme icons for disconnected containers;
               // only the connected container uses the check-dot SVG.
-              icon: online ? this.icon('vm-active')
+              icon: online
+                ? this.icon('vm-active')
                 : new vscode.ThemeIcon(i.status === 'Running' ? 'vm-running' : 'vm'),
             });
           });
@@ -150,9 +175,20 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
         // The ACTIVE row is marked only when BOTH the authority and the folder
         // path match the current window — the same path on a different
         // instance is NOT active (bug fixed 2026-10-23).
-        return this.history.folders(element.authority).map((f) =>
-          new FolderNode(element, f,
-            this.icon(session?.authority === element.authority && session.folder === f ? 'folder-active' : 'folder')));
+        return this.history
+          .folders(element.authority)
+          .map(
+            (f) =>
+              new FolderNode(
+                element,
+                f,
+                this.icon(
+                  session?.authority === element.authority && session.folder === f
+                    ? 'folder-active'
+                    : 'folder',
+                ),
+              ),
+          );
       }
       return [];
     } catch (err) {

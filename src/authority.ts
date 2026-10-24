@@ -22,7 +22,9 @@ export interface ParsedAuthority {
 export function parseAuthority(authority: string): ParsedAuthority {
   const prefix = `${AUTHORITY_PREFIX}+`;
   if (!authority.startsWith(prefix)) {
-    throw new Error(`unsupported authority "${authority}" (expected "${prefix}<remote>:<instance>")`);
+    throw new Error(
+      `unsupported authority "${authority}" (expected "${prefix}<remote>:<instance>")`,
+    );
   }
   const rest = authority.slice(prefix.length);
   const sep = rest.indexOf(':');

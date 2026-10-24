@@ -29,15 +29,18 @@ const KEY = 'remote-incus.folder.history.v1';
 const MAX_PER_INSTANCE = 10;
 
 export class FolderHistory {
-  constructor(private readonly context: vscode.ExtensionContext) {
-  }
+  constructor(private readonly context: vscode.ExtensionContext) {}
 
   /** Most-recent-first, deduped, capped. */
   record(authority: string, folderPath: string): void {
     const data = this.read();
-    const next = [folderPath, ...(data[authority] ?? []).filter((f) => f !== folderPath)]
-      .slice(0, MAX_PER_INSTANCE);
-    if (JSON.stringify(next) === JSON.stringify(data[authority] ?? [])) { return; }
+    const next = [folderPath, ...(data[authority] ?? []).filter((f) => f !== folderPath)].slice(
+      0,
+      MAX_PER_INSTANCE,
+    );
+    if (JSON.stringify(next) === JSON.stringify(data[authority] ?? [])) {
+      return;
+    }
     data[authority] = next;
     void this.context.globalState.update(KEY, data);
   }
@@ -49,16 +52,20 @@ export class FolderHistory {
   remove(authority: string, folderPath: string): void {
     const data = this.read();
     const next = (data[authority] ?? []).filter((f) => f !== folderPath);
-    if (next.length === (data[authority] ?? []).length) { return; }
-    if (next.length === 0) {
-      delete data[authority];
-    } else {
-      data[authority] = next;
+    if (next.length === (data[authority] ?? []).length) {
+      return;
     }
+    if (next.length === 0) {
+      // Drop the authority key entirely (no empty arrays in persisted state).
+      const { [authority]: _removed, ...rest } = data;
+      void this.context.globalState.update(KEY, rest);
+      return;
+    }
+    data[authority] = next;
     void this.context.globalState.update(KEY, data);
   }
 
   private read(): Record<string, string[]> {
-    return (this.context.globalState.get<Record<string, string[]>>(KEY)) ?? {};
+    return this.context.globalState.get<Record<string, string[]>>(KEY) ?? {};
   }
 }

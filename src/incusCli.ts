@@ -12,7 +12,11 @@
 import * as cp from 'child_process';
 import * as fs from 'fs';
 export class IncusError extends Error {
-  constructor(message: string, readonly args: string[], readonly stderr?: string) {
+  constructor(
+    message: string,
+    readonly args: string[],
+    readonly stderr?: string,
+  ) {
     super(message);
     this.name = 'IncusError';
   }
@@ -25,17 +29,24 @@ export interface IncusRunOptions {
 /** Run `incus` and capture stdout. Non-zero exit rejects with an IncusError. */
 export function incus(args: string[], opts: IncusRunOptions = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    cp.execFile('incus', args, { timeout: opts.timeoutMs ?? 30_000, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err) {
-        // Line 1 must lead with the WHY (stderr / exit status), never the full
-        // command: error toasts and firstLine() truncation cut line 2+, and a
-        // multi-line script joined into the command text would swallow them.
-        const why = err.killed ? 'timed out' : `exit ${err.code ?? '?'}: ${(stderr || err.message).trim()}`;
-        reject(new IncusError(`incus ${describe(args)} failed (${why})`, args, stderr));
-      } else {
-        resolve(stdout);
-      }
-    });
+    cp.execFile(
+      'incus',
+      args,
+      { timeout: opts.timeoutMs ?? 30_000, maxBuffer: 64 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        if (err) {
+          // Line 1 must lead with the WHY (stderr / exit status), never the full
+          // command: error toasts and firstLine() truncation cut line 2+, and a
+          // multi-line script joined into the command text would swallow them.
+          const why = err.killed
+            ? 'timed out'
+            : `exit ${err.code ?? '?'}: ${(stderr || err.message).trim()}`;
+          reject(new IncusError(`incus ${describe(args)} failed (${why})`, args, stderr));
+        } else {
+          resolve(stdout);
+        }
+      },
+    );
   });
 }
 
@@ -80,12 +91,24 @@ export interface ExecOptions {
 }
 
 /** Run a shell snippet inside an instance (bash assumed; glibc MVP images). */
-export async function execInInstance(ref: InstanceRef, script: string, opts: ExecOptions = {}): Promise<string> {
+export async function execInInstance(
+  ref: InstanceRef,
+  script: string,
+  opts: ExecOptions = {},
+): Promise<string> {
   const args = ['exec', target(ref), '--mode', 'non-interactive'];
-  if (opts.uid !== undefined) { args.push('--user', String(opts.uid)); }
-  if (opts.group !== undefined) { args.push('--group', String(opts.group)); }
-  if (opts.home) { args.push('--env', `HOME=${opts.home}`); }
-  for (const [k, v] of Object.entries(opts.env ?? {})) { args.push('--env', `${k}=${v}`); }
+  if (opts.uid !== undefined) {
+    args.push('--user', String(opts.uid));
+  }
+  if (opts.group !== undefined) {
+    args.push('--group', String(opts.group));
+  }
+  if (opts.home) {
+    args.push('--env', `HOME=${opts.home}`);
+  }
+  for (const [k, v] of Object.entries(opts.env ?? {})) {
+    args.push('--env', `${k}=${v}`);
+  }
   args.push('--', 'bash', '-c', script);
   return incus(args, { timeoutMs: opts.timeoutMs });
 }
@@ -111,56 +134,89 @@ export interface PushOptions {
  *    file's size in the instance (`stat -c %s`) — the SFTP writer extends
  *    the file in place, so the byte count is the real transfer progress.
  */
-export function pushFile(ref: InstanceRef, localPath: string, remotePath: string, opts: PushOptions = {}): Promise<void> {
+export function pushFile(
+  ref: InstanceRef,
+  localPath: string,
+  remotePath: string,
+  opts: PushOptions = {},
+): Promise<void> {
   const args = ['file', 'push', localPath, `${target(ref)}${remotePath}`];
-  if (opts.uid !== undefined) { args.push('--uid', String(opts.uid)); }
-  if (opts.gid !== undefined) { args.push('--gid', String(opts.gid)); }
-  if (opts.mode) { args.push('--mode', opts.mode); }
+  if (opts.uid !== undefined) {
+    args.push('--uid', String(opts.uid));
+  }
+  if (opts.gid !== undefined) {
+    args.push('--gid', String(opts.gid));
+  }
+  if (opts.mode) {
+    args.push('--mode', opts.mode);
+  }
   // 222 MB took ~110 s on the measured CLI path; this is not a protocol ceiling.
   return new Promise((resolve, reject) => {
     const child = cp.spawn('incus', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let output = '';
     let last = 0;
     let polling = true;
+    const isPolling = (): boolean => polling;
     const report = (percent: number): void => {
-      if (polling && percent > last) {
+      if (isPolling() && percent > last) {
         last = percent;
         opts.onProgress?.(last);
       }
     };
     const onData = (d: Buffer): void => {
       output += d.toString();
-      if (output.length > 128 * 1024) { output = output.slice(-64 * 1024); } // the meter rewrites one line
+      if (output.length > 128 * 1024) {
+        output = output.slice(-64 * 1024);
+      } // the meter rewrites one line
       for (const m of d.toString().matchAll(/(\d+)%/g)) {
         report(Number(m[1]));
       }
     };
-    child.stdout?.on('data', onData);
-    child.stderr?.on('data', onData);
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
 
     // 7.x fallback: size-poll the target file (1 Hz; stat hiccups never fail
     // the push). The poller stops with the push; one in-flight stat may
     // outlive it briefly and is ignored.
     let totalBytes = 0;
-    try { totalBytes = fs.statSync(localPath).size; } catch { /* size unknown → no % from polls */ }
+    try {
+      totalBytes = fs.statSync(localPath).size;
+    } catch {
+      /* size unknown → no % from polls */
+    }
     if (totalBytes > 0) {
       void (async () => {
-        const probe = ['exec', target(ref), '--', 'bash', '-c', `stat -c %s ${sq(remotePath)} 2>/dev/null || echo 0`];
-        while (polling) {
+        const probe = [
+          'exec',
+          target(ref),
+          '--',
+          'bash',
+          '-c',
+          `stat -c %s ${sq(remotePath)} 2>/dev/null || echo 0`,
+        ];
+        while (isPolling()) {
           try {
             const size = Number((await incus(probe, { timeoutMs: 15_000 })).trim());
-            if (!polling) { break; }
+            if (!isPolling()) {
+              break;
+            }
             if (Number.isFinite(size) && size > 0) {
               report(Math.min(100, Math.floor((size / totalBytes) * 100)));
             }
-          } catch { /* transient exec hiccup — the push itself decides success */ }
-          if (!polling) { break; }
+          } catch {
+            /* transient exec hiccup — the push itself decides success */
+          }
+          if (!isPolling()) {
+            break;
+          }
           await new Promise((r) => setTimeout(r, 1000));
         }
       })();
     }
 
-    const stop = (): void => { polling = false; };
+    const stop = (): void => {
+      polling = false;
+    };
     const timer = setTimeout(() => {
       stop();
       child.kill();
@@ -177,7 +233,13 @@ export function pushFile(ref: InstanceRef, localPath: string, remotePath: string
       if (code === 0) {
         resolve();
       } else {
-        reject(new IncusError(`incus file push failed (exit ${code}): ${output.split('\n').pop()?.trim() ?? ''}`, args, output));
+        reject(
+          new IncusError(
+            `incus file push failed (exit ${code ?? 'null'}): ${output.split('\n').pop()?.trim() ?? ''}`,
+            args,
+            output,
+          ),
+        );
       }
     });
   });
@@ -196,14 +258,17 @@ export interface RemoteInfo {
 
 /** Instance daemons only (`Protocol === 'incus'`) — drops simplestreams remotes. */
 export async function listRemotes(): Promise<RemoteInfo[]> {
-  const raw = JSON.parse(await incus(['remote', 'list', '--format', 'json'])) as Record<string, Record<string, unknown>>;
+  const raw = JSON.parse(await incus(['remote', 'list', '--format', 'json'])) as Record<
+    string,
+    { Addr?: string; Protocol?: string; AuthType?: string } & Record<string, unknown>
+  >;
   return Object.entries(raw)
     .filter(([, r]) => r.Protocol === 'incus')
     .map(([name, r]) => ({
       name,
-      address: String(r.Addr ?? ''),
-      protocol: String(r.Protocol ?? ''),
-      authType: String(r.AuthType ?? ''),
+      address: r.Addr ?? '',
+      protocol: r.Protocol ?? '',
+      authType: r.AuthType ?? '',
     }));
 }
 
@@ -220,7 +285,10 @@ export interface InstanceInfo {
 }
 
 export async function listInstances(remote: string): Promise<InstanceInfo[]> {
-  const raw = JSON.parse(await incus(['list', `${remote}:`, '--format', 'json'])) as Record<string, unknown>[];
+  const raw = JSON.parse(await incus(['list', `${remote}:`, '--format', 'json'])) as Record<
+    string,
+    unknown
+  >[];
   return raw.map((i) => {
     const cfg = (i.config ?? {}) as Record<string, string>;
     return {
@@ -241,7 +309,9 @@ export async function getInstanceStatus(ref: InstanceRef): Promise<string | unde
   // zabbly CLI update), while CLI 6.x and 7.x both accept the space form.
   // Exact-name match afterwards: the positional filter is fuzzy, and another
   // instance must never be mistaken for this one (isolation rule).
-  const raw = JSON.parse(await incus(['list', `${ref.remote}:`, ref.instance, '--format', 'json'])) as Record<string, unknown>[];
+  const raw = JSON.parse(
+    await incus(['list', `${ref.remote}:`, ref.instance, '--format', 'json']),
+  ) as Record<string, unknown>[];
   const hit = raw.find((i) => String(i.name) === ref.instance);
   return hit ? String(hit.status) : undefined;
 }

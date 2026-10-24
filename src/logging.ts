@@ -24,14 +24,19 @@ export function log(message: string): void {
   const line = `[${new Date().toISOString()}] ${message}`;
   console.log('[remote-incus]', line);
   if (debugFile) {
-    try { fs.appendFileSync(debugFile, line + '\n'); } catch { /* ignore */ }
+    try {
+      fs.appendFileSync(debugFile, line + '\n');
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 /** First line of an error message (incus/stderr blobs are multi-line). */
 export function firstLine(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
-  return msg.split('\n')[0].trim() || 'unknown error';
+  const [first = ''] = msg.split('\n');
+  return first.trim() || 'unknown error';
 }
 
 /** Bring the output channel into view (diagnostics command). */

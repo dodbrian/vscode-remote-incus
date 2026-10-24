@@ -13,7 +13,9 @@ import { initLogging, log } from './logging';
 
 export function activate(context: vscode.ExtensionContext): void {
   initLogging(context);
-  log(`activate: VS Code ${vscode.version}, extension ${context.extension.id} ${context.extension.packageJSON?.version}`);
+  log(
+    `activate: VS Code ${vscode.version}, extension ${context.extension.id} ${(context.extension.packageJSON as { version?: string } | undefined)?.version ?? 'unknown'}`,
+  );
 
   const history = new FolderHistory(context);
   // Record the current window's folder on every ext-host start of a window
@@ -31,7 +33,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const tree = new InstancesTree(history, context.asAbsolutePath('assets'));
   context.subscriptions.push(
-    vscode.workspace.registerRemoteAuthorityResolver(AUTHORITY_PREFIX, new IncusAuthorityResolver(context)),
+    vscode.workspace.registerRemoteAuthorityResolver(
+      AUTHORITY_PREFIX,
+      new IncusAuthorityResolver(context),
+    ),
     vscode.window.registerTreeDataProvider('remote-incus.instances', tree),
   );
   registerCommands(context, tree, history);
