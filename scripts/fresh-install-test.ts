@@ -16,11 +16,18 @@ import { initLogging } from '../src/logging';
 
 const REPO = '/path/to/repository';
 
+function defined<T>(value: T | undefined | null, message = 'expected a defined value'): T {
+  if (value === undefined || value === null) throw new Error(message);
+  return value;
+}
+
 function clientCommit(): string {
   const out = cp.execFileSync('code', ['--version'], { encoding: 'utf8' });
   const commit = out.split('\n')[1]?.trim();
   if (!commit || !/^[0-9a-f]{40}$/.test(commit)) {
-    throw new Error(`could not parse the client commit from code --version: ${JSON.stringify(out.slice(0, 120))}`);
+    throw new Error(
+      `could not parse the client commit from code --version: ${JSON.stringify(out.slice(0, 120))}`,
+    );
   }
   return commit;
 }
@@ -34,30 +41,49 @@ function fakeContext(): vscode.ExtensionContext {
 }
 
 async function main(): Promise<void> {
+  const targetArg = process.argv[2];
+  // Deliberate falsy fallback: a degenerate empty instance segment opts into
+  // the default fixture name (nullish `??` would keep the empty string).
+  const instanceArg = targetArg?.split(':').pop();
+  const instance =
+    instanceArg === undefined || instanceArg === '' ? 'fresh-install-fixture' : instanceArg;
   const ref: InstanceRef = {
-    remote: process.argv[2]?.includes(':') ? process.argv[2].split(':')[0] : 'local',
-    instance: process.argv[2]?.split(':').pop() || 'fresh-install-fixture',
+    remote: targetArg?.includes(':') ? defined(targetArg.split(':')[0]) : 'local',
+    instance,
   };
   initLogging(fakeContext());
   (vscode as unknown as { env: { appCommit?: string } }).env.appCommit = clientCommit();
-  console.log(`probing ${target(ref)} with client commit ${(vscode as unknown as { env: { appCommit: string } }).env.appCommit.slice(0, 10)}…`);
+  console.log(
+    `probing ${target(ref)} with client commit ${(vscode as unknown as { env: { appCommit: string } }).env.appCommit.slice(0, 10)}…`,
+  );
 
   const session = await ensureServerReady(fakeContext(), ref, (message, percent) => {
     console.log(`  [${percent !== undefined ? `${Math.round(percent)}%` : '…'}] ${message}`);
   });
 
-  console.log(`session: commit=${session.commit.slice(0, 10)}… port=${session.port} token=${session.token ? 'present' : 'MISSING'} user=${session.identity.username}`);
+  console.log(
+    `session: commit=${session.commit.slice(0, 10)}… port=${session.port} token=${session.token ? 'present' : 'MISSING'} user=${session.identity.username}`,
+  );
 
   // on-disk verification
-  const checks = await execInInstance(ref, [
-    `test -f ${session.identity.home}/.vscode-server/bin/${session.commit}/.incus-install-ok && echo "marker: ok" || echo "marker: MISSING"`,
-    `ls /tmp/vscode-server-*.tar.gz 2>/dev/null && echo "tmp-tarball: LEFTOVER" || echo "tmp-tarball: cleaned"`,
-    `stat -c "relay: %a %U" ${session.identity.home}/.vscode-server/relay.js`,
-    `stat -c "token: %a %U" ${session.identity.home}/.vscode-server/data/Machine/.incus-conn-token`,
-  ].join('\n'), { uid: session.identity.uid, home: session.identity.home });
+  const checks = await execInInstance(
+    ref,
+    [
+      `test -f ${session.identity.home}/.vscode-server/bin/${session.commit}/.incus-install-ok && echo "marker: ok" || echo "marker: MISSING"`,
+      `ls /tmp/vscode-server-*.tar.gz 2>/dev/null && echo "tmp-tarball: LEFTOVER" || echo "tmp-tarball: cleaned"`,
+      `stat -c "relay: %a %U" ${session.identity.home}/.vscode-server/relay.js`,
+      `stat -c "token: %a %U" ${session.identity.home}/.vscode-server/data/Machine/.incus-conn-token`,
+    ].join('\n'),
+    { uid: session.identity.uid, home: session.identity.home },
+  );
   console.log(checks.trim());
 
-  if (!session.port || !session.token || checks.includes('MISSING') || checks.includes('LEFTOVER')) {
+  if (
+    !session.port ||
+    !session.token ||
+    checks.includes('MISSING') ||
+    checks.includes('LEFTOVER')
+  ) {
     throw new Error('fresh-install verification FAILED');
   }
   console.log('ALL FRESH-INSTALL CHECKS OK');
@@ -65,5 +91,8 @@ async function main(): Promise<void> {
 
 main().then(
   () => process.exit(0),
-  (err) => { console.error('FAILED:', err instanceof Error ? err.message : err); process.exit(1); },
+  (err: unknown) => {
+    console.error('FAILED:', err instanceof Error ? err.message : err);
+    process.exit(1);
+  },
 );

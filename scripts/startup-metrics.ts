@@ -1,14 +1,28 @@
 /** Manual harness instrumentation. Never records argv, stdout, tokens or targets. */
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import { performance } from 'node:perf_hooks';
 
-const cp = require('node:child_process') as typeof import('node:child_process');
-let active: {
-  started: number; elapsedMs: number; execs: number; pushes: number; bytes: number;
-  phases: { phase: string; ms: number }[];
-} | undefined;
+// Mutable module handle: this harness monkey-patches execFile/spawn for measurement.
+const cp = createRequire(process.cwd() + '/package.json')(
+  'node:child_process',
+) as typeof import('node:child_process');
+let active:
+  | {
+      started: number;
+      elapsedMs: number;
+      execs: number;
+      pushes: number;
+      bytes: number;
+      phases: { phase: string; ms: number }[];
+    }
+  | undefined;
 
-export async function measureStartup<T>(scenario: string, run: () => Promise<T>, output: (line: string) => void): Promise<T> {
+export async function measureStartup<T>(
+  scenario: string,
+  run: () => T | Promise<T>,
+  output: (line: string) => void,
+): Promise<T> {
   if (active) throw new Error('nested measurement');
   const originalExec = cp.execFile;
   const originalSpawn = cp.spawn;
@@ -26,7 +40,7 @@ export async function measureStartup<T>(scenario: string, run: () => Promise<T>,
   }) as typeof cp.spawn;
   let outcome = 'failure';
   try {
-    const result = await run();
+    const result = await Promise.resolve(run());
     outcome = 'success';
     return result;
   } finally {

@@ -7,16 +7,21 @@ const path = require('node:path');
 async function bounded(promise) {
   let timer;
   try {
-    return await Promise.race([promise, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(Error('5s bounded wait exceeded')), 5000);
-    })]);
-  } finally { clearTimeout(timer); }
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(Error('5s bounded wait exceeded')), 5000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function main() {
   const children = new Set();
   const sockets = new Set();
-  const server = net.createServer({ allowHalfOpen: true }, socket => {
+  const server = net.createServer({ allowHalfOpen: true }, (socket) => {
     sockets.add(socket);
     socket.on('error', () => {});
     socket.on('close', () => sockets.delete(socket));
@@ -52,24 +57,32 @@ async function main() {
     let count = 0;
     let onData;
     try {
-      await bounded(new Promise((resolve, reject) => {
-        onData = chunk => {
-          chunks.push(chunk);
-          count += chunk.length;
-          if (count >= bytes.length) resolve();
-        };
-        child.stdout.on('data', onData);
-        child.stdin.write(bytes, error => { if (error) reject(error); });
-      }));
+      await bounded(
+        new Promise((resolve, reject) => {
+          onData = (chunk) => {
+            chunks.push(chunk);
+            count += chunk.length;
+            if (count >= bytes.length) resolve();
+          };
+          child.stdout.on('data', onData);
+          child.stdin.write(bytes, (error) => {
+            if (error) reject(error);
+          });
+        }),
+      );
       assert.deepEqual(Buffer.concat(chunks), bytes);
-    } finally { child.stdout.off('data', onData); }
+    } finally {
+      child.stdout.off('data', onData);
+    }
   }
 
   try {
-    const first = relay(), second = relay();
+    const first = relay(),
+      second = relay();
     const bytes = Buffer.from(Array.from({ length: 65536 }, (_, i) => i % 256));
     await Promise.all([exchange(first, bytes), exchange(second, Buffer.from(bytes).reverse())]);
-    if (process.argv.includes('--exercise-failure-cleanup')) throw Error('injected cleanup verification');
+    if (process.argv.includes('--exercise-failure-cleanup'))
+      throw Error('injected cleanup verification');
     first.stdin.end();
     assert.equal((await bounded(first.done)).code, 0);
     await exchange(second, bytes);
@@ -86,9 +99,9 @@ async function main() {
     console.log('PASS repeated connect/disconnect');
 
     const reservation = net.createServer();
-    await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
+    await new Promise((resolve) => reservation.listen(0, '127.0.0.1', resolve));
     const refusedPort = reservation.address().port;
-    await new Promise(resolve => reservation.close(resolve));
+    await new Promise((resolve) => reservation.close(resolve));
     const refused = relay(refusedPort);
     assert.equal((await bounded(refused.done)).code, 1);
     console.log('PASS connection refusal');
@@ -111,17 +124,23 @@ async function main() {
     for (const child of pending) child.kill('SIGKILL');
     for (const socket of sockets) socket.destroy();
     const cleanup = await Promise.allSettled([
-      bounded(Promise.all(pending.map(child => child.done))),
-      bounded(new Promise(resolve => server.close(resolve))),
+      bounded(Promise.all(pending.map((child) => child.done))),
+      bounded(new Promise((resolve) => server.close(resolve))),
     ]);
-    assert.ok(cleanup.every(result => result.status === 'fulfilled'));
+    assert.ok(cleanup.every((result) => result.status === 'fulfilled'));
     assert.equal(children.size, 0);
     assert.equal(sockets.size, 0);
     console.log('PASS bounded cleanup: no owned children or sockets');
   }
 }
-main().catch(error => {
-  if (process.argv.includes('--exercise-failure-cleanup') && error.message === 'injected cleanup verification') {
+main().catch((error) => {
+  if (
+    process.argv.includes('--exercise-failure-cleanup') &&
+    error.message === 'injected cleanup verification'
+  ) {
     console.log('PASS failure after two live channels cleaned up');
-  } else { console.error(error); process.exitCode = 1; }
+  } else {
+    console.error(error);
+    process.exitCode = 1;
+  }
 });
