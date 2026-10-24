@@ -83,23 +83,35 @@ also passed outside the sandbox, which blocks TCP listeners. Full installation
 and cleanup, followed by prerequisite installation and a rerun, were explicitly
 approved by the user.
 
-No redeploy or normal-profile restart occurred. Resolver taxonomy regressions
-remain offline evidence; these live checks exercise shell/bootstrap/relay and
-rescue-terminal behavior. Ports acceptance and identical-folder evidence below
-remain scoped to their previously tested build. The user accepted the live
-results and requested committing the fixes, regressions and documentation.
-Resolver classification is committed as `aee3bc5`; shell portability and live
-evidence are committed together with this handover. No push was requested.
+The user accepted the live results and requested committing the fixes,
+regressions and documentation. Resolver classification is `aee3bc5`; shell
+portability and live evidence are `15ba764`. No push was requested.
 
-Recommended next step: at the user's request, redeploy these fixes and smoke-test
-a normal VS Code window against the Bash-free fixture, including the integrated
-terminal and rescue terminal. This is not yet authorized. Next implementation
-candidate: detect missing server runtime prerequisites before the readiness
-poll, with a direct actionable error naming the missing libraries or utilities.
-The Alpine run exposed this diagnostic gap; no prerequisite detection or
-automatic package installation has been implemented. The IPv6-only fixture
-edge case, normal-profile new-window acceptance, and naming/publisher plus
-publication-privacy prerequisites remain open.
+The user then authorized redeployment and the normal-window smoke check.
+`./redeploy.sh` built, packaged and installed the committed extension, restarted
+normal VS Code and reopened its designated remote window. The installed bundle
+was SHA-256 verified byte-identical to the production build. Logs confirm the
+existing remote reused its healthy server and started both exec bridges.
+A separate normal-profile window opened the named Bash-free Alpine fixture at
+its root home. Container download fell back to client transfer because curl is
+absent; fresh install completed, the resolver returned a ready session and both
+exec bridges started on Stable 1.143.1. The window's normal server installation
+is retained for use; the earlier test-run cleanup remains separate.
+
+Current stopping point: deployment and normal-window terminal smoke checks
+accepted. Asked to run `echo shell-ok` in both New Terminal and Open Terminal
+(exec), the user confirmed "both work" on the Bash-free Alpine fixture. This is
+manual acceptance of those two terminal workflows on the tested runtime, not
+broader image/platform coverage. Resolver error taxonomy has offline regression
+evidence; error-dialog UX has not been reverified live. Ports acceptance and
+identical-folder evidence below remain scoped to their previously tested build.
+
+Next implementation candidate: detect missing server runtime prerequisites
+before the readiness poll, with a direct actionable error naming the missing
+libraries or utilities. The Alpine run exposed this diagnostic gap; no
+prerequisite detection or automatic package installation has been implemented.
+The IPv6-only fixture edge case, normal-profile new-window acceptance, and
+naming/publisher plus publication-privacy prerequisites remain open.
 
 ## Previous state: deployed fixes and Ports acceptance (2026-10-25)
 
