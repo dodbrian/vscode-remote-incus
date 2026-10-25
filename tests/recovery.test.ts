@@ -76,10 +76,16 @@ for (const mode of ['corrupt', 'interrupted', 'stale-marker'] as const)
       }
       assert.equal(spawnSync('tar', ['-czf', archive, '-C', f.directory, 'payload']).status, 0);
       if (mode === 'interrupted') {
-        const interrupted = spawnSync('/bin/sh', [
-          '-c',
-          `tar() { command tar "$@"; kill -TERM "$$"; };\n${extraction}`,
-        ]);
+        const utilities = `${f.directory}/utilities`;
+        mkdirSync(utilities);
+        writeFileSync(
+          `${utilities}/tar`,
+          '#!/bin/sh\n/usr/bin/tar "$@" || exit "$?"\nkill -TERM "$PPID"\n',
+          { mode: 0o700 },
+        );
+        const interrupted = spawnSync('/bin/sh', ['-c', extraction], {
+          env: { ...process.env, PATH: `${utilities}:${process.env.PATH ?? '/usr/bin:/bin'}` },
+        });
         assert.equal(interrupted.signal, 'SIGTERM');
         assert.equal(existsSync(`${dir}/.incus-install-ok`), false);
         assert.equal(spawnSync('/bin/sh', ['-c', probe], { encoding: 'utf8' }).stdout.trim(), 'no');

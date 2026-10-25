@@ -178,7 +178,7 @@ function assertSignalSupport(out: string, identity: Identity): void {
 export type ServerFlavor = 'linux-x64' | 'linux-arm64' | 'linux-alpine';
 
 export async function probeFlavor(ref: InstanceRef, identity: Identity): Promise<ServerFlavor> {
-  const out = await execInInstance(ref, 'uname -m; ldd --version 2>&1 || true', {
+  const out = await execInInstance(ref, flavorProbeScript(), {
     uid: identity.uid,
     home: identity.home,
   });
@@ -467,16 +467,45 @@ async function isServerInstalled(
   );
 }
 
-/** Check the selected user's PATH before downloading or changing an install. */
-function setupPrerequisiteCheck(): string {
+/** Some shells, including default Bash, resolve non-executable PATH files. */
+function requiredUtilitiesCheck(tools: string[], purpose: string): string {
   return [
-    'for tool in tar gzip mkdir rm touch sha256sum cut stat chmod tr head wc mv; do',
-    '  if ! command -v "$tool" >/dev/null 2>&1; then',
-    `    printf '%s\\n' "VS Code server setup requires '$tool' in the selected user's PATH; install or expose the required utility inside the instance before reconnecting" >&2`,
+    `for tool in ${tools.join(' ')}; do`,
+    '  if ! tool_path=$(command -v "$tool" 2>/dev/null) || [ ! -f "$tool_path" ] || [ ! -x "$tool_path" ]; then',
+    `    printf '%s\\n' "VS Code server ${purpose} requires '$tool' as an executable file in the selected user's PATH; install or expose the required utility inside the instance before reconnecting" >&2`,
     '    exit 127',
     '  fi',
     'done',
   ].join('\n');
+}
+
+function flavorProbeScript(): string {
+  return [
+    requiredUtilitiesCheck(['uname'], 'flavor probe'),
+    'uname -m; ldd --version 2>&1 || true',
+  ].join('\n');
+}
+
+/** Check the selected user's PATH before downloading or changing an install. */
+function setupPrerequisiteCheck(): string {
+  return requiredUtilitiesCheck(
+    [
+      'tar',
+      'gzip',
+      'mkdir',
+      'rm',
+      'touch',
+      'sha256sum',
+      'cut',
+      'stat',
+      'chmod',
+      'tr',
+      'head',
+      'wc',
+      'mv',
+    ],
+    'setup',
+  );
 }
 
 function installationProbe(identity: Identity, commit: string, checkSetup = false): string {
@@ -626,7 +655,7 @@ async function inspectServer(
       [
         'kill -0 $$ && echo yes || { echo no; exit 0; }',
         `printf '\\nINCUS_FLAVOR\\n'`,
-        'uname -m; ldd --version 2>&1 || true',
+        flavorProbeScript(),
         `printf '\\nINCUS_INSTALL\\n'`,
         installationProbe(identity, commit, true),
       ].join('\n'),

@@ -302,3 +302,142 @@ test('flavor probe accepts musl version output with a nonzero ldd status without
       'linux-alpine',
     );
   }));
+
+for (const entry of ['non-executable', 'directory'] as const)
+  for (const stage of ['inspection', 'extraction'] as const)
+    test(
+      `Bash rejects ${entry} tar during ${stage} without deleting prior install`,
+      {
+        skip: !existsSync('/bin/bash'),
+      },
+      (t) =>
+        withFixture(t, async (f) => {
+          const { createHash } = await import('node:crypto');
+          const sha = createHash('sha256').update('archive').digest('hex');
+          const home = `${f.directory}/selected home`;
+          const bin = `${home}/.vscode-server/bin/${COMMIT}`;
+          mkdirSync(bin, { recursive: true });
+          writeFileSync(`${bin}/retained`, 'prior install evidence');
+          const utilities = `${f.directory}/utilities`;
+          setupPath(utilities, 'tar');
+          if (entry === 'non-executable')
+            writeFileSync(`${utilities}/tar`, '#!/bin/sh\nexit 0\n', { mode: 0o600 });
+          else mkdirSync(`${utilities}/tar`, { mode: 0o700 });
+          // Default Bash exposes non-executable files through command -v (POSIX mode does not).
+          const lookup = spawnSync('/bin/bash', ['-c', 'command -v tar'], {
+            env: { PATH: utilities },
+            encoding: 'utf8',
+          });
+          if (entry === 'non-executable') assert.equal(lookup.status, 0);
+          if (stage === 'extraction') f.expect('fetch', () => new Response('archive'));
+          let guarded = 0;
+          const operations = installedServer(f, {
+            installed: false,
+            running: '',
+            remoteSha: sha,
+            hook: (_args, script) => {
+              if (
+                !(stage === 'inspection'
+                  ? script.startsWith('kill -0')
+                  : script.includes('tar -xzf'))
+              )
+                return undefined;
+              guarded++;
+              const result = spawnSync(
+                '/bin/bash',
+                ['-c', script.replaceAll('/home/alice', home)],
+                {
+                  env: { PATH: utilities },
+                  encoding: 'utf8',
+                },
+              );
+              assert.equal(result.status, 127);
+              assert.match(
+                result.stderr.split('\n')[0] ?? '',
+                /setup requires 'tar' as an executable file/,
+              );
+              throw new Error(result.stderr);
+            },
+          });
+          await assert.rejects(
+            ensureServerReady(context(f), {
+              remote: `unusable-tar-${entry}-${stage}`,
+              instance: 'owned',
+            }),
+            /setup requires 'tar' as an executable file/,
+          );
+          assert.equal(guarded, 1);
+          assert.equal(readFileSync(`${bin}/retained`, 'utf8'), 'prior install evidence');
+          assert.equal(existsSync(`${bin}/.incus-installing`), false);
+          assert.ok(
+            !operations.some((args) => /fresh token minted|nohup|pkill/.test(defined(args.at(-1)))),
+          );
+          if (stage === 'inspection') {
+            assert.ok(!f.calls.some((call) => call.name === 'fetch'));
+            assert.ok(
+              !operations.some(
+                (args) => args[0] === 'file' || defined(args.at(-1)).includes('tar -xzf'),
+              ),
+            );
+          }
+        }),
+    );
+
+for (const entry of ['missing', 'non-executable'] as const)
+  for (const path of ['standalone', 'inspection'] as const)
+    test(`${entry} uname gives actionable first line during ${path} flavor probe`, (t) =>
+      withFixture(t, async (f) => {
+        const utilities = `${f.directory}/utilities`;
+        // tar is also absent: the uname error must take precedence over raw shell stderr.
+        mkdirSync(utilities);
+        if (entry === 'non-executable')
+          writeFileSync(`${utilities}/uname`, '#!/bin/sh\nexit 0\n', { mode: 0o600 });
+        let guarded = 0;
+        const run = (script: string): never => {
+          guarded++;
+          const result = spawnSync('/bin/sh', ['-c', script], {
+            env: { PATH: utilities },
+            encoding: 'utf8',
+          });
+          assert.equal(result.status, 127);
+          assert.match(
+            result.stderr.split('\n')[0] ?? '',
+            /flavor probe requires 'uname' as an executable file/,
+          );
+          assert.ok(!result.stderr.includes('not found'));
+          throw new Error(result.stderr);
+        };
+        const ref = { remote: `unusable-uname-${entry}-${path}`, instance: 'owned' };
+        if (path === 'standalone') {
+          f.expect('child_process.execFile', (_command, args, _options, callback) => {
+            try {
+              run(defined(args.at(-1)));
+            } catch (error) {
+              callback(error, '', String(error));
+            }
+          });
+          await assert.rejects(
+            probeFlavor(ref, {
+              uid: 1001,
+              gid: 1002,
+              username: 'alice',
+              home: '/home/alice',
+            }),
+            /flavor probe requires 'uname'/,
+          );
+        } else {
+          const operations = installedServer(f, {
+            installed: false,
+            running: '',
+            hook: (_args, script) => (script.startsWith('kill -0') ? run(script) : undefined),
+          });
+          await assert.rejects(ensureServerReady(context(f), ref), /flavor probe requires 'uname'/);
+          assert.ok(!f.calls.some((call) => call.name === 'fetch'));
+          assert.ok(
+            !operations.some(
+              (args) => args[0] === 'file' || /pkill|tar -xzf/.test(defined(args.at(-1))),
+            ),
+          );
+        }
+        assert.equal(guarded, 1);
+      }));
