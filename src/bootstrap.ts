@@ -178,7 +178,7 @@ function assertSignalSupport(out: string, identity: Identity): void {
 export type ServerFlavor = 'linux-x64' | 'linux-arm64' | 'linux-alpine';
 
 export async function probeFlavor(ref: InstanceRef, identity: Identity): Promise<ServerFlavor> {
-  const out = await execInInstance(ref, 'uname -m; ldd --version 2>&1 | head -1', {
+  const out = await execInInstance(ref, 'uname -m; ldd --version 2>&1 || true', {
     uid: identity.uid,
     home: identity.home,
   });
@@ -467,16 +467,30 @@ async function isServerInstalled(
   );
 }
 
-function installationProbe(identity: Identity, commit: string): string {
+/** Check the selected user's PATH before downloading or changing an install. */
+function setupPrerequisiteCheck(): string {
+  return [
+    'for tool in tar gzip mkdir rm touch sha256sum cut stat chmod tr head wc mv; do',
+    '  if ! command -v "$tool" >/dev/null 2>&1; then',
+    `    printf '%s\\n' "VS Code server setup requires '$tool' in the selected user's PATH; install or expose the required utility inside the instance before reconnecting" >&2`,
+    '    exit 127',
+    '  fi',
+    'done',
+  ].join('\n');
+}
+
+function installationProbe(identity: Identity, commit: string, checkSetup = false): string {
   const dir = `${identity.home}/${VS_SERVER_DIR}/bin/${commit}`;
   // Root pgrep can run concurrently: never put the plain process name in argv.
   const main = `${sq(`${dir}/out`)}/'server'-main.js`;
   return [
     `if [ -f ${sq(`${dir}/.incus-installing`)} ]; then`,
+    ...(checkSetup ? [setupPrerequisiteCheck()] : []),
     `  echo no`,
     `elif [ -x ${sq(`${dir}/bin/code-server`)} ] && [ -f ${main} ] && [ -x ${sq(`${dir}/node`)} ]; then`,
     `  echo yes`,
     `else`,
+    ...(checkSetup ? [setupPrerequisiteCheck()] : []),
     `  echo no`,
     `fi`,
   ].join('\n');
@@ -504,6 +518,7 @@ async function ensureExtracted(
     ref,
     [
       `set -e`,
+      setupPrerequisiteCheck(),
       `rm -rf ${sq(dir)}`,
       `mkdir -p ${sq(dir)}`,
       `touch ${sq(`${dir}/.incus-installing`)}`,
@@ -611,9 +626,9 @@ async function inspectServer(
       [
         'kill -0 $$ && echo yes || { echo no; exit 0; }',
         `printf '\\nINCUS_FLAVOR\\n'`,
-        'uname -m; ldd --version 2>&1 | head -1',
+        'uname -m; ldd --version 2>&1 || true',
         `printf '\\nINCUS_INSTALL\\n'`,
-        installationProbe(identity, commit),
+        installationProbe(identity, commit, true),
       ].join('\n'),
       { uid: identity.uid, home: identity.home },
     ),
