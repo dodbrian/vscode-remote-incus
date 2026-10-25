@@ -50,7 +50,7 @@ export class IncusAuthorityResolver implements vscode.RemoteAuthorityResolver {
     if (!vscode.ManagedResolvedAuthority) {
       throw new Error(
         'vscode.ManagedResolvedAuthority is undefined — the "resolvers" proposed API was stripped. ' +
-          'Enable it once via ~/.vscode/argv.json: "enable-proposed-api": ["local-dev.remote-incus"]',
+          `Enable it once via ~/.vscode/argv.json: "enable-proposed-api": [${JSON.stringify(this.context.extension.id)}]`,
       );
     }
     const parsed = parseAuthority(authority);

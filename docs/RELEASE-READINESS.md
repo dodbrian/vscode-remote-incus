@@ -2,7 +2,7 @@
 
 The extension has scoped functional acceptance. The private content identified
 in this review has since been cleaned from the checkout, rewritten reachable
-history and rebuilt VSIX. Final identity and distribution
+history and rebuilt VSIX. Release identity is selected below; distribution
 decisions remain pending. Repeatable local packaging and a headless CI workflow
 are now implemented; the first hosted workflow run remains unverified.
 The table below preserves the initial
@@ -27,7 +27,7 @@ existing Ports row. None of these is evidence of failure on an untested system.
 
 ## Current backlog classification
 
-Naming and publication decisions are deferred at the user's request. The user
+Release identity is now selected below; publication remains deferred. The user
 subsequently authorized offline reliability and release tooling with local
 commits. Packaging now uses the lockfile-installed VSCE, a production prepublish
 build, actual-VSIX policy validation and synthetic archive regression tests.
@@ -129,12 +129,12 @@ environment restriction, not evidence of a broken production build.
 4. The tracked `.github/workflows/offline-ci.yml` performs these steps on a
    headless Linux runner and uploads the validated VSIX as a 14-day build
    artifact. Action revisions and the Node version are pinned.
-5. Choose final identity and distribution eligibility/route before publication;
+5. Verify publisher registration and distribution eligibility/route before publication;
    no registry release or credentials are configured here.
 
 The build sequence is repeatable from locked inputs; byte-identical ZIP output
 is not promised. Hosted execution remains unverified until a repository push
-and an actual GitHub Actions run. CI artifacts retain provisional identity and
+and an actual GitHub Actions run. CI artifacts use the selected identity and
 are review builds, not publication approval.
 
 No live instance checks or expanded platform tests are needed to resolve the
@@ -240,7 +240,7 @@ including 61 additional unreachable commits. Reflogs were expired and
 unreachable objects pruned. Verification confirmed repository integrity, all
 82 commits and 15 refs with unchanged parent relationships and metadata, no
 remaining old mapped objects, no unreachable objects and no reflog entries.
-Remaining release work is final identity, first hosted CI verification and
+Remaining release work is repository creation, publisher registration, first hosted CI verification and
 distribution eligibility. Production packaging and the archive policy are implemented. No push or publication is authorized.
 
 ## Independent follow-up audit
@@ -266,3 +266,33 @@ documentation file links also passed. The independent agent's final verdict
 was clean within this audited scope. The subsequently approved permanent
 recovery-object cleanup also passed integrity, graph and privacy checks.
 No universal secret-detection claim is made.
+
+## Release identity decision (2026-10-25)
+
+The user selected **Remote - Incus** (`remote-incus`) under publisher namespace
+`dodbrian`, with planned source repository
+`https://github.com/dodbrian/vscode-remote-incus`. The manifest, README and current test instructions use `dodbrian.remote-incus`;
+resolver opt-in guidance derives the ID from the running extension metadata.
+The authenticated GitHub account was checked with `gh`; the planned repository
+returned 404. Registry namespace availability and registration are still
+unverified.
+The manifest retains `private: true` to guard against accidental npm publication;
+it is not evidence of extension registry eligibility.
+
+Three parallel research agents checked project policy, governance and ecosystem
+precedents. No Incus-specific third-party naming policy or explicit permission
+for this name was found in the official sources searched. Incus's
+[Apache 2.0 license, section 6](https://github.com/lxc/incus/blob/main/COPYING)
+does not grant general trademark rights. An older
+[Linux Containers maintainer discussion about LXC/LXD names](https://discuss.linuxcontainers.org/t/the-naming-of-third-party-open-source-lxc-lxd-non-canonical-managed-projects/14818)
+welcomes third-party names that avoid implying official relationship/support,
+but predates Incus and is not Incus-specific authorization. The official
+[third-party integrations list](https://linuxcontainers.org/incus/docs/main/third_party/)
+establishes ecosystem precedent, not permission for our name. This is bounded
+project-policy research, not a worldwide trademark clearance.
+
+The user chose to proceed with the current naming and reconsider if maintainers
+object. No maintainer was contacted. The README states that this is an independent
+project, without Incus or Linux Containers affiliation or endorsement. This
+choice does not authorize Incus logo use. Repository creation, push, registry
+publication and installation of the renamed extension remain separate actions.

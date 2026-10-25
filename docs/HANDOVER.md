@@ -20,7 +20,47 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: reviewed build deployed and connection-verified (2026-10-25)
+## Current stopping point: release identity reviewed (2026-10-25)
+
+The user selected display name **Remote - Incus**, package name `remote-incus`,
+publisher namespace `dodbrian` and planned GitHub repository
+`https://github.com/dodbrian/vscode-remote-incus`. The extension ID is
+`dodbrian.remote-incus`. The authenticated GitHub account was verified with `gh`;
+the planned repository returned 404. Publisher registration/availability remains
+unverified. No repository creation, push, registry publication or deployment was
+authorized by this decision.
+
+The user accepted keeping the name pending any objection from Incus maintainers.
+No Incus-specific naming permission was established, and no maintainer was
+contacted. The README identifies the extension as independent; Incus logo use
+is not authorized by this naming decision. See the
+[identity research](RELEASE-READINESS.md#release-identity-decision-2026-10-25).
+The user's locally installed build still has the development ID
+`local-dev.remote-incus`; the newly packaged identity has not been installed.
+Resolver opt-in diagnostics derive the ID from the running extension metadata.
+
+The identity changes were reviewed and improved. Runtime opt-in guidance uses
+`context.extension.id`, with an existing regression strengthened to verify a
+synthetic publisher ID before any external work. Package-policy fixtures also
+use a synthetic publisher. The public README describes local VSIX installation,
+links the build instructions and does not imply an existing Open VSX listing.
+There are no external users to migrate; no migration feature or public migration
+guidance is needed.
+
+Validation passed: `npm test` (16 offline test-file entries and strict quality
+gates), `npm run test:package` (three test-file entries), `npm run package` and
+`git diff --check`. The rebuilt production VSIX passed archive policy and privacy
+checks with 33 files and 86 local documentation links. This identity build was
+not installed or live-tested; prior connection acceptance applies to the
+previously deployed build recorded in the checkpoint below.
+
+Recommended next release step: create the planned GitHub repository, then push
+and inspect the first hosted CI run and its VSIX artifact. Repository visibility
+must be selected before creation. These external actions require a separate user
+instruction; this checkpoint authorizes only the local commit. Publisher
+namespace availability/registration and distribution eligibility remain pending.
+
+## Previous checkpoint: reviewed build deployed and connection-verified (2026-10-25)
 
 The user accepted the completed deployment/verification result and requested
 this handover checkpoint. The deployment helper fix is committed as `2b49bd9`;
@@ -28,8 +68,8 @@ live evidence and support-matrix updates are committed as `c5c8af0`. The scoped
 Ubuntu/Rocky connection and missing-tool task is complete; do not reopen it as
 pending or expand acceptance beyond the checks recorded below.
 
-Naming/publication decisions remain deferred. A focused next technical candidate
-is Linux x64 Insiders compatibility verification in an isolated profile, keeping
+The release identity is now selected above; publication remains deferred.
+A focused next technical candidate is Linux x64 Insiders compatibility verification in an isolated profile, keeping
 the normal Stable session intact. Broader platform coverage, hosted CI and
 optional future architecture remain separate workstreams in the current task
 status below. No additional test, client installation, push or publication is
@@ -121,7 +161,7 @@ is part of the authorization.
 
 ## Current task status (2026-10-25)
 
-Naming and publication decisions are deferred at the user's request. The accepted
+Release identity is selected above; publication remains deferred. The accepted
 Linux x64 MVP includes resolver classification, startup prerequisite diagnostics,
 Alpine/Bash-free support, the IPv4 forwarding helper and identical-folder new
 windows. These are completed features, not pending implementation tasks.
@@ -132,14 +172,14 @@ dialog are now verified within the scope above.
 Remaining project-wide work is separated by purpose. Completed offline tooling
 is not an open implementation task:
 
-| Workstream                          | Pending result                                                                                                           | Scope or prerequisite                                                                                                    |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Release identity and distribution   | Final display/package name, publisher, public repository, consistent opt-in guidance, and distribution eligibility/route | User decisions deferred; registry publication separately authorized                                                      |
-| Hosted CI                           | First actual workflow execution and artifact inspection                                                                  | Requires an authorized repository push; local clean-copy validation is complete                                          |
-| Other live acceptance               | Resolver errors other than missing `tar`, additional Rocky terminal/UI workflows and broader image/platform behavior     | The missing-tool dialog and scoped Ubuntu/Rocky connection/reuse checks are complete; further tests need a defined scope |
-| Broader support coverage            | Insiders, ARM64, macOS/Windows clients, restricted remotes/projects and more Incus/image versions                        | Scope fixtures and platform access before testing; untested is not failed                                                |
-| Optional compatibility architecture | Centralized version probe, adapter table and per-instance feature gates (DESIGN §14)                                     | Future architecture; existing list syntax, 7.x transfer progress, signal probes and resolver classification already work |
-| Later-phase product features        | Concurrent different-user attaches and per-connection environment/working-directory support toward devcontainer.json     | Future scope, not unfinished accepted MVP requirements                                                                   |
+| Workstream                          | Pending result                                                                                                       | Scope or prerequisite                                                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Release identity and distribution   | Create planned GitHub repository, verify/register publisher namespace and confirm distribution eligibility/route     | Identity selected above; registry publication separately authorized                                                      |
+| Hosted CI                           | First actual workflow execution and artifact inspection                                                              | Requires an authorized repository push; local clean-copy validation is complete                                          |
+| Other live acceptance               | Resolver errors other than missing `tar`, additional Rocky terminal/UI workflows and broader image/platform behavior | The missing-tool dialog and scoped Ubuntu/Rocky connection/reuse checks are complete; further tests need a defined scope |
+| Broader support coverage            | Insiders, ARM64, macOS/Windows clients, restricted remotes/projects and more Incus/image versions                    | Scope fixtures and platform access before testing; untested is not failed                                                |
+| Optional compatibility architecture | Centralized version probe, adapter table and per-instance feature gates (DESIGN §14)                                 | Future architecture; existing list syntax, 7.x transfer progress, signal probes and resolver classification already work |
+| Later-phase product features        | Concurrent different-user attaches and per-connection environment/working-directory support toward devcontainer.json | Future scope, not unfinished accepted MVP requirements                                                                   |
 
 Ordinary IPv4-loopback forwarding on IPv6-only-networked containers retains a
 known limitation; the selected-row IPv4 helper is implemented and manually

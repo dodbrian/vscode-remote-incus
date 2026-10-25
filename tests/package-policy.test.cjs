@@ -12,7 +12,7 @@ function fixture() {
     Buffer.from(
       JSON.stringify({
         name: 'remote-incus',
-        publisher: 'local-dev',
+        publisher: 'fixture-publisher',
         version: '0.1.0',
         main: './dist/extension.js',
       }),
@@ -27,7 +27,7 @@ function fixture() {
   records.set(
     'extension.vsixmanifest',
     Buffer.from(
-      '<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"><Metadata><Identity Id="remote-incus" Version="0.1.0" Publisher="local-dev"/><License>extension/LICENSE.txt</License></Metadata><Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json"/><Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/readme.md"/><Asset Type="Microsoft.VisualStudio.Services.Content.License" Path="extension/LICENSE.txt"/></Assets></PackageManifest>',
+      '<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"><Metadata><Identity Id="remote-incus" Version="0.1.0" Publisher="fixture-publisher"/><License>extension/LICENSE.txt</License></Metadata><Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json"/><Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/readme.md"/><Asset Type="Microsoft.VisualStudio.Services.Content.License" Path="extension/LICENSE.txt"/></Assets></PackageManifest>',
     ),
   );
   return records;
@@ -230,7 +230,7 @@ test('package policy rejects malformed, mismatched and incomplete VSIX metadata'
   for (const [before, after, expected] of [
     ['Id="remote-incus"', 'Id="other"', 'VSIX identity Id'],
     ['Version="0.1.0"', 'Version="9.0.0"', 'VSIX identity Version'],
-    ['Publisher="local-dev"', 'Publisher="other"', 'VSIX identity Publisher'],
+    ['Publisher="fixture-publisher"', 'Publisher="other"', 'VSIX identity Publisher'],
     ['Path="extension/readme.md"', 'Path="extension/missing.md"', 'VSIX asset points'],
     ['Microsoft.VisualStudio.Code.Manifest', 'Other.Manifest', 'VSIX required asset is missing'],
   ]) {

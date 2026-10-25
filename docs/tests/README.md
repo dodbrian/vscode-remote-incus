@@ -210,7 +210,7 @@ require a real development window.
 
 For window checks, use a fresh temporary `--user-data-dir` and
 `--extensions-dir`, this checkout's isolated bundle through
-`--extensionDevelopmentPath`, and `--enable-proposed-api=local-dev.remote-incus`.
+`--extensionDevelopmentPath`, and `--enable-proposed-api=dodbrian.remote-incus`.
 Do not install a VSIX, run `scripts/redeploy.sh` or restart normal windows. Supply only
 the authorized explicit authority at runtime. User data, logs and history may
 contain private infrastructure details: keep them outside the repository and

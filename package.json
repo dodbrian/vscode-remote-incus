@@ -2,13 +2,13 @@
   "name": "remote-incus",
   "displayName": "Remote - Incus",
   "description": "Connect to Incus containers as a first-class remote connection type (exec-stdio transport, no sshd).",
-  "publisher": "local-dev",
+  "publisher": "dodbrian",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://example.invalid/local-dev/remote-incus"
+    "url": "https://github.com/dodbrian/vscode-remote-incus"
   },
   "engines": {
     "vscode": "^1.140.0"

@@ -100,9 +100,18 @@ test('C3: unsupported proposed API fails with setup guidance before external wor
     f.defer(() => {
       setManagedApiAvailable(true);
     });
+    const extensionContext = context(f);
+    const extensionId = 'fixture-publisher.remote-incus';
+    Object.assign(extensionContext.extension, { id: extensionId });
     await assert.rejects(
-      new IncusAuthorityResolver(context(f)).resolve('incus+selected:same', {} as any),
-      /enable-proposed-api/,
+      new IncusAuthorityResolver(extensionContext).resolve('incus+selected:same', {} as any),
+      (err: Error) => {
+        assert.ok(
+          err.message.includes(`"enable-proposed-api": ["${extensionId}"]`),
+          'setup guidance must identify the running extension',
+        );
+        return true;
+      },
     );
     assert.deepEqual(f.calls, []);
   }));

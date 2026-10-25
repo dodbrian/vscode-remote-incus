@@ -603,7 +603,11 @@ coverage. Earlier evidence does not establish every intermediate version.
 
 ## 11. Open questions (recorded, with leaning)
 
-1. Final product naming/publisher (working title "Remote - Incus") — TBD before OpenVSX.
+1. Product identity selected (2026-10-25): "Remote - Incus", package
+   `remote-incus`, publisher namespace `dodbrian`, planned repository
+   `https://github.com/dodbrian/vscode-remote-incus`. Publisher registration and
+   distribution eligibility remain pending; see
+   [release identity decision](RELEASE-READINESS.md#release-identity-decision-2026-10-25).
 2. ~~`contribViewsRemote` tree-view wiring~~ **Verified 2026-10-19** (see §8).
 3. Per-connection `--env`/`--cwd` surface for future devcontainer.json support — Phase 3.
 4. Multi-user-in-one-instance semantics (concurrent different-uid attaches) — Phase 2.
@@ -652,8 +656,9 @@ coverage. Earlier evidence does not establish every intermediate version.
    testing or optimization without explicit next-step authorization.
 7. Packaging pipeline: lockfile-installed VSCE, production prepublish build,
    actual-archive policy checks and headless local-fixture CI are implemented.
-   Hosted CI execution remains unverified. Final identity and distribution
-   eligibility/route are deferred; registry publication is separately authorized.
+   Hosted CI execution remains unverified. Identity is selected in §11; publisher
+   registration and distribution eligibility/route remain pending. Registry
+   publication is separately authorized.
 8. Incus version-compat layer (design sketch §14 — NOT yet implemented):
    version probe, behavioral adapter table, per-member/per-instance feature gates.
 

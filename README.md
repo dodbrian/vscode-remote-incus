@@ -7,6 +7,9 @@ same slot Dev Containers / Remote-SSH occupy in the Remote Explorer.
 **Status: Phase 1 work in progress** — architecture is frozen and spike-verified
 (see [design](docs/DESIGN.md)); the extension is not yet published.
 
+This is an independent project, not affiliated with or endorsed by the Incus
+project or Linux Containers.
+
 ## How it works (no sshd required)
 
 - Instances are addressed via the existing `incus` client configuration
@@ -29,16 +32,21 @@ for dated findings, sources, and distribution research.
 
 ## Install (VS Code stable)
 
-Proposed APIs are not permitted on the Marketplace; install from VSIX/OpenVSX
-and opt in once via `~/.vscode/argv.json`:
+Install a locally built VSIX (see [Development](#development)) and opt in once via VS Code's
+**Preferences: Configure Runtime Arguments**
+command (`argv.json`; preserve any existing entries):
 
 ```json
 {
-  "enable-proposed-api": ["local-dev.remote-incus"]
+  "enable-proposed-api": ["dodbrian.remote-incus"]
 }
 ```
 
 Then install the VSIX: `code --install-extension remote-incus.vsix`.
+Restart VS Code after changing the runtime arguments. The extension ID is
+`dodbrian.remote-incus`. The extension is not published in a registry; publisher
+registration and an Open VSX distribution route remain pending.
+
 Current verified configuration: Linux x64 client, Stable VS Code 1.143.1 and
 Incus 7.5.1, with scoped Ubuntu/Rocky Linux 9.8 glibc x64 and Alpine musl x64
 instance checks.
@@ -248,4 +256,4 @@ for source and license details.
 See the [documentation index](docs/README.md) for architecture, testing, task plans,
 verification results, and project history. The
 [release-readiness review](docs/RELEASE-READINESS.md) records publication blockers
-and the remaining naming, packaging and distribution decisions.
+and the remaining publisher registration, hosted CI and distribution work.
