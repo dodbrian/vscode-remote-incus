@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 import { formatAuthority } from './authority';
 import { Identity, killServer, resetToken, resolveIdentity, uninstallServer } from './bootstrap';
 import { FolderHistory } from './history';
+import { registerIPv4Forwarding } from './forwarding';
 import { InstanceRef, restartInstance, startInstance, stopInstance, target } from './incusCli';
 import { firstLine, log, showLog } from './logging';
 import { openExecTerminal } from './terminal';
@@ -109,6 +110,7 @@ export function registerCommands(
     (node) => node instanceof InstanceNode && resetTokenCommand(context, node, tree),
   );
   reg('remote-incus.collectDiagnostics', () => collectDiagnostics(context));
+  registerIPv4Forwarding(context);
 }
 
 async function withProgress<T>(title: string, fn: () => Promise<T>): Promise<T> {

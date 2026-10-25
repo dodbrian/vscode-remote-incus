@@ -47,6 +47,10 @@ export class EventEmitter<T> {
 }
 
 export const workspace = {
+  get tunnels(): Promise<any[]> {
+    return fixture().call('vscode.tunnels', []);
+  },
+  openTunnel: (...args: any[]) => fixture().call('vscode.openTunnel', args),
   get workspaceFolders(): any {
     return fixture().state.get('folders');
   },

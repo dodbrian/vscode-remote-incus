@@ -20,7 +20,122 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: early startup prerequisite diagnostics (2026-10-25)
+## Current stopping point: IPv4 helper deployed and accepted (2026-10-25)
+
+The user accepted the normal-profile IPv4 helper workflow and requested
+committing the implementation, regression coverage and documentation together.
+The helper is deployed; no push or publication was requested.
+
+`remote-incus.forwardPortIPv4` (`src/forwarding.ts`, registered by
+`src/commands.ts`) contributes "Forward over IPv4" to the Ports-row context
+menu for a single Incus IPv4-loopback row. It takes the selected port
+automatically, with no number prompt. Core forwards that same port using
+`::ffff:127.0.0.1`, bypassing the problematic localhost/ADDRCONFIG lookup.
+The standard resolver, core tunnel factory and Incus exec-stdio transport
+remain in use; there is no automatic interception of ordinary forwarding.
+
+The helper validates row/remote/port inputs, accepts `localhost`, `127.0.0.1`
+and `0.0.0.0`, retains label/protocol/local-port preferences, requests private
+forwarding, reuses existing mapped tunnels and deduplicates concurrent clicks.
+An original ordinary forward is retained; core chooses another available local
+port if necessary. Core manages closing and local-port changes; extension
+handles are disposed with the context. The production manifest enables the
+`tunnels` proposal, with typings pinned to VS Code 1.143.1.
+
+Important discovery limitation: Ports displays forwarded/environment-detected
+entries, not every raw listening-port candidate. The user's `hybrid` setting
+uses terminal-output URLs to initiate forwarding. The initial externally
+started test service produced no row until its URL was printed in the
+integrated terminal. The helper acts on the resulting row; it adds no service
+scanner and changes no discovery settings. README documents this flow.
+
+The first manual context-menu check also exposed a condition bug:
+`tunnelViewMultiSelection == undefined` compares to the string "undefined".
+The corrected condition is `!tunnelViewMultiSelection`; regression coverage
+rejects the mistaken literal comparison. A temporary bundle of the exact
+upstream VS Code parser/scanner verified old false/new true for the single-row
+context and new false for multiselection or another remote. No parser copy or
+new parser dependency was added to production or CI.
+
+Verification: all 15 offline test-file entries pass, including typecheck, lint
+and formatting; compile and `git diff --check` pass. Failure-first command tests
+cover port reuse without prompting, metadata, validation, remote changes,
+existing forwards, concurrent clicks, error/retry and menu conditions. An
+isolated Stable 1.143.1 development profile verified exact HTTP traffic through
+the helper, duplicate suppression, core close and helper reopening on the
+IPv6-only-networked fixture. That temporary profile/listener/relays were cleaned
+up; networking was unchanged.
+
+For manual acceptance, `./redeploy.sh` built, packaged and installed the helper
+and restarted normal VS Code. Installed bundle and corrected manifest were
+verified. The normal fixture window resolved and started both exec bridges.
+The user showed the helper-created mapped-address entry beside the original
+auto-forward, then confirmed the exact HTTP marker through the new local
+address. Core correctly selected an available local port when the preferred
+port was occupied. This accepts the menu-to-HTTP workflow on the tested Linux
+x64 / Stable 1.143.1 / Incus 7.5.1 fixture, not additional clients or platforms.
+
+After acceptance the exact test-owned HTTP process was identity-checked and
+stopped; its exec session exited successfully. User-created forwarded entries
+and ordinary editor relays were left alone. The user can remove the unused
+test forwards in Ports. No container networking, packages, token policy or
+upstream server code changed. Private fixture identifiers and raw logs remain
+outside the repository.
+
+Recommended next task: a release-readiness review. Reconcile README/DESIGN and
+the support matrix with the completed resolver, Alpine/shell, diagnostics and
+Ports work; audit tracked files/history and the VSIX contents for publication
+privacy; and decide the final extension name/publisher before publication.
+Then prepare repeatable CI VSIX packaging and the chosen distribution route.
+This is a recommendation, not authorization to publish or begin another task.
+The remaining normal-profile identical-folder UX acceptance and untested
+client/platform matrix should remain explicit limitations.
+
+## Previous state: IPv4 forwarding investigation (2026-10-25)
+
+The user authorized investigating the remaining IPv4-only loopback forwarding
+failure on the previously designated IPv6-only-networked local fixture.
+Fresh read-only checks confirmed IPv4 exists only on loopback and the external
+interface has IPv6 only. No container networking was changed.
+
+Reproduction with the fixture's bundled Node 24.22.1 and a bounded temporary
+HTTP service bound only to `127.0.0.1`:
+
+- Unfiltered `dns.lookup('localhost', {all:true})` returned both `::1` and
+  `127.0.0.1`; adding `dns.ADDRCONFIG` returned only `::1`.
+- Direct IPv4 returned the exact HTTP marker. Normal `localhost` connection
+  failed with ECONNREFUSED. An unfiltered custom lookup and literal
+  `::ffff:127.0.0.1` both returned the marker.
+- A separate Stable 1.143.1 development profile using the unchanged production
+  resolver and actual core-created tunnels reproduced failure for remote
+  `127.0.0.1`, then returned the exact IPv4-only service marker for remote
+  `::ffff:127.0.0.1`. Only the temporary verification manifest enabled the
+  tunnels proposal. Production has not gained that proposal or any new command.
+
+The temporary extension host exited with code 0; fresh process checks found no
+owned HTTP listener or relay processes. The temporary development profile was
+removed after confirming no processes referenced it. Interface addresses
+remained unchanged. The preexisting server installation was retained. Private
+targets and raw logs remain outside the repository. This is API-created tunnel
+and actual HTTP traffic evidence, not manual Ports-input acceptance.
+
+Exact-version source inspection confirms the cause and available API:
+[core loopback normalization](https://github.com/microsoft/vscode/blob/1.143.1/src/vs/platform/tunnel/node/tunnelService.ts),
+[server family selection](https://github.com/microsoft/vscode/blob/1.143.1/src/vs/server/node/remoteExtensionHostAgentServer.ts),
+[Node ADDRCONFIG injection](https://github.com/nodejs/node/blob/v24.22.1/lib/net.js),
+[resolver factory selection](https://github.com/microsoft/vscode/blob/1.143.1/src/vs/workbench/api/common/extHostTunnelService.ts).
+The supported resolver `tunnelFactory` replaces core's synthesized managed
+factory; returning undefined is not a reliable way to delegate individual
+requests back to that default. DESIGN section 2 currently specifies core
+forwarding, so replacing this component needs an explicit direction decision.
+
+At the end of this investigation no production forwarding change had been made.
+The user subsequently selected the detected-port helper described above,
+resolving the architecture question without replacing core forwarding.
+No commit, deployment, normal-profile restart, push or publication occurred
+during the investigation itself.
+
+## Previous state: early startup prerequisite diagnostics (2026-10-25)
 
 The deployment and terminal acceptance record below is committed as `a795b5d`.
 The user then authorized proceeding with prerequisite diagnostics.

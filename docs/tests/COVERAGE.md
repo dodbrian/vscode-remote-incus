@@ -1,3 +1,40 @@
+# Detected-port IPv4 helper follow-up (2026-10-25)
+
+`forwarding.test.ts` exercises the registered Ports-row command with detected
+port payloads, checking mapped-address forwarding of the same numeric port
+without input prompts or Incus calls. It covers allowed loopback hosts, invalid
+rows and port ranges, remote changes, label/protocol/local-port metadata,
+existing mapped tunnels, concurrent clicks, failure/retry, and exact manifest
+host matching. Existing original-host forwards are preserved. The pinned tunnels
+proposal is enabled in production; the resolver keeps core's tunnel factory.
+
+An isolated Stable 1.143.1 development profile invoked the production command
+using a Ports-row payload against the designated IPv6-only-networked fixture.
+An IPv4-only HTTP listener's exact marker passed through the helper-created core
+tunnel. Repeated invocation left one mapped entry; the core close command removed
+it; invoking the helper again reopened a working tunnel. Manual context-menu
+rendering/click acceptance was not covered by that isolated run. Subsequent
+normal-profile deployment succeeded, but the user's screenshot showed no Ports
+row for an externally launched service. The test setup had assumed raw candidates
+were displayed; core only displays forwarded/environment-detected rows. With the
+user's hybrid discovery, a service URL in terminal output is needed to trigger
+ordinary auto-forwarding. Manual acceptance remains pending after correcting
+the setup; synthetic command-payload tests do not prove candidate-to-row discovery.
+The URL then created an auto-forwarded row, but the user's next screenshot
+exposed a hidden menu action. Its manifest comparison to literal `undefined`
+was wrong; absence now uses `!tunnelViewMultiSelection`. The manifest regression
+rejects that invalid comparison. The exact-version upstream parser/scanner,
+bundled only for temporary verification, confirmed old false/new true for the
+single-row context and new false for multiselection or another remote. The
+corrected installed manifest was verified after redeploy. The user's next
+screenshot confirmed the mapped-address helper forward and automatic selection
+of an available local port beside the existing auto-forward. The user then
+confirmed the exact HTTP payload through the helper's local address. This is
+manual acceptance of the menu-to-HTTP workflow on the tested fixture. The
+identity-checked temporary HTTP process was stopped; user-owned forwarded
+entries and ordinary remote session relays were retained.
+Private fixture identifiers and raw logs remain outside the repository.
+
 # Prerequisite diagnostics follow-up (2026-10-25)
 
 `prerequisites.test.ts` executes the generated startup script under `/bin/sh`

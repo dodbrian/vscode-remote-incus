@@ -24,7 +24,8 @@
   "main": "./dist/extension.js",
   "enabledApiProposals": [
     "resolvers",
-    "contribViewsRemote"
+    "contribViewsRemote",
+    "tunnels"
   ],
   "activationEvents": [
     "onResolveRemoteAuthority:incus",
@@ -126,6 +127,11 @@
         "title": "Refresh",
         "category": "Remote - Incus",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "remote-incus.forwardPortIPv4",
+        "title": "Forward over IPv4",
+        "category": "Remote - Incus"
       }
     ],
     "menus": {
@@ -148,6 +154,10 @@
         },
         {
           "command": "remote-incus.removeFolderFromHistory",
+          "when": "false"
+        },
+        {
+          "command": "remote-incus.forwardPortIPv4",
           "when": "false"
         }
       ],
@@ -238,6 +248,13 @@
           "command": "remote-incus.uninstallServer",
           "when": "view == remote-incus.instances && viewItem =~ /instance-(running|stopped)/",
           "group": "remote-incus@7"
+        }
+      ],
+      "ports/item/context": [
+        {
+          "command": "remote-incus.forwardPortIPv4",
+          "when": "remoteName == incus && tunnelType != Add && !tunnelViewMultiSelection && tunnelViewSelection =~ /^(localhost|127[.]0[.]0[.]1|0[.]0[.]0[.]0):[0-9]+$/",
+          "group": "0_manage@0"
         }
       ]
     },

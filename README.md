@@ -52,6 +52,24 @@ runtime and reports loader or permission failures immediately; it also checks
 for `nohup` and an executable launcher. The rescue terminal names a missing
 `script` utility directly.
 
+## IPv4 forwarding on IPv6-only containers
+
+If an IPv4-only service fails through ordinary forwarding on an IPv6-only
+container, right-click its existing row in the Ports view and choose
+**Forward over IPv4**. The action uses that row's port automatically; it does
+not ask for a port number. VS Code manages the resulting forward as usual.
+
+The helper uses an existing forwarded or environment-detected row; it does not
+make all listening services appear in Ports. VS Code's discovery settings still
+apply. With `hybrid` discovery, run the service in the integrated terminal so
+its startup URL can trigger automatic forwarding. An externally started service
+may have no row until its URL appears in terminal output or it is forwarded.
+
+The action supports IPv4 loopback rows in an Incus remote window. If the port
+already has an ordinary forward, the helper creates a separate entry; stop the
+original when it is no longer needed. Existing forwarding and automatic port
+detection continue to use VS Code's core behavior.
+
 ## Server download strategy
 
 `remote-incus.downloadStrategy` defaults to `auto`. No selection is required
