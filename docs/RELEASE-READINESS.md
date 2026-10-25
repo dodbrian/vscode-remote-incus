@@ -38,10 +38,17 @@ The coverage limits above are verification gaps, not missing implementations.
 The centralized Incus compatibility layer and later-phase multi-user or
 devcontainer.json work are separate future scope.
 
+The current workstream backlog is maintained in the
+[handover task status](HANDOVER.md#current-task-status-2026-10-25). Deployment
+of the reviewed build and its targeted live acceptance are still pending;
+prior normal-profile acceptance covers earlier builds. First hosted CI execution
+is also pending. Local implementation, clean-copy checks and independent review
+are complete within their recorded scope.
+
 A newly recorded user report describes setup failing to find `tar` on Rocky
 Linux 9 amd64. Setup now detects missing tools before download or destructive
 extraction, with actionable selected-user PATH guidance and offline regressions.
-The original target has not been reproduced or inspected live; see the [handover report](HANDOVER.md#open-bug-connection-fails-when-target-cannot-find-tar-2026-10-25).
+The original target has not been reproduced or inspected live; see the [handover report](HANDOVER.md#reported-target-issue-tar-unavailable-2026-10-25).
 This diagnostic repair does not install tools or establish acceptance on Rocky
 Linux. Accepted fixture coverage does not establish universal image support.
 

@@ -20,7 +20,7 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: offline reliability and release tooling (2026-10-25)
+## Current stopping point: offline tooling reviewed and committed (2026-10-25)
 
 The user authorized setup prerequisite diagnostics, repeatable packaging,
 headless CI, archive validation, documentation reconciliation and local commits,
@@ -58,7 +58,67 @@ validation. Packaging stages each candidate and replaces the previous VSIX
 only after all checks pass. All 16 offline test-file entries and quality gates,
 26 package regressions, checkout privacy audit and a 33-file production VSIX
 with 82 local links/anchors passed. Review results are recorded in release readiness.
-The work is committed locally; no push or publication is part of the authorization.
+Review follow-up commits are `6e279a4` (utility guards), `d635af0` (verified
+artifact preservation and validation) and `f5422bd` (review evidence). No
+unresolved implementation defect was identified within this reviewed scope.
+These changes have not been deployed or live-accepted. No push or publication
+is part of the authorization.
+
+## Current task status (2026-10-25)
+
+Naming and publication decisions are deferred at the user's request. The accepted
+Linux x64 MVP includes resolver classification, startup prerequisite diagnostics,
+Alpine/Bash-free support, the IPv4 forwarding helper and identical-folder new
+windows. These are completed features, not pending implementation tasks.
+Offline checks and their current results are recorded in [release readiness](RELEASE-READINESS.md). No live fixture was accessed.
+
+Remaining project-wide work is separated by purpose. Completed offline tooling
+is not an open implementation task:
+
+| Workstream                          | Pending result                                                                                                           | Scope or prerequisite                                                                                                             |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| Release identity and distribution   | Final display/package name, publisher, public repository, consistent opt-in guidance, and distribution eligibility/route | User decisions deferred; registry publication separately authorized                                                               |
+| Hosted CI                           | First actual workflow execution and artifact inspection                                                                  | Requires an authorized repository push; local clean-copy validation is complete                                                   |
+| Deployment and targeted acceptance  | Install the reviewed build, smoke-test normal connection/reuse and verify missing-tool/error-dialog behavior             | Requires explicit deployment/editor-restart authorization and a named test-owned fixture; no live action starts from this backlog |
+| Rocky Linux report                  | Establish actual package/PATH state and verify behavior on the reported Rocky Linux 9 amd64 image                        | Diagnostic implementation is repaired offline; target state and live acceptance remain unverified                                 |
+| Broader support coverage            | Insiders, ARM64, macOS/Windows clients, restricted remotes/projects and more Incus/image versions                        | Scope fixtures and platform access before testing; untested is not failed                                                         |
+| Optional compatibility architecture | Centralized version probe, adapter table and per-instance feature gates (DESIGN §14)                                     | Future architecture; existing list syntax, 7.x transfer progress, signal probes and resolver classification already work          |
+| Later-phase product features        | Concurrent different-user attaches and per-connection environment/working-directory support toward devcontainer.json     | Future scope, not unfinished accepted MVP requirements                                                                            |
+
+Ordinary IPv4-loopback forwarding on IPv6-only-networked containers retains a
+known limitation; the selected-row IPv4 helper is implemented and manually
+accepted. Automatic workspace-file pruning is deliberately absent because it
+could break retained workspace references. Neither is an unaccepted helper or
+window fix. See [release readiness](RELEASE-READINESS.md) and DESIGN's support
+matrix for the scoped evidence. No next implementation or live test starts
+merely because it appears in this list.
+
+## Reported target issue: tar unavailable (2026-10-25)
+
+Extension-side diagnostic handling and regression coverage are complete. The
+remaining work is target inspection and live acceptance, not a missing offline
+implementation.
+
+User-reported screenshot evidence: connecting fails to resolve the Incus remote
+authority and VS Code reports "Failed to connect to the remote extension host
+server". The failing `incus exec` runs `/bin/sh` as user 0 with `HOME=/root`;
+the inline script exits 127 with `/bin/sh: line 5: tar: command not found`.
+Private remote and instance identifiers are intentionally omitted.
+
+Original target status: unverified; recorded from the screenshot only, without
+reproduction or live inspection. The evidence establishes that `tar` was unavailable to that
+script, but does not establish whether it is absent from the image or missing
+from the script's PATH. The user identified the target as Rocky Linux 9,
+amd64; the installation state has not been verified.
+
+Offline handling is now implemented: missing/incomplete installation checks
+report unavailable setup tools in the selected user's PATH before download,
+and extraction repeats the guard before removing an old directory. Controlled
+shell regressions cover the missing-tool error and preservation of an existing
+installation. Real Rocky Linux reproduction and package/PATH inspection remain
+pending. Verify appropriate target guidance before recommending a package
+command. Any live reproduction needs an explicitly designated fixture; this
+report does not authorize installing packages or changing the target.
 
 ## Previous state: development tooling cleanup complete (2026-10-25)
 
@@ -86,65 +146,6 @@ removed implementation and deployment helpers. Mocked checks verified checkout
 paths with spaces, external working directories/CDPATH, command arguments,
 stop-on-failure, input guards and executable mode. No deployment, live instance
 access, editor restart, push or publication was performed.
-
-## Current task status (2026-10-25)
-
-Naming and publication decisions are deferred at the user's request. The accepted
-Linux x64 MVP includes resolver classification, startup prerequisite diagnostics,
-Alpine/Bash-free support, the IPv4 forwarding helper and identical-folder new
-windows. These are completed features, not pending implementation tasks.
-Offline checks and their current results are recorded in [release readiness](RELEASE-READINESS.md). No live fixture was accessed.
-
-Remaining project-wide work is separated by purpose:
-
-- **Reported target issue:** setup cannot find `tar` on a user-reported Rocky
-  Linux 9 amd64 target; see the report below. Diagnostic handling is repaired
-  offline; target package/PATH state and live acceptance remain unverified.
-- **Deferred release decisions:** final identity/repository, consistent opt-in
-  guidance and distribution route/eligibility review. CI packaging and archive
-  checks are implemented; their first hosted run remains pending. Registry
-  publication requires separate authorization.
-- **Verification gaps:** rendered error-dialog UX, Insiders, ARM64, macOS/Windows
-  clients, restricted remotes/projects and additional Incus/image versions.
-  Existing scoped acceptance does not establish this broader coverage.
-- **Optional compatibility architecture:** the centralized version probe,
-  adapter table and per-instance feature gates in DESIGN §14 are unimplemented.
-  Existing universal list syntax, 7.x transfer-progress handling, signal probes
-  and resolver classification are already implemented.
-- **Later-phase features:** concurrent different-user attaches and a
-  per-connection environment/working-directory surface for devcontainer.json
-  support. These are future scope, not unfinished accepted MVP requirements.
-
-Ordinary IPv4-loopback forwarding on IPv6-only-networked containers retains a
-known limitation; the selected-row IPv4 helper is implemented and manually
-accepted. Automatic workspace-file pruning is deliberately absent because it
-could break retained workspace references. Neither is an unaccepted helper or
-window fix. See [release readiness](RELEASE-READINESS.md) and DESIGN's support
-matrix for the scoped evidence. No next implementation or live test starts
-merely because it appears in this list.
-
-## Open bug: connection fails when target cannot find tar (2026-10-25)
-
-User-reported screenshot evidence: connecting fails to resolve the Incus remote
-authority and VS Code reports "Failed to connect to the remote extension host
-server". The failing `incus exec` runs `/bin/sh` as user 0 with `HOME=/root`;
-the inline script exits 127 with `/bin/sh: line 5: tar: command not found`.
-Private remote and instance identifiers are intentionally omitted.
-
-Original target status: unverified; recorded from the screenshot only, without
-reproduction or live inspection. The evidence establishes that `tar` was unavailable to that
-script, but does not establish whether it is absent from the image or missing
-from the script's PATH. The user identified the target as Rocky Linux 9,
-amd64; the installation state has not been verified.
-
-Offline handling is now implemented: missing/incomplete installation checks
-report unavailable setup tools in the selected user's PATH before download,
-and extraction repeats the guard before removing an old directory. Controlled
-shell regressions cover the missing-tool error and preservation of an existing
-installation. Real Rocky Linux reproduction and package/PATH inspection remain
-pending. Verify appropriate target guidance before recommending a package
-command. Any live reproduction needs an explicitly designated fixture; this
-report does not authorize installing packages or changing the target.
 
 ## Previous state: privacy cleanup complete (2026-10-25)
 

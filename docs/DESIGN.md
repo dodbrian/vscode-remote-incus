@@ -635,7 +635,8 @@ coverage. Earlier evidence does not establish every intermediate version.
    `TemporarilyNotAvailable`; unexpected failures retain their cause. Startup
    prerequisite probes and missing rescue-terminal `script` guidance are also
    implemented. Offline and scoped live evidence is in the handover; error-dialog
-   UX remains unverified live.
+   UX remains unverified live. The reviewed executable-tool and missing-`uname`
+   guards have offline regressions; the latest build has not been deployed.
 6. Tests: Task 3's 80-test correctness gate and Task 4's real shell/relay,
    explicit-target local/TLS handshakes and Stable development-window checks
    are complete within their recorded scope. See [Task 4 results](TASK-04-RESULTS.md).
