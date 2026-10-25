@@ -223,20 +223,22 @@ manual-selection policy at the user's request; no keepalive setting is changed.
 
 Pre-flight before every resolve, from `incus list` / daemon state:
 
-| Situation                                          | Current behavior                                                                                                   |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Instance stopped                                   | Start during resolve with progress, then recheck state                                                             |
-| Instance deleted or renamed                        | `NotAvailable`, refresh tree; never auto-recreate                                                                  |
-| Instance starting, including after a start request | `TemporarilyNotAvailable`; do not issue another start for an already-starting instance                             |
-| Unexpected state or daemon/transport failure       | Preserve cause in logs and wrap unexpected errors with authority and first-line detail                             |
-| Stale server commit or missing install             | Detect and replace/reinstall as appropriate before reuse                                                           |
-| Container stopped mid-session                      | Bridges close; core can re-resolve through the same pre-flight                                                     |
-| Unsupported architecture/libc                      | Refuse with the detected constraint                                                                                |
-| New server startup prerequisites                   | Check `nohup`, executable launcher and bundled `node --version` before detaching; preserve previous log on failure |
+| Situation                                          | Current behavior                                                                                                                 |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Instance stopped                                   | Start during resolve with progress, then recheck state                                                                           |
+| Instance deleted or renamed                        | `NotAvailable`, refresh tree; never auto-recreate                                                                                |
+| Instance starting, including after a start request | `TemporarilyNotAvailable`; do not issue another start for an already-starting instance                                           |
+| Unexpected state or daemon/transport failure       | Preserve cause in logs and wrap unexpected errors with authority and first-line detail                                           |
+| Stale server commit or missing install             | Detect and replace/reinstall as appropriate before reuse                                                                         |
+| Container stopped mid-session                      | Bridges close; core can re-resolve through the same pre-flight                                                                   |
+| Unsupported architecture/libc                      | Refuse with the detected constraint                                                                                              |
+| Missing or unusable setup utility                  | Require executable utility files before download/replacement and before destructive extraction; report the missing tool directly |
+| New server startup prerequisites                   | Check `nohup`, executable launcher and bundled `node --version` before detaching; preserve previous log on failure               |
 
 The runtime probe catches loader and executable failures, not every later
-server requirement. Error classification has offline regression coverage;
-error-dialog UX has not been reverified live.
+server requirement. Error classification has offline regression coverage.
+The missing-`tar` dialog is live-verified on Rocky Linux 9.8; other resolver
+error dialogs remain unverified.
 
 Parity commands (with official Remote-SSH): Kill VS Code Server on Instance, Uninstall
 from Instance, plus an escape-hatch **open terminal over exec** (no sshd → no plain
@@ -593,11 +595,11 @@ coverage. Earlier evidence does not establish every intermediate version.
 | Proposed APIs                | `resolvers`, `contribViewsRemote`, `tunnels`; typings pinned to 1.143.1                                        | Stable requires explicit opt-in; registry eligibility must be checked before publication                               |
 | Daemon transport             | Local Unix socket and remote TLS/cluster fixtures                                                              | Restricted remotes/projects unverified                                                                                 |
 | Incus CLI/server             | Scoped 7.5.1 checks; historical 6.0.5 evidence                                                                 | Packaging can block signals (§14); no exhaustive version/package matrix                                                |
-| Instance architecture/libc   | Ubuntu glibc x64 and Alpine 3.24 musl x64 checks                                                               | glibc ARM64 selection implemented but unverified; musl ARM64 rejected                                                  |
+| Instance architecture/libc   | Ubuntu and Rocky Linux 9.8 glibc x64; Alpine 3.24 musl x64 checks                                              | glibc ARM64 selection implemented but unverified; musl ARM64 rejected                                                  |
 | Shell/runtime                | `/bin/sh`, including BusyBox without Bash; Alpine prerequisites and normal-profile terminal workflows verified | Required runtime libraries/utilities must already be installed; rescue terminal needs util-linux `script`              |
 | Ports                        | Core forwarding plus selected-row IPv4 helper; normal-profile manual acceptance on 2026-10-25                  | Ordinary IPv4-loopback forwarding can fail with IPv6-only external networking; helper needs an existing Ports row      |
 | Identical-folder new windows | Isolated concurrent/reopening checks plus normal-profile manual acceptance on 2026-10-25                       | Uses retained local workspace files; no automatic pruning                                                              |
-| Diagnostics                  | Resolver classification and startup prerequisite regressions; scoped live startup checks                       | Error-dialog UX has not been reverified live; runtime probe does not cover every later startup failure                 |
+| Diagnostics                  | Resolver classification and startup prerequisite regressions; scoped live startup checks                       | Missing-tar dialog verified; other error dialogs unverified; runtime probe does not cover every later startup failure  |
 
 ## 11. Open questions (recorded, with leaning)
 
@@ -635,8 +637,10 @@ coverage. Earlier evidence does not establish every intermediate version.
    `TemporarilyNotAvailable`; unexpected failures retain their cause. Startup
    prerequisite probes and missing rescue-terminal `script` guidance are also
    implemented. Offline and scoped live evidence is in the handover; error-dialog
-   UX remains unverified live. The reviewed executable-tool and missing-`uname`
-   guards have offline regressions; the latest build has not been deployed.
+   UX was initially unverified live. The reviewed executable-tool and missing-`uname`
+   guards have offline regressions and the latest build is deployed. Rocky's
+   missing-`tar` dialog and Ubuntu/Rocky connection/reuse passed live checks;
+   other resolver dialogs remain unverified.
 6. Tests: Task 3's 80-test correctness gate and Task 4's real shell/relay,
    explicit-target local/TLS handshakes and Stable development-window checks
    are complete within their recorded scope. See [Task 4 results](TASK-04-RESULTS.md).

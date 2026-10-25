@@ -16,6 +16,7 @@ npm ci --include=dev
 npm test
 npm run test:relay
 npm run test:package
+npm run test:redeploy
 npm run audit:privacy
 npm run package
 ```
@@ -44,6 +45,9 @@ archive-policy failures, parsed Markdown links and staged-build preservation.
 Packaging creates a temporary candidate on the destination filesystem, then
 finalizes and validates it before renaming it over the last verified VSIX.
 Failed builds leave that last artifact intact and clean their temporary files.
+`npm run test:redeploy` uses only mock executables to verify that package failures
+stop the manual helper before installation or editor restart, while preserving
+fixture/folder guards and checkout paths containing spaces.
 The file allowlist retains runtime, licenses
 and linked documentation, and rejects unexpected or private/development files. Validation checks ZIP CRCs,
 nonempty required files, JavaScript syntax without execution, and well-formed

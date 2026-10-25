@@ -19,8 +19,9 @@ the normal profile on 2026-10-25. Historical task reports retain their original
 scope; the current support matrix and handover supersede their open findings.
 
 Remaining coverage limits include Insiders, ARM64, other client operating
-systems and additional version/image combinations. Error-dialog UX has not
-been reverified live. Ordinary forwarding retains the IPv4-loopback lookup
+systems and additional version/image combinations. The missing-`tar` error dialog
+is now verified from the user's screenshot; other resolver error dialogs remain
+unverified live. Ordinary forwarding retains the IPv4-loopback lookup
 limitation on IPv6-only-networked containers; the accepted helper works from an
 existing Ports row. None of these is evidence of failure on an untested system.
 
@@ -39,18 +40,47 @@ The centralized Incus compatibility layer and later-phase multi-user or
 devcontainer.json work are separate future scope.
 
 The current workstream backlog is maintained in the
-[handover task status](HANDOVER.md#current-task-status-2026-10-25). Deployment
-of the reviewed build and its targeted live acceptance are still pending;
-prior normal-profile acceptance covers earlier builds. First hosted CI execution
-is also pending. Local implementation, clean-copy checks and independent review
+[handover task status](HANDOVER.md#current-task-status-2026-10-25). The reviewed build is now deployed. Normal-profile Ubuntu/Rocky connection
+checks, signed authentication/reuse and Rocky's missing-tool dialog passed;
+other UI/error cases remain separately scoped. First hosted CI execution
+is pending. Local implementation, clean-copy checks and independent review
 are complete within their recorded scope.
 
-A newly recorded user report describes setup failing to find `tar` on Rocky
-Linux 9 amd64. Setup now detects missing tools before download or destructive
-extraction, with actionable selected-user PATH guidance and offline regressions.
-The original target has not been reproduced or inspected live; see the [handover report](HANDOVER.md#reported-target-issue-tar-unavailable-2026-10-25).
-This diagnostic repair does not install tools or establish acceptance on Rocky
-Linux. Accepted fixture coverage does not establish universal image support.
+The Rocky Linux `tar` report is resolved on the tested fixture. The package was
+confirmed absent; the improved diagnostic was shown in VS Code without changing
+installation markers. After separate user approval, installing only `tar`
+allowed setup and normal connection to complete. See the
+[handover report](HANDOVER.md#reported-target-issue-tar-unavailable-2026-10-25).
+This is scoped Rocky Linux 9.8 x64 evidence, not universal image acceptance.
+
+## Deployment and live verification (2026-10-25)
+
+The user authorized normal-profile deployment/editor restart and live connection
+checks, then separately approved the Rocky `tar` installation. The installed
+bundle matches the reviewed production bundle by SHA-256. The helper now uses
+the reviewed staged package pipeline; three mocked tests ensure package failure
+prevents installation/restart and validate fixture arguments and checkout paths.
+`npm run test:redeploy` is part of headless local-fixture CI.
+
+Stable 1.143.1 / commit `e646868227…`, Incus 7.5.1 and Linux x64 were checked.
+Ubuntu reused its healthy server. Rocky Linux 9.8 showed the actionable missing
+`tar` dialog (user screenshot), preserving incomplete-install directory/marker
+metadata; the approved RPM transaction installed only `tar`. A distinct normal
+profile workspace forced a new resolve after VS Code initially focused the
+existing failed window. Setup completed, both exec bridges started, and core
+logs confirmed remote agent initialization. The installed Rocky Node is 24.22.1.
+
+A bounded connection-only temporary harness passed signed management negotiation,
+invalid-token rejection, filesystem ownership/modes, relay hash and healthy reuse
+on both targets. Server process identities stayed unchanged during reuse. It
+closed only its own relay channels; normal editor sessions and server installs
+were retained. The destructive manual verifier was not run. No token reset,
+manual server wipe, networking change, production-instance operation, push or
+publication occurred. Raw evidence and target identifiers remain untracked.
+
+Other Rocky terminal/UI workflows, other resolver dialogs and additional
+platforms remain unverified. The earlier review/validation sections below record
+historical evidence and do not override this deployment result.
 
 ## Initial review findings (before cleanup)
 

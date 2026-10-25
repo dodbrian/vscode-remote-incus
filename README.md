@@ -40,7 +40,8 @@ and opt in once via `~/.vscode/argv.json`:
 
 Then install the VSIX: `code --install-extension remote-incus.vsix`.
 Current verified configuration: Linux x64 client, Stable VS Code 1.143.1 and
-Incus 7.5.1, with scoped Ubuntu glibc x64 and Alpine musl x64 instance checks.
+Incus 7.5.1, with scoped Ubuntu/Rocky Linux 9.8 glibc x64 and Alpine musl x64
+instance checks.
 The manifest declares VS Code `^1.140.0`, and bootstrap implements glibc arm64
 selection, but these are not evidence that every matching version or architecture
 works. ARM64, Insiders, macOS and Windows remain unverified. Incus 6.0.5 has
@@ -113,6 +114,12 @@ The extension does not enable or change Incus keepalive configuration.
 
 ## Verification status
 
+The reviewed build was deployed on 2026-10-25 and verified byte-identical to its
+production bundle. Normal Ubuntu/Rocky connections, signed authentication,
+invalid-token rejection and healthy reuse passed. Rocky's missing-`tar` error
+was verified in VS Code before an explicitly approved `tar` installation;
+setup then completed. Other Rocky terminal/UI and error cases remain unverified.
+
 Task 4 verification is complete; its results have been discussed and the user
 has resolved the discussion gate. Real shell/relay
 checks and explicitly authorized local/TLS integration passed, along with
@@ -151,6 +158,7 @@ npm run test:relay
 npm run typecheck
 npm run compile
 npm run test:package
+npm run test:redeploy
 npm run package
 ```
 

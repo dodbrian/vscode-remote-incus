@@ -1,5 +1,13 @@
 # Current verification scope (2026-10-25)
 
+The reviewed build is now deployed and bundle-hash verified. Normal-profile
+Ubuntu/Rocky connection setup and both exec bridges passed; bounded live checks
+also passed signed negotiation, invalid-token rejection, metadata/hash checks
+and healthy reuse without server replacement. The missing-`tar` dialog was
+confirmed by the user's screenshot before the approved package installation;
+Rocky setup then succeeded. Other error dialogs and Rocky terminal/UI workflows
+remain unverified. See the handover for exact scope and retained state.
+
 Resolver classification, startup diagnostics, Alpine/Bash-free support, IPv4
 helper forwarding and identical-folder windows are implemented with the scoped
 acceptance recorded below. Later descriptions of pending checks belong to the
@@ -8,15 +16,15 @@ matrix state current limits.
 
 Setup-tool prerequisite regressions now execute generated `/bin/sh` scripts
 with a controlled PATH, including missing `tar`/`gzip`, selected-user handling,
-all download strategies and refusal before destructive extraction. This is
-offline evidence, not reproduction on Rocky Linux or a live deployment.
+all download strategies and refusal before destructive extraction. These regressions are offline evidence; the separate deployment above adds
+actual Rocky missing-tool and connection evidence.
 
 Package regressions cover synthetic ZIP integrity/metadata/runtime failures,
 parsed Markdown destinations and preserving the last artifact after packaging
 failure. Production packaging validates the candidate before replacing the
 previous VSIX. Executable-tool and missing-`uname` regressions extend setup
 coverage; default Bash's non-executable lookup differs from its POSIX mode. The tracked headless workflow uses local fixtures only.
-Hosted CI, rendered error-dialog UX and additional platforms remain unverified.
+Hosted CI, other rendered error dialogs and additional platforms remain unverified.
 
 # Detected-port IPv4 helper follow-up (2026-10-25)
 

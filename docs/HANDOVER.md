@@ -20,7 +20,49 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: offline tooling reviewed and committed (2026-10-25)
+## Current stopping point: reviewed build deployed and connection-verified (2026-10-25)
+
+The user explicitly authorized deployment and connection/error verification,
+including the reported Rocky Linux target, then separately approved installing
+`tar` there. The normal-profile VSIX was installed and VS Code restarted through
+`scripts/redeploy.sh`. The installed extension bundle was SHA-256 verified
+byte-identical to the reviewed production build.
+
+The deployment helper was found to bypass the reviewed packaging pipeline. It
+now runs `npm run package` before installation or restart, preserving staged
+archive validation and last-good-artifact handling. Three mocked shell tests
+cover refusal before installation/restart on package failure, argument guards,
+checkout paths with spaces, external working directories and CDPATH. The
+headless CI workflow runs these tests without a real editor or Incus target.
+
+The existing Ubuntu connection reused its healthy server. On Rocky Linux 9.8
+x64, read-only checks confirmed that the `tar` RPM was absent, rather than just
+unavailable through PATH. The deployed build refused setup with actionable
+selected-user prerequisite guidance. The user's screenshot confirms the actual
+VS Code error dialog; installation directory/marker metadata remained unchanged.
+Only the explicitly approved `tar` package was installed, with no additional
+packages in that transaction. Retrying completed setup and opened both exec
+bridges in a normal-profile remote workspace. Core logs confirm remote agent
+initialization. The existing root fallback policy was unchanged.
+
+Connection-only live checks on both targets passed complete signed management
+handshakes, invalid-token rejection, runtime/relay/token ownership and modes,
+relay content verification, and healthy reuse with unchanged server processes.
+The temporary verifier used only the connection/check helpers from the manual
+harness; destructive scenarios and server cleanup were excluded. It closed only
+its own relay channels. Existing server installations and normal editor channels
+remain running. A private client-local workspace for the Rocky retry remains
+available for reopening; no workspace file was written into the remote project.
+
+Scope: VS Code Stable 1.143.1, client/server commit `e646868227…`, Incus 7.5.1,
+Linux x64, and the selected Ubuntu/Rocky fixtures. Rocky's bundled Node reports
+24.22.1. This verifies normal connection and missing-tool error behavior, not
+all Rocky terminal/UI workflows or every resolver error dialog. Private target
+identifiers, addresses, raw logs, marker snapshots and the temporary verifier
+remain outside tracked files. No production instance was used, and no token
+reset, manual server wipe, networking change, push or publication was performed.
+
+## Previous state: offline tooling reviewed and committed (2026-10-25)
 
 The user authorized setup prerequisite diagnostics, repeatable packaging,
 headless CI, archive validation, documentation reconciliation and local commits,
@@ -70,20 +112,21 @@ Naming and publication decisions are deferred at the user's request. The accepte
 Linux x64 MVP includes resolver classification, startup prerequisite diagnostics,
 Alpine/Bash-free support, the IPv4 forwarding helper and identical-folder new
 windows. These are completed features, not pending implementation tasks.
-Offline checks and their current results are recorded in [release readiness](RELEASE-READINESS.md). No live fixture was accessed.
+Current verification evidence is recorded in [release readiness](RELEASE-READINESS.md).
+Reviewed-build deployment, normal Ubuntu/Rocky connections and Rocky's missing-tool
+dialog are now verified within the scope above.
 
 Remaining project-wide work is separated by purpose. Completed offline tooling
 is not an open implementation task:
 
-| Workstream                          | Pending result                                                                                                           | Scope or prerequisite                                                                                                             |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| Release identity and distribution   | Final display/package name, publisher, public repository, consistent opt-in guidance, and distribution eligibility/route | User decisions deferred; registry publication separately authorized                                                               |
-| Hosted CI                           | First actual workflow execution and artifact inspection                                                                  | Requires an authorized repository push; local clean-copy validation is complete                                                   |
-| Deployment and targeted acceptance  | Install the reviewed build, smoke-test normal connection/reuse and verify missing-tool/error-dialog behavior             | Requires explicit deployment/editor-restart authorization and a named test-owned fixture; no live action starts from this backlog |
-| Rocky Linux report                  | Establish actual package/PATH state and verify behavior on the reported Rocky Linux 9 amd64 image                        | Diagnostic implementation is repaired offline; target state and live acceptance remain unverified                                 |
-| Broader support coverage            | Insiders, ARM64, macOS/Windows clients, restricted remotes/projects and more Incus/image versions                        | Scope fixtures and platform access before testing; untested is not failed                                                         |
-| Optional compatibility architecture | Centralized version probe, adapter table and per-instance feature gates (DESIGN §14)                                     | Future architecture; existing list syntax, 7.x transfer progress, signal probes and resolver classification already work          |
-| Later-phase product features        | Concurrent different-user attaches and per-connection environment/working-directory support toward devcontainer.json     | Future scope, not unfinished accepted MVP requirements                                                                            |
+| Workstream                          | Pending result                                                                                                           | Scope or prerequisite                                                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Release identity and distribution   | Final display/package name, publisher, public repository, consistent opt-in guidance, and distribution eligibility/route | User decisions deferred; registry publication separately authorized                                                      |
+| Hosted CI                           | First actual workflow execution and artifact inspection                                                                  | Requires an authorized repository push; local clean-copy validation is complete                                          |
+| Other live acceptance               | Resolver errors other than missing `tar`, additional Rocky terminal/UI workflows and broader image/platform behavior     | The missing-tool dialog and scoped Ubuntu/Rocky connection/reuse checks are complete; further tests need a defined scope |
+| Broader support coverage            | Insiders, ARM64, macOS/Windows clients, restricted remotes/projects and more Incus/image versions                        | Scope fixtures and platform access before testing; untested is not failed                                                |
+| Optional compatibility architecture | Centralized version probe, adapter table and per-instance feature gates (DESIGN §14)                                     | Future architecture; existing list syntax, 7.x transfer progress, signal probes and resolver classification already work |
+| Later-phase product features        | Concurrent different-user attaches and per-connection environment/working-directory support toward devcontainer.json     | Future scope, not unfinished accepted MVP requirements                                                                   |
 
 Ordinary IPv4-loopback forwarding on IPv6-only-networked containers retains a
 known limitation; the selected-row IPv4 helper is implemented and manually
@@ -95,9 +138,10 @@ merely because it appears in this list.
 
 ## Reported target issue: tar unavailable (2026-10-25)
 
-Extension-side diagnostic handling and regression coverage are complete. The
-remaining work is target inspection and live acceptance, not a missing offline
-implementation.
+Resolved on the tested target. Live inspection confirmed `tar` was not installed.
+The reviewed error was verified in VS Code before the user-approved installation
+of `tar`; setup and normal connection then succeeded. The original evidence and
+pre-repair stopping point below are historical.
 
 User-reported screenshot evidence: connecting fails to resolve the Incus remote
 authority and VS Code reports "Failed to connect to the remote extension host
@@ -105,20 +149,19 @@ server". The failing `incus exec` runs `/bin/sh` as user 0 with `HOME=/root`;
 the inline script exits 127 with `/bin/sh: line 5: tar: command not found`.
 Private remote and instance identifiers are intentionally omitted.
 
-Original target status: unverified; recorded from the screenshot only, without
-reproduction or live inspection. The evidence establishes that `tar` was unavailable to that
+Original report status (before the deployment above): unverified, recorded from
+the screenshot only, without reproduction or live inspection. The evidence establishes that `tar` was unavailable to that
 script, but does not establish whether it is absent from the image or missing
 from the script's PATH. The user identified the target as Rocky Linux 9,
-amd64; the installation state has not been verified.
+amd64; installation state was not verified at the time of that report.
 
 Offline handling is now implemented: missing/incomplete installation checks
 report unavailable setup tools in the selected user's PATH before download,
 and extraction repeats the guard before removing an old directory. Controlled
 shell regressions cover the missing-tool error and preservation of an existing
-installation. Real Rocky Linux reproduction and package/PATH inspection remain
-pending. Verify appropriate target guidance before recommending a package
-command. Any live reproduction needs an explicitly designated fixture; this
-report does not authorize installing packages or changing the target.
+installation. Subsequent live reproduction, RPM/PATH inspection and the
+explicitly approved `tar` installation are complete as recorded above. This
+resolution does not authorize package changes on other targets.
 
 ## Previous state: development tooling cleanup complete (2026-10-25)
 
