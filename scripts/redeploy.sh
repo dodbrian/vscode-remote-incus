@@ -1,7 +1,7 @@
 #!/bin/sh
 # Phase-1 dev loop: build, package, install, restart VS Code, reopen the
 # remote window on an explicitly selected test-owned instance.
-# Usage: ./redeploy.sh <remote:instance> <absolute-folder>
+# Usage: ./scripts/redeploy.sh <remote:instance> <absolute-folder>
 set -eu
 umask 077
 if [ "$#" -ne 2 ]; then
@@ -16,7 +16,8 @@ esac
 case "$2" in /*) ;; *) echo "Expected an absolute remote folder" >&2; exit 2 ;; esac
 REDEPLOY_TARGET=$1
 REDEPLOY_FOLDER=$2
-cd "$(dirname "$0")"
+REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$REPO_ROOT"
 
 node esbuild.js --production
 ./node_modules/.bin/vsce package --allow-missing-repository --no-rewrite-relative-links -o remote-incus.vsix >/dev/null

@@ -184,10 +184,16 @@ without a target argument; live smoke requires an explicit `remote:instance`.
 Fresh-install checks also require `INCUS_TEST_ALLOW_DESTRUCTIVE=yes`. Run these
 manual harnesses from the repository root against a test-owned idle fixture.
 
-```
+For a manual deployment, replace the quoted placeholders with your test-owned
+fixture and absolute remote folder. This installs the build, restarts normal
+VS Code and reopens that folder. Quote paths containing spaces. The helper
+resolves the checkout root itself, so it can also be invoked by absolute path
+from another working directory.
+
+```sh
 npm install
 npm run typecheck
-./redeploy.sh <remote:instance> <absolute-folder>  # install + restart + reopen explicit fixture
+./scripts/redeploy.sh '<remote:instance>' '<absolute-folder>'
 ```
 
 ## Publication privacy

@@ -1,45 +1,22 @@
-# Phase-0 spike: VS Code server over `incus exec` stdio (no sshd)
+# Phase-0 transport proof of concept
 
-Goal: validate the exec-stdio transport design hands-on *before* writing the [design](../DESIGN.md).
-Nothing here is production code — it's disposable plumbing.
+The original spike established that a VS Code server could run in an Incus
+container and communicate with the client through `incus exec` stdio, without
+SSH or externally exposed instance ports. Its implementation has been removed
+from the working tree and remains available in sanitized Git history.
 
-## What must be proven
+The experiments established the architecture used by the extension:
 
-1. **No-sshd by construction** — the container gets the VS Code server installed and
-   running *without* `openssh-server` (checked via dpkg).
-2. **Least-privilege bootstrap** — server installed & run as `ubuntu` (uid 1000), not root.
-3. **Exec stdio is binary-clean in practice** — the full VS Code workbench (web UI)
-   served through: browser → local TCP listener → `incus exec … node -e relay → server`.
-4. **Per-connection spawn works** — killing the relay mid-session and reloading still works.
-5. **Token rotation semantics** — restarting the server mints a new token; the old
-   connection fails, new one works.
-6. **No orphaned relays** — after the local listener dies, no leftover `node -e`
-   processes inside the container within ~2s.
-7. **Flag-name reality on incus 6.0.5** — `--user ubuntu` vs `--user 1000`,
-   `--mode/non-interactive` behavior, `incus file push` from stdin.
+- Install and run the server as the selected instance user, with token-file
+  authentication and a loopback listener.
+- Bridge each logical connection through a separate Incus exec process using
+  the server's bundled Node runtime.
+- Keep protocol bytes on stdout and diagnostics on stderr; bound relay cleanup.
+- Handle client/server commit alignment and real Incus CLI behavior.
 
-## Steps
-
-Script paths below are relative to `spike/` in the repository root.
-
-| script | what it does |
-|---|---|
-| `02-install-server.sh` | downloads server tarball **client-side** (air-gap pattern!), pushes via `incus file push -`, extracts as `ubuntu` into `~/.vscode-server/bin/<commit>` |
-| `03-start-server.sh` | writes/ensures `0600` token file, starts server detached via `bin/code-server --host 127.0.0.1 --port 0 --connection-token-file …`, parses the listening port from stdout log, writes `spike/.state/` |
-| `04-relay.py` | local TCP listener on `127.0.0.1:16080`; every connection spawns its own `incus exec … node -e` relay bridging stdio ↔ the in-container server port; keeps the connection token out of stdout |
-
-The verification requirements are listed above under “What must be proven”.
-
-## Hygiene
-
-- Supply `INCUS_SPIKE_TARGET` as an explicit test-owned idle `remote:instance`.
-  The archived spike assumes an Ubuntu fixture with uid 1000. It has no default
-  target. The spike extension also requires `INCUS_SPIKE_REPO_ROOT`.
-- Local state/cache under `spike/.state/` and `/tmp/remote-incus-dev/fixture-container/`.
-- 232 MB tarball cached client-side so restarts are cheap.
-- incus here is **6.0.5**: `incus port-forward` (7.3+) is NOT available — by design the
-  spike relies on per-connection exec bridges only.
-
-These scripts are historical references, not CI entry points. Run destructive
-install/start steps only with explicit fixture authorization. Token state is
-private (`0700` directory / `0600` files) and ignored by Git; never publish it.
+The canonical findings, versions and limitations are recorded in
+[DESIGN §8](../DESIGN.md#8-spike-evidence-ledger-all-hands-on-verified-incus-605-vs-code-1141211420).
+The [current testing guide](../tests/README.md) describes supported verification
+entry points. The spike's old deployment and token-state scripts are historical
+experiments, not current operating instructions. Current token policy is
+specified in [DESIGN §4](../DESIGN.md#4-connection-token-policy-frozen).

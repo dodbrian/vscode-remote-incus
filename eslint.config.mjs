@@ -14,7 +14,6 @@ export default tseslint.config(
     ignores: [
       'dist/**',
       'node_modules/**',
-      'spike/**', // dev-loop scratch space, never shipped
       'licenses/**', // vendored third-party license texts
       'src/types/**', // vendored vscode API proposal typings (upstream-owned)
       '**/*.vsix',

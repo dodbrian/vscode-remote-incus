@@ -645,17 +645,17 @@ coverage. Earlier evidence does not establish every intermediate version.
 8. Incus version-compat layer (design sketch §14 — NOT yet implemented):
    version probe, behavioral adapter table, per-member/per-instance feature gates.
 
-## 13. Spike artifact inventory (`spike/`)
+## 13. Phase-0 archive
 
-| file                                      | role                                                           | keep?                        |
-| ----------------------------------------- | -------------------------------------------------------------- | ---------------------------- |
-| `02-install-server.sh`                    | verified install flow (path-push, sha, extract, no-sshd proof) | reference for Phase-1 module |
-| `03-start-server.sh`                      | verified token+start+discovery flow                            | reference                    |
-| `relay.js` / `relay-child` semantics      | the stdio↔TCP relay                                            | becomes bundled asset        |
-| `exec-bridge.sh`, `04-relay.py`           | socat/poc scaffolding                                          | disposable                   |
-| `ext/` (extension.js, package.json, VSIX) | resolver proof                                                 | becomes Phase-1 skeleton     |
-| `redeploy.sh`                             | dev loop helper                                                | keep while Phase 1 iterates  |
-| `.state/`                                 | port/token/commit cache                                        | dev-loop artifact            |
+The original proof-of-concept implementation has been removed from the working
+tree. It is preserved in sanitized Git history; it is not a runtime, build or
+test dependency. Its verified architectural findings remain in §8 and the
+[historical summary](spike/README.md).
+
+Current bootstrap and relay implementations live in `src/bootstrap.ts` and
+`assets/relay.js`. Current verification uses `tests/` and the opt-in verifiers
+in `scripts/`. The manual development deployment helper is
+`scripts/redeploy.sh`.
 
 ## 14. Incus version & packaging compatibility (design sketch — NOT yet implemented)
 

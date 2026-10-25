@@ -20,7 +20,40 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: privacy cleanup complete; release identity next (2026-10-25)
+## Current stopping point: development tooling cleanup complete (2026-10-25)
+
+The user approved moving the manual deployment helper to `scripts/redeploy.sh`
+and removing the obsolete root `spike/` implementation, then requested committing
+the reviewed changes. Historical deployment records retain the former
+`./redeploy.sh` path used at the time. Current commands and file maps use the
+new location. The helper resolves the checkout root from its own location and
+still requires explicit fixture and absolute-folder arguments.
+
+The spike implementation remains in sanitized Git history. Its short historical
+summary lives in `docs/spike/README.md`, with canonical findings in DESIGN.
+Production build, runtime and tests did not depend on the removed files.
+Obsolete tooling exclusions and retention instructions were removed.
+
+Review also fixed the privacy audit crashing on unstaged deletions/renames.
+A temporary Git fixture verified that a renamed destination is scanned and
+that an untracked synthetic credential is detected without printing its value.
+
+Validation passed: 177 offline tests including typecheck/lint/format gates,
+checkout privacy scan, production build and a 33-entry local VSIX. All 78 local
+documentation file links and the new historical-summary anchors resolve.
+The archive retains the summary, runtime and licenses while excluding the
+removed implementation and deployment helpers. Mocked checks verified checkout
+paths with spaces, external working directories/CDPATH, command arguments,
+stop-on-failure, input guards and executable mode. No deployment, live instance
+access, editor restart, push or publication was performed.
+
+Next: choose final display name, extension name, publisher and public repository.
+Then update identity/opt-in guidance and prepare repeatable CI packaging with
+the lockfile-installed packager and an explicit production build. CI must use
+local fixtures; registry publication remains separately authorized. Remaining
+support limits are recorded in [release readiness](RELEASE-READINESS.md).
+
+## Previous state: privacy cleanup complete (2026-10-25)
 
 The user authorized thorough privacy cleanup and a separate independent agent
 check, then explicitly requested rewriting the existing history without
@@ -765,7 +798,7 @@ authority-aware active row).
 
 - Phase 0 (spike) **COMPLETE** — all hypotheses validated in real windows
   (DESIGN §8). Spike extension uninstalled from the user's VS Code; source
-  stays committed under `spike/` as reference.
+  was retained as reference at that time; its implementation is now in Git history.
 - Phase 1 items 1–4 **COMPLETE, user-verified on stable 1.142.0**:
   1. TypeScript + esbuild project at repo root (`src/`, bundle `dist/extension.js`,
      relay as bundled asset `assets/relay.js`; proposal d.ts committed in
@@ -902,11 +935,12 @@ inventory, addresses, instance names or cached process state is authoritative.
 
 ## Dev loop
 
-- `./redeploy.sh <remote:instance> <absolute-folder>` — build, package, install,
-  restart VS Code, reopen the
-  remote window using explicit runtime target and folder arguments.
+- `./scripts/redeploy.sh <remote:instance> <absolute-folder>` — build, package, install,
+  restart normal VS Code and reopen the selected remote folder. Quote folder
+  paths containing spaces. This command installs the build and restarts editor
+  windows; it is a manual deployment step, not a verification command.
 - Extension log: `/tmp/remote-incus-dev/redeploy/ext.log` (via
-  `REMOTE_INCUS_DEBUG_LOG`, which redeploy.sh sets) plus the
+  `REMOTE_INCUS_DEBUG_LOG`, which scripts/redeploy.sh sets) plus the
   "Remote - Incus" output channel.
 - Offline smoke: `npx esbuild scripts/smoke.ts --bundle --platform=node
 --alias:vscode=./scripts/vscode-stub.js --outfile=/tmp/remote-incus-dev/smoke.js &&
@@ -914,7 +948,7 @@ node /tmp/remote-incus-dev/smoke.js` (authority round-trips + read-only daemon p
 - Chain deploy steps with `&&`, not `;` — a `;` chain once relaunched a
   window with STALE code after a failed typecheck (cost: confusing session).
 - **Committing + harness-verifying is NOT deployment** — the running windows
-  only pick up src changes via `./redeploy.sh` (cost one user-visible round:
+  only pick up src changes via `./scripts/redeploy.sh` (cost one user-visible round:
   a committed, harness-verified fix was still un-deployed and the user
   re-hit the bug).
 - Server commit = local client commit: `vscode.env.appCommit` (resolvers
@@ -960,7 +994,7 @@ timed out): <stderr line 1>`; catches log the FULL message, toasts take
   `firstLine()`.
 - **"Another instance of Code is running but not responding" modal**: relaunch
   raced a half-dead pkilled instance; Code processes can ignore SIGTERM
-  entirely (one needed `kill -9`). `redeploy.sh` now polls `/proc/*/exe`
+  entirely (one needed `kill -9`). `scripts/redeploy.sh` now polls `/proc/*/exe`
   until no code process remains before launching — keep that loop.
 - **Collapsed progress toasts truncate title+message as one line** — put the
   percentage at the START of progress messages.
@@ -1021,8 +1055,8 @@ transport, token policy, and user policy are frozen after evidence.
   before code (the rhythm: research → adversarial audit → spike → freeze → build).
 - Prefer parallel subagents for research bursts; require URL-cited, verified
   claims; mark UNVERIFIED explicitly.
-- Keep spike artifacts as reference (inventory in DESIGN §13); committed and
-  deliberately NOT production code.
+- Phase-0 implementation is retained in sanitized Git history. DESIGN §13 and
+  the historical summary preserve its findings; use current verifiers for new work.
 
 ## Quick file map
 
@@ -1037,7 +1071,6 @@ docs/
   spike/                   Phase-0 verification guide
 package.json               extension manifest (proposals, views, commands, settings)
 tsconfig.json / esbuild.js build config (bundle → dist/extension.js)
-redeploy.sh                dev loop: build + package + install + relaunch
 src/
   extension.ts             activate: resolver + tree + commands wiring
   authority.ts             `incus+<remote>:<instance>` parse/format
@@ -1053,6 +1086,6 @@ src/
   types/                   proposal d.ts pinned to vscode 1.143.1
 assets/relay.js            bundled relay (staged in-instance per install)
 tests/                     regression/script suite and fixtures
-scripts/                   portable relay check, opt-in live verifier, older harnesses
-spike/                     Phase-0 artifacts (reference only)
+scripts/                   development helpers and opt-in verification
+  redeploy.sh              build + package + install + restart normal VS Code
 ```

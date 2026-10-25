@@ -185,7 +185,7 @@ require a real development window.
 For window checks, use a fresh temporary `--user-data-dir` and
 `--extensions-dir`, this checkout's isolated bundle through
 `--extensionDevelopmentPath`, and `--enable-proposed-api=local-dev.remote-incus`.
-Do not install a VSIX, run redeploy.sh or restart normal windows. Supply only
+Do not install a VSIX, run `scripts/redeploy.sh` or restart normal windows. Supply only
 the authorized explicit authority at runtime. User data, logs and history may
 contain private infrastructure details: keep them outside the repository and
 remove them after the development windows exit. Check, with user assistance:
