@@ -11,8 +11,11 @@ with a controlled PATH, including missing `tar`/`gzip`, selected-user handling,
 all download strategies and refusal before destructive extraction. This is
 offline evidence, not reproduction on Rocky Linux or a live deployment.
 
-Package policy regressions use synthetic ZIPs; production packaging validates
-actual VSIX contents. The tracked headless workflow uses local fixtures only.
+Package regressions cover synthetic ZIP integrity/metadata/runtime failures,
+parsed Markdown destinations and preserving the last artifact after packaging
+failure. Production packaging validates the candidate before replacing the
+previous VSIX. Executable-tool and missing-`uname` regressions extend setup
+coverage; default Bash's non-executable lookup differs from its POSIX mode. The tracked headless workflow uses local fixtures only.
 Hosted CI, rendered error-dialog UX and additional platforms remain unverified.
 
 # Detected-port IPv4 helper follow-up (2026-10-25)

@@ -51,7 +51,8 @@ Bootstrap requires `/bin/sh`; Bash is optional. Before a missing or incomplete
 installation is downloaded or extracted, setup checks `tar`, `gzip` and its
 required file/checksum utilities in the selected user's PATH. A missing tool
 produces a direct prerequisite error; install it or make it available in that
-user's PATH before reconnecting. The extension does not repair PATH or install
+user's PATH before reconnecting. The checks require executable utility files;
+flavor detection reports an unavailable `uname` directly. The extension does not repair PATH or install
 packages automatically. The rescue terminal additionally
 requires util-linux `script`. Minimal Alpine x64 images need `libstdc++` and
 `libgcc` for the musl server runtime; installing Bash does not supply those
@@ -163,9 +164,12 @@ and retains a verified VSIX as a build artifact. It does not publish a release.
 `npm run package` uses the lockfile-installed VSCE. Its `vscode:prepublish` hook
 builds minified production output and removes stale source maps. The package
 validator inspects the actual ZIP contents against an explicit file policy,
-checks required runtime/licenses and documentation links, and scans privacy
-patterns. Packaging adjusts root README/license references to VSCE's emitted
-filenames so the archive's relative links remain valid. `npm run test:package` tests that policy with synthetic archives.
+checks nonempty runtime/licenses, JavaScript syntax, matching VSIX metadata,
+ZIP checksums and documentation links, and scans privacy patterns. Packaging adjusts root README/license references to VSCE's emitted
+filenames so the archive's relative links remain valid. A new build replaces `remote-incus.vsix` only after finalization and validation
+succeed; failures preserve the previous artifact and remove the rejected
+candidate. `npm run test:package` covers archive policy, Markdown handling and
+build-failure preservation with local fixtures.
 Local validation does not establish that the workflow has run on GitHub.
 
 ### Mandatory quality gates

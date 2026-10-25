@@ -43,13 +43,22 @@ The headless GitHub Actions workflow runs locked installation, offline/relay
 and package checks, and retains the verified VSIX as an artifact. Hosted CI
 has not run; implementing the workflow does not establish hosted execution.
 
-Validation completed from a clean temporary source copy after locked dependency
+Initial validation completed from a clean temporary source copy after locked dependency
 installation: 16 offline test-file entries and strict quality gates, six relay
 checks, nine archive-policy tests, checkout privacy audit and a 33-file
 production VSIX with 82 valid local documentation links/anchors. Independent
 review found no remaining blockers after musl status and packaged README-link
-fixes. Release readiness records the evidence and sandbox boundary. The work is committed locally; no push or
-publication is part of the authorization.
+fixes. Release readiness records the evidence and sandbox boundary.
+
+A second adversarial review hardened executable utility checks and reports a
+missing/unusable `uname` before flavor probing. Archive verification now checks
+CRC corruption, nonempty runtime files, JavaScript syntax and metadata
+consistency. Parsed inline/reference Markdown links replace regex-only
+validation. Packaging stages each candidate and replaces the previous VSIX
+only after all checks pass. All 16 offline test-file entries and quality gates,
+26 package regressions, checkout privacy audit and a 33-file production VSIX
+with 82 local links/anchors passed. Review results are recorded in release readiness.
+The work is committed locally; no push or publication is part of the authorization.
 
 ## Previous state: development tooling cleanup complete (2026-10-25)
 

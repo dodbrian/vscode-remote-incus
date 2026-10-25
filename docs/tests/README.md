@@ -1,7 +1,9 @@
 # Regression, script and relay verification
 
 Run `npm test` with installed dependencies and Node 22.13+ (the extension build
-also targets Node 22). Verified locally with Node 24.21.0. Tests use Node's built-in runner; archive tooling uses locked development dependencies. `npm run typecheck` checks production and
+also targets Node 22). Verified locally with Node 24.21.0. Tests use Node's
+built-in runner; archive tooling uses locked development dependencies.
+`npm run typecheck` checks production and
 test TypeScript separately; `npm run compile` creates a development bundle.
 
 ## CI
@@ -38,8 +40,15 @@ GitHub Actions runs it. Local checks do not substitute for that evidence.
 `npm run package` invokes the lockfile-installed VSCE, runs the production
 `vscode:prepublish` hook and checks actual archive contents. `npm run
 verify:package` rechecks the existing VSIX; `npm run test:package` exercises
-synthetic archive policy failures. The file allowlist retains runtime, licenses
-and linked documentation, and rejects unexpected or private/development files.
+archive-policy failures, parsed Markdown links and staged-build preservation.
+Packaging creates a temporary candidate on the destination filesystem, then
+finalizes and validates it before renaming it over the last verified VSIX.
+Failed builds leave that last artifact intact and clean their temporary files.
+The file allowlist retains runtime, licenses
+and linked documentation, and rejects unexpected or private/development files. Validation checks ZIP CRCs,
+nonempty required files, JavaScript syntax without execution, and well-formed
+metadata with identity/asset references matching packaged files. Markdown uses
+a locked parser for inline/reference links, headings and fenced examples.
 Privacy scanning is bounded pattern detection, not a universal secret guarantee.
 Coverage and its exact limits are recorded in [COVERAGE.md](COVERAGE.md).
 

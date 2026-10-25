@@ -4,7 +4,8 @@ The extension has scoped functional acceptance. The private content identified
 in this review has since been cleaned from the checkout, rewritten reachable
 history and rebuilt VSIX. Final identity and distribution
 decisions remain pending. Repeatable local packaging and a headless CI workflow
-are now implemented; the first hosted workflow run remains unverified. The table below preserves the initial
+are now implemented; the first hosted workflow run remains unverified.
+The table below preserves the initial
 review findings; the cleanup status section records their remediation. It does not authorize a
 push, public repository, registry upload, deployment or history rewrite.
 
@@ -83,9 +84,11 @@ environment restriction, not evidence of a broken production build.
 2. Run `npm test`, `npm run test:relay`, `npm run test:package` and
    `npm run audit:privacy` without any Incus daemon, credentials or private targets.
 3. Run `npm run package`: the local VSCE invokes `vscode:prepublish` for a
-   production build before creating `remote-incus.vsix`, then the validator
+   production build into a temporary candidate. The validator
    checks its actual contents, local documentation links/anchors and privacy
-   patterns against an explicit file allowlist.
+   patterns against an explicit file allowlist. Only a successful result is
+   renamed to `remote-incus.vsix`; build/finalization/validation failures preserve
+   the previous verified artifact.
 4. The tracked `.github/workflows/offline-ci.yml` performs these steps on a
    headless Linux runner and uploads the validated VSIX as a 14-day build
    artifact. Action revisions and the Node version are pinned.
@@ -100,7 +103,38 @@ are review builds, not publication approval.
 No live instance checks or expanded platform tests are needed to resolve the
 source privacy and identity decisions. Those tests remain separately scoped.
 
-## Offline tooling validation (2026-10-25)
+## Review follow-up (2026-10-25)
+
+A second review reproduced gaps in the first implementation and repaired them:
+
+- A command found by `command -v` can still be a non-executable file in default
+  Bash. Utility guards now require an executable regular file, and flavor
+  probing checks `uname` before invoking it. Bash POSIX mode and Dash did not
+  reproduce that lookup behavior; this is not a Rocky-specific reproduction.
+- The ZIP reader previously trusted CRC values and skipped directory entries
+  before checking hidden payloads. It now verifies checksums and checks every
+  entry's safety, size and type before accepting it.
+- Required runtime files could be empty and XML metadata could be malformed or
+  disagree with `package.json`. Validation now requires nonempty files, parses
+  JavaScript without executing it, checks complete XML documents and verifies
+  identity, required assets and content-type coverage. These checks are not a
+  full VSIX schema validator or an extension-host integration test.
+- Regex-only Markdown checks missed reference links. A locked Markdown parser
+  now recognizes links/headings and isolates fenced examples; parsed destination
+  rewriting handles encoded root README/license links and reference definitions
+  while retaining source formatting. This avoids case-colliding archive aliases.
+- Failed packaging could overwrite the last verified local artifact. Builds
+  now use a candidate on the destination filesystem and rename it into place
+  only after finalization and all policy checks pass. Failure cleanup and
+  previous-artifact preservation have regression coverage.
+
+Review verification passes all 16 offline test-file entries and quality gates,
+26 package regressions across three files, the privacy audit and a production
+33-file VSIX with 82 local documentation links/anchors. Eight new prerequisite
+regressions cover unusable tools and unavailable probe utilities. No deployment,
+publication, hosted workflow run or Rocky Linux acceptance is claimed.
+
+## Initial offline tooling validation (2026-10-25)
 
 A clean temporary source copy, without existing dependencies or build output,
 passed `npm ci --include=dev --no-audit --no-fund` and the complete workflow
