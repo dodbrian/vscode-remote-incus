@@ -312,6 +312,13 @@
     "test:package": "node --test tests/package-policy.test.cjs tests/package-markdown.test.cjs tests/package-build.test.cjs",
     "test:redeploy": "node --test tests/redeploy.test.cjs"
   },
+  "overrides": {
+    "@vscode/vsce": {
+      "@azure/identity": {
+        "@azure/msal-node": "7.1.1"
+      }
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.0.0",

@@ -1,5 +1,20 @@
 # Release-readiness review — 2026-10-25
 
+## Dependency security follow-up
+
+The `fast-uri` alerts were resolved by its lockfile update to `3.1.9`.
+For [GHSA-xcx6-jx8p-x3h5](https://github.com/advisories/GHSA-xcx6-jx8p-x3h5),
+VSCE's Azure Identity `4.14.0` still requests MSAL Node `^6.0.0`, while the
+advisory requires `7.1.0` or newer. A scoped npm override pins MSAL Node
+`7.1.1` beneath VSCE's Azure Identity dependency. Remove the override once
+upstream supports a patched MSAL dependency directly and the audit remains clean.
+The [MSAL changelog](https://github.com/AzureAD/microsoft-authentication-library-for-js/blob/dev/lib/msal-node/CHANGELOG.md)
+identifies removal of the interactive `responseMode` option in version 7;
+Azure Identity's installed client does not pass that option. Packaging is
+validated separately; live Azure authentication and Marketplace publication
+are outside this project's tested publishing route.
+These are development dependencies excluded from the production VSIX.
+
 ## Public distribution checkpoint
 
 The user subsequently authorized the public GitHub repository and Open VSX

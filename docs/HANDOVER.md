@@ -46,9 +46,14 @@ Namespace verification is separate from publication; the namespace API reports
 version bump and fresh authorization. Do not rerun upload for version `0.1.0`.
 The identity build has not been installed or live-tested locally.
 
-GitHub reported five open development-dependency advisories: one high in
+At publication, GitHub reported five open development-dependency advisories: one high in
 `@azure/msal-node` and four moderate/low in `fast-uri`. These dependencies are
-excluded from the validated VSIX. Dependency remediation remains separate work.
+excluded from the validated VSIX. The subsequent `fast-uri` lockfile update and
+scoped MSAL `7.1.1` override resolve those dependencies; a clean locked install
+reports zero npm audit vulnerabilities. See
+[dependency security follow-up](RELEASE-READINESS.md#dependency-security-follow-up).
+CodeQL alerts 1 and 2 were fixed by `b5939e7`, removing account identity from
+connection logs and replacing every newline in the flavor test label.
 No editor restart, live fixture operation or Marketplace publication occurred.
 
 ## Previous checkpoint: release identity reviewed (2026-10-25)
