@@ -3,11 +3,14 @@
 //   node esbuild.js --production minified, no sourcemaps (packaging)
 //   node esbuild.js --watch      incremental watch mode
 const esbuild = require('esbuild');
+const fs = require('node:fs');
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
 async function main() {
+  // A prior development build may have left a sourcemap beside the bundle.
+  if (production) fs.rmSync('dist/extension.js.map', { force: true });
   const ctx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     bundle: true,
