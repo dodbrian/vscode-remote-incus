@@ -86,10 +86,13 @@ function main() {
   } else if (args.length === 2 && args[0] === '--root') {
     records = walk(args[1]).map((file) => ({ file, data: fs.readFileSync(file) }));
   } else if (args.length === 0) {
-    records = git(['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
+    // The index still lists an unstaged deletion or rename's original path.
+    // Scan the current checkout; --history separately audits committed content.
+    const deleted = new Set(git(['ls-files', '-z', '--deleted']).toString().split('\0'));
+    records = git(['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--deduplicate'])
       .toString()
       .split('\0')
-      .filter(Boolean)
+      .filter((file) => file && !deleted.has(file))
       .map((file) => ({ file, data: fs.readFileSync(file) }));
   } else {
     throw new Error('Usage: node scripts/audit-privacy.cjs [--history | --root DIRECTORY]');
