@@ -10,3 +10,6 @@ dist/
 *.log
 *.key
 *.pem
+
+# Temporary candidates are never source or package content.
+.remote-incus-package-*/

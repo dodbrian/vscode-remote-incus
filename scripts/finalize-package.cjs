@@ -10,39 +10,32 @@ const { pipeline } = require('node:stream/promises');
 const { ZipFile } = require('yazl');
 const { readArchive } = require('./verify-package.cjs');
 
-function normalizeLinks(records) {
+const { resolveLocalLink, rewriteMarkdownLinks } = require('./package-markdown.cjs');
+
+function finalizeRecords(records) {
   const result = new Map(records);
-  let count = 0;
   for (const [name, bytes] of records) {
     if (!name.endsWith('.md')) continue;
-    const text = bytes
-      .toString('utf8')
-      .replace(/```[^\n]*\n[\s\S]*?```|\]\((<[^>]+>|[^\s)]+)(?:\s+"[^"]*")?\)/g, (link, raw) => {
-        if (!raw) return link;
-        const target = raw.replace(/^<|>$/g, '');
-        if (/^(?:[a-z][a-z0-9+.-]*:|#)/i.test(target)) return link;
-        const file = target.split(/[?#]/)[0];
-        const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(name), file));
-        const replacement =
-          resolved === 'extension/README.md'
-            ? 'readme.md'
-            : resolved === 'extension/LICENSE'
-              ? 'LICENSE.txt'
-              : undefined;
-        if (!replacement) return link;
-        count++;
-        return link.replace(raw, raw.replace(/(?:README\.md|LICENSE)(?=[?#>]|$)/, replacement));
-      });
-    result.set(name, Buffer.from(text));
+    const rewritten = rewriteMarkdownLinks(bytes.toString('utf8'), (href) => {
+      const local = resolveLocalLink(name, href);
+      if (!local) return null;
+      const canonical =
+        local.target === 'extension/README.md'
+          ? 'extension/readme.md'
+          : local.target === 'extension/LICENSE'
+            ? 'extension/LICENSE.txt'
+            : null;
+      if (!canonical) return null;
+      const suffix = href.slice(href.split(/[?#]/)[0].length);
+      return path.posix.relative(path.posix.dirname(name), canonical) + suffix;
+    });
+    result.set(name, Buffer.from(rewritten.text));
   }
-  return { records: result, count };
+  return result;
 }
 
-async function main() {
-  if (process.argv.length !== 3)
-    throw new Error('Usage: node scripts/finalize-package.cjs FILE.vsix');
-  const filename = process.argv[2];
-  const { records, count } = normalizeLinks(await readArchive(filename));
+async function finalizePackage(filename) {
+  const records = finalizeRecords(await readArchive(filename));
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'incus-package-finalize-'));
   try {
     const output = path.join(directory, 'final.vsix');
@@ -54,10 +47,17 @@ async function main() {
     zip.end();
     await completion;
     fs.copyFileSync(output, filename);
-    console.log(`Package links: ${count} root README/license references normalized.`);
+    return records;
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+}
+
+async function main() {
+  if (process.argv.length !== 3)
+    throw new Error('Usage: node scripts/finalize-package.cjs FILE.vsix');
+  await finalizePackage(process.argv[2]);
+  console.log('Package links: root README/license references normalized.');
 }
 
 if (require.main === module)
@@ -65,4 +65,4 @@ if (require.main === module)
     console.error(error.message);
     process.exitCode = 1;
   });
-module.exports = { normalizeLinks };
+module.exports = { finalizeRecords, finalizePackage };

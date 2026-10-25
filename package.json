@@ -302,14 +302,14 @@
     "check": "npm run typecheck && npm run lint && npm run format:check",
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "package": "npm run check && vsce package --no-dependencies --no-rewrite-relative-links --allow-missing-repository -o remote-incus.vsix && node scripts/finalize-package.cjs remote-incus.vsix && npm run verify:package",
+    "package": "npm run check && node scripts/package.cjs",
     "test": "npm run check && node tests/build.cjs",
     "test:relay": "node scripts/verify-relay.cjs",
     "prepare": "sh scripts/setup-hooks.sh",
     "audit:privacy": "node scripts/audit-privacy.cjs",
     "vscode:prepublish": "node esbuild.js --production",
     "verify:package": "node scripts/verify-package.cjs remote-incus.vsix",
-    "test:package": "node --test tests/package-policy.test.cjs"
+    "test:package": "node --test tests/package-policy.test.cjs tests/package-markdown.test.cjs tests/package-build.test.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -324,6 +324,10 @@
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.72.0",
     "yauzl": "3.4.0",
-    "yazl": "2.5.1"
+    "yazl": "2.5.1",
+    "xml2js": "0.5.0",
+    "markdown-it": "14.3.3",
+    "sax": "1.6.1",
+    "parse5": "7.3.0"
   }
 }

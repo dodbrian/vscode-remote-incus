@@ -26,3 +26,6 @@ eslint.config.mjs
 **/*.map
 **/.state/**
 .github/**
+
+# Temporary candidates are never source or package content.
+.remote-incus-package-*/

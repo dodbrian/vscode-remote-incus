@@ -9,10 +9,27 @@ function fixture() {
   );
   records.set(
     'extension/package.json',
-    Buffer.from(JSON.stringify({ main: './dist/extension.js' })),
+    Buffer.from(
+      JSON.stringify({
+        name: 'remote-incus',
+        publisher: 'local-dev',
+        version: '0.1.0',
+        main: './dist/extension.js',
+      }),
+    ),
   );
-  records.set('[Content_Types].xml', Buffer.from('<Types/>'));
-  records.set('extension.vsixmanifest', Buffer.from('<PackageManifest/>'));
+  records.set(
+    '[Content_Types].xml',
+    Buffer.from(
+      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">${['js', 'json', 'md', 'svg', 'txt', 'vsixmanifest'].map((extension) => `<Default Extension="${extension}" ContentType="text/plain"/>`).join('')}</Types>`,
+    ),
+  );
+  records.set(
+    'extension.vsixmanifest',
+    Buffer.from(
+      '<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"><Metadata><Identity Id="remote-incus" Version="0.1.0" Publisher="local-dev"/><License>extension/LICENSE.txt</License></Metadata><Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json"/><Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/readme.md"/><Asset Type="Microsoft.VisualStudio.Services.Content.License" Path="extension/LICENSE.txt"/></Assets></PackageManifest>',
+    ),
+  );
   return records;
 }
 
@@ -162,39 +179,6 @@ test('archive parser reads real ZIP bytes and rejects duplicates, traversal and 
   }
 });
 
-test('package finalization fixes actual VSCE root aliases without weakening link validation', () => {
-  const { normalizeLinks } = require('../scripts/finalize-package.cjs');
-  const records = fixture();
-  records.set(
-    'extension/docs/README.md',
-    Buffer.from(
-      '[root](../README.md#heading "Title") [license](../LICENSE) [external](https://example.invalid/README.md)\n```md\n[example](../README.md)\n```',
-    ),
-  );
-  records.set('extension/readme.md', Buffer.from('# Heading'));
-  assert.equal(
-    inspectRecords(records).errors.filter((error) => error.startsWith('Missing packaged link'))
-      .length,
-    2,
-  );
-  const normalized = normalizeLinks(records);
-  assert.equal(normalized.count, 2);
-  assert.deepEqual(inspectRecords(normalized.records).errors, []);
-  assert.match(
-    normalized.records.get('extension/docs/README.md').toString(),
-    /https:\/\/example[.]invalid\/README[.]md/,
-  );
-  assert.match(records.get('extension/docs/README.md').toString(), /[.][.]\/README[.]md/);
-  assert.match(
-    normalized.records.get('extension/docs/README.md').toString(),
-    /example\]\([.][.]\/README[.]md\)/,
-  );
-  assert.match(
-    normalized.records.get('extension/docs/README.md').toString(),
-    /readme[.]md#heading "Title"/,
-  );
-});
-
 test('anchor check handles repeated headings, same-file links and fenced examples', () => {
   const records = fixture();
   records.set(
@@ -208,4 +192,106 @@ test('anchor check handles repeated headings, same-file links and fenced example
   assert.ok(
     inspectRecords(records).errors.some((error) => error.startsWith('Missing packaged anchor')),
   );
+});
+
+test('package policy rejects empty required files and invalid JavaScript without executing it', () => {
+  for (const file of [...required, ...documentation]) {
+    const records = fixture();
+    records.set(`extension/${file}`, Buffer.from(' \n'));
+    assert.ok(
+      inspectRecords(records).errors.some((error) =>
+        error.startsWith('Required archive file empty:'),
+      ),
+    );
+  }
+  const records = fixture();
+  records.set('extension/dist/extension.js', Buffer.from('function ('));
+  assert.ok(
+    inspectRecords(records).errors.some((error) =>
+      error.startsWith('Invalid JavaScript runtime file:'),
+    ),
+  );
+});
+
+test('package policy rejects malformed, mismatched and incomplete VSIX metadata', () => {
+  for (const file of ['extension.vsixmanifest', '[Content_Types].xml']) {
+    const records = fixture();
+    records.set(file, Buffer.from('not XML'));
+    assert.ok(inspectRecords(records).errors.some((error) => error.startsWith('Invalid VSIX')));
+  }
+  for (const suffix of ['junk', '<Other/>']) {
+    const records = fixture();
+    records.set(
+      'extension.vsixmanifest',
+      Buffer.from(records.get('extension.vsixmanifest').toString() + suffix),
+    );
+    assert.ok(inspectRecords(records).errors.includes('Invalid VSIX manifest metadata'));
+  }
+  for (const [before, after, expected] of [
+    ['Id="remote-incus"', 'Id="other"', 'VSIX identity Id'],
+    ['Version="0.1.0"', 'Version="9.0.0"', 'VSIX identity Version'],
+    ['Publisher="local-dev"', 'Publisher="other"', 'VSIX identity Publisher'],
+    ['Path="extension/readme.md"', 'Path="extension/missing.md"', 'VSIX asset points'],
+    ['Microsoft.VisualStudio.Code.Manifest', 'Other.Manifest', 'VSIX required asset is missing'],
+  ]) {
+    const records = fixture();
+    records.set(
+      'extension.vsixmanifest',
+      Buffer.from(records.get('extension.vsixmanifest').toString().replace(before, after)),
+    );
+    assert.ok(inspectRecords(records).errors.some((error) => error.startsWith(expected)));
+  }
+  const records = fixture();
+  records.set(
+    '[Content_Types].xml',
+    Buffer.from('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>'),
+  );
+  assert.ok(
+    inspectRecords(records).errors.some((error) =>
+      error.startsWith('VSIX content type is missing'),
+    ),
+  );
+});
+
+test('archive parser refuses CRC corruption and hidden directory payloads', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { readArchive } = require('../scripts/verify-package.cjs');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'incus-package-integrity-'));
+  const file = path.join(directory, 'fixture.vsix');
+  try {
+    const bytes = storedZip([{ name: 'extension/readme.md', data: 'original' }]);
+    bytes[bytes.indexOf(Buffer.from('original'))] = 'X'.charCodeAt(0);
+    fs.writeFileSync(file, bytes);
+    await assert.rejects(readArchive(file), /CRC mismatch/);
+    for (const entry of [
+      { name: 'extension/private/', data: 'hidden-payload' },
+      { name: 'extension/link/', data: '', mode: 0o120777 },
+    ]) {
+      fs.writeFileSync(file, storedZip([entry]));
+      await assert.rejects(readArchive(file), /hidden data|symlink/);
+    }
+    fs.writeFileSync(file, storedZip([{ name: 'extension/', data: '', mode: 0o40755 }]));
+    assert.equal((await readArchive(file)).size, 0);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('missing-link diagnostics redact credential-like target values', () => {
+  const records = fixture();
+  const credential = 'gh' + 'p_' + 'A'.repeat(36);
+  records.set('extension/readme.md', Buffer.from(`[missing](missing-${credential}.md)`));
+  const errors = inspectRecords(records).errors;
+  assert.ok(errors.some((error) => error.startsWith('Missing packaged link target')));
+  assert.ok(errors.every((error) => !error.includes(credential)));
+});
+
+test('package policy checks recognized reference-style local links', () => {
+  const records = fixture();
+  records.set('extension/readme.md', Buffer.from('[broken][target]\n\n[target]: missing.md\n'));
+  const result = inspectRecords(records);
+  assert.equal(result.links, 1);
+  assert.ok(result.errors.some((error) => error.startsWith('Missing packaged link target')));
 });
