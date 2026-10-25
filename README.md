@@ -5,7 +5,8 @@ Incus = community fork of LXD) as a first-class remote connection type — the
 same slot Dev Containers / Remote-SSH occupy in the Remote Explorer.
 
 **Status: Phase 1 work in progress** — architecture is frozen and spike-verified
-(see [design](docs/DESIGN.md)); the extension is not yet published.
+(see [design](docs/DESIGN.md)); version 0.1.0 is available on
+[Open VSX](https://open-vsx.org/extension/dodbrian/remote-incus).
 
 This is an independent project, not affiliated with or endorsed by the Incus
 project or Linux Containers.
@@ -32,7 +33,8 @@ for dated findings, sources, and distribution research.
 
 ## Install (VS Code stable)
 
-Install a locally built VSIX (see [Development](#development)) and opt in once via VS Code's
+Download the VSIX from [Open VSX](https://open-vsx.org/extension/dodbrian/remote-incus)
+or build it locally (see [Development](#development)), and opt in once via VS Code's
 **Preferences: Configure Runtime Arguments**
 command (`argv.json`; preserve any existing entries):
 
@@ -42,10 +44,17 @@ command (`argv.json`; preserve any existing entries):
 }
 ```
 
-Then install the VSIX: `code --install-extension remote-incus.vsix`.
+Then install the downloaded VSIX:
+
+```sh
+code --install-extension dodbrian.remote-incus-0.1.0.vsix
+```
+
+For a local build, the filename is `remote-incus.vsix`.
 Restart VS Code after changing the runtime arguments. The extension ID is
-`dodbrian.remote-incus`. The extension is not published in a registry; publisher
-registration and an Open VSX distribution route remain pending.
+`dodbrian.remote-incus`. Open VSX hosting does not change VS Code's default
+extension marketplace. The Open VSX namespace is currently unverified;
+ownership verification is pending.
 
 Current verified configuration: Linux x64 client, Stable VS Code 1.143.1 and
 Incus 7.5.1, with scoped Ubuntu/Rocky Linux 9.8 glibc x64 and Alpine musl x64
@@ -255,5 +264,5 @@ for source and license details.
 
 See the [documentation index](docs/README.md) for architecture, testing, task plans,
 verification results, and project history. The
-[release-readiness review](docs/RELEASE-READINESS.md) records publication blockers
-and the remaining publisher registration, hosted CI and distribution work.
+[release-readiness review](docs/RELEASE-READINESS.md) records hosted CI,
+publication evidence and remaining verification work.

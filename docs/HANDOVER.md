@@ -20,7 +20,38 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: release identity reviewed (2026-10-25)
+## Current stopping point: Open VSX release available (2026-10-25)
+
+The user authorized a public repository and Open VSX publication, completed
+the account/agreement setup and configured the `OVSX_PAT` repository secret.
+The public repository is https://github.com/dodbrian/vscode-remote-incus.
+The first hosted verification run, `40226291218`, passed; its downloaded VSIX
+passed archive validation (33 files, 86 local documentation links).
+
+Commit `42262de` introduces a manual, main-only publishing workflow. It reuses
+the full verification workflow, downloads the artifact from that same run,
+validates it again and uses pinned `ovsx@1.3.0`. The token is exposed only to
+the namespace/upload step. Publication run `40229238587` passed all checks,
+created namespace `dodbrian`, verified publishing access and reported
+`Published dodbrian.remote-incus v0.1.0`.
+
+The public version API initially returned 404, then exposed version `0.1.0` as
+downloadable. The public VSIX passed archive validation (33 files, 86 links) and
+is byte-identical to the publishing run's artifact. The listing is
+https://open-vsx.org/extension/dodbrian/remote-incus.
+Next release-administration step: claim verified namespace ownership through
+Open VSX's documented public issue process. No ownership claim has been filed.
+Namespace verification is separate from publication; the namespace API reports
+`verified: false`. Future publication remains manual; a new version requires a
+version bump and fresh authorization. Do not rerun upload for version `0.1.0`.
+The identity build has not been installed or live-tested locally.
+
+GitHub reported five open development-dependency advisories: one high in
+`@azure/msal-node` and four moderate/low in `fast-uri`. These dependencies are
+excluded from the validated VSIX. Dependency remediation remains separate work.
+No editor restart, live fixture operation or Marketplace publication occurred.
+
+## Previous checkpoint: release identity reviewed (2026-10-25)
 
 The user selected display name **Remote - Incus**, package name `remote-incus`,
 publisher namespace `dodbrian` and planned GitHub repository

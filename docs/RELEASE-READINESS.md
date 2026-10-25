@@ -1,5 +1,21 @@
 # Release-readiness review — 2026-10-25
 
+## Public distribution checkpoint
+
+The user subsequently authorized the public GitHub repository and Open VSX
+publication. The [first hosted CI run](https://github.com/dodbrian/vscode-remote-incus/actions/runs/40226291218)
+passed, and its downloaded VSIX passed archive policy checks. The
+[publication run](https://github.com/dodbrian/vscode-remote-incus/actions/runs/40229238587)
+passed the full verification suite, validated its own artifact again, created
+namespace `dodbrian` and reported uploading version `0.1.0` successfully.
+After an initial visibility delay, the public API confirmed version `0.1.0` is
+downloadable. The public VSIX passed archive validation and is byte-identical
+to the publishing run's artifact. The
+[Open VSX listing](https://open-vsx.org/extension/dodbrian/remote-incus) is available;
+namespace ownership verification remains pending.
+See the [current handover](HANDOVER.md#current-stopping-point-open-vsx-release-available-2026-10-25).
+The sections below preserve the earlier review and its dated evidence.
+
 The extension has scoped functional acceptance. The private content identified
 in this review has since been cleaned from the checkout, rewritten reachable
 history and rebuilt VSIX. Release identity is selected below; distribution
