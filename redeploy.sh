@@ -1,8 +1,21 @@
 #!/bin/sh
 # Phase-1 dev loop: build, package, install, restart VS Code, reopen the
-# remote window on the test instance (fixture-container on the `fixture-remote` remote).
-# Usage: ./redeploy.sh
-set -e
+# remote window on an explicitly selected test-owned instance.
+# Usage: ./redeploy.sh <remote:instance> <absolute-folder>
+set -eu
+umask 077
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <remote:instance> <absolute-folder>" >&2
+  exit 2
+fi
+case "$1" in
+  -*|:*|*:|*:*:*|*[!a-zA-Z0-9:_.-]*) echo "Expected an explicit remote:instance" >&2; exit 2 ;;
+  *:*) ;;
+  *) echo "Expected an explicit remote:instance" >&2; exit 2 ;;
+esac
+case "$2" in /*) ;; *) echo "Expected an absolute remote folder" >&2; exit 2 ;; esac
+REDEPLOY_TARGET=$1
+REDEPLOY_FOLDER=$2
 cd "$(dirname "$0")"
 
 node esbuild.js --production
@@ -19,9 +32,9 @@ for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
 done
 sleep 1
 
-mkdir -p /tmp/remote-incus-dev/fixture-container
-: > /tmp/remote-incus-dev/fixture-container/ext.log
-REMOTE_INCUS_DEBUG_LOG=/tmp/remote-incus-dev/fixture-container/ext.log setsid code --new-window \
-  --remote=incus+fixture-remote:fixture-container /home/ubuntu \
-  >/tmp/remote-incus-dev/fixture-container/verbose.log 2>&1 &
-echo "redeployed; window relaunching; log: /tmp/remote-incus-dev/fixture-container/ext.log"
+mkdir -p /tmp/remote-incus-dev/redeploy
+: > /tmp/remote-incus-dev/redeploy/ext.log
+REMOTE_INCUS_DEBUG_LOG=/tmp/remote-incus-dev/redeploy/ext.log setsid code --new-window \
+  --remote="incus+$REDEPLOY_TARGET" "$REDEPLOY_FOLDER" \
+  >/tmp/remote-incus-dev/redeploy/verbose.log 2>&1 &
+echo "redeployed; window relaunching; log: /tmp/remote-incus-dev/redeploy/ext.log"

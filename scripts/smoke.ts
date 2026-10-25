@@ -4,13 +4,7 @@
  *   npx esbuild scripts/smoke.ts --bundle --platform=node --alias:vscode=./scripts/vscode-stub.js --outfile=/tmp/remote-incus-dev/smoke.js && node /tmp/remote-incus-dev/smoke.js
  */
 import { parseAuthority, formatAuthority } from '../src/authority';
-import {
-  listRemotes,
-  getDefaultRemote,
-  listInstances,
-  execInInstance,
-  target,
-} from '../src/incusCli';
+import { listRemotes, listInstances, execInInstance, target } from '../src/incusCli';
 import { resolveIdentity, probeFlavor, resolveClientCommit } from '../src/bootstrap';
 import { FolderHistory } from '../src/history';
 
@@ -30,7 +24,8 @@ async function main(): Promise<void> {
     'parse explicit remote authority',
   );
   assert(
-    JSON.stringify(parseAuthority('incus+fixture-container')) === '{"instance":"fixture-container"}',
+    JSON.stringify(parseAuthority('incus+fixture-container')) ===
+      '{"instance":"fixture-container"}',
     'parse default-remote authority',
   );
   assert(
@@ -68,7 +63,8 @@ async function main(): Promise<void> {
   );
   history.remove('incus+fixture-remote:fixture-container', '/home/ubuntu/proj-a');
   assert(
-    JSON.stringify(history.folders('incus+fixture-remote:fixture-container')) === '["/home/ubuntu/proj-b"]',
+    JSON.stringify(history.folders('incus+fixture-remote:fixture-container')) ===
+      '["/home/ubuntu/proj-b"]',
     'history remove',
   );
   history.remove('incus+fixture-remote:fixture-container', '/home/ubuntu/proj-b');
@@ -78,36 +74,30 @@ async function main(): Promise<void> {
   );
   assert(history.folders('incus+other:x').length === 0, 'history isolated per authority');
 
-  // live daemon (read-only)
-  const def = await getDefaultRemote();
-  console.log('default remote:', def);
-  const remotes = await listRemotes();
-  console.log('remotes (protocol incus):', remotes.map((r) => r.name).join(', '));
-  assert(
-    remotes.some((r) => r.name === def),
-    'default remote present in filtered list',
-  );
-  assert(!remotes.some((r) => r.name === 'images'), 'simplestreams remote dropped');
-
-  const instances = await listInstances(def);
-  console.log(`instances on ${def}:`, instances.map((i) => `${i.name}=${i.status}`).join(', '));
-  const spike = instances.find((i) => i.name === 'fixture-container');
-  assert(!!spike, 'fixture-container visible on the default remote');
-
-  if (spike?.status === 'Running') {
-    const ref = { remote: def, instance: 'fixture-container' };
-    const identity = await resolveIdentity(ref);
-    console.log('identity:', identity);
-    assert(
-      identity.uid === 1000 && identity.username === 'ubuntu' && identity.home === '/home/ubuntu',
-      'primary user resolved',
-    );
-    const flavor = await probeFlavor(ref, identity);
-    console.log('flavor:', flavor);
-    assert(flavor === 'linux-x64', 'flavor probed');
-    const out = await execInInstance(ref, 'echo $HOME', { uid: identity.uid, home: identity.home });
-    assert(out.trim() === '/home/ubuntu', `exec as user honors HOME (${target(ref)})`);
+  // Live checks require an explicit fixture; pure checks above use synthetic names.
+  const selected = process.argv[2];
+  if (!selected) {
+    console.log('Pure smoke checks passed; no live fixture selected.');
+    return;
   }
+  if (process.env.CI || !/^[^:\s-][^:\s]*:[^:\s-][^:\s]*$/.test(selected)) {
+    throw new Error('Live smoke requires explicit remote:instance outside CI');
+  }
+  const [remote, instance] = selected.split(':');
+  if (!remote || !instance) throw new Error('Expected remote:instance');
+  const ref = { remote, instance };
+  const remotes = await listRemotes();
+  assert(
+    remotes.some((r) => r.name === remote),
+    'selected remote is an Incus remote',
+  );
+  const instances = await listInstances(remote);
+  const fixture = instances.find((i) => i.name === instance);
+  assert(fixture?.status === 'Running', 'selected fixture is running');
+  const identity = await resolveIdentity(ref);
+  await probeFlavor(ref, identity);
+  const out = await execInInstance(ref, 'echo "$HOME"', { uid: identity.uid, home: identity.home });
+  assert(out.trim() === identity.home, `exec as user honors HOME (${target(ref)})`);
 
   const commit = await resolveClientCommit();
   console.log('client commit:', commit);

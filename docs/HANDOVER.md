@@ -20,7 +20,73 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: IPv4 helper deployed and accepted (2026-10-25)
+## Current stopping point: privacy cleanup complete; release identity next (2026-10-25)
+
+The user authorized thorough privacy cleanup and a separate independent agent
+check, then explicitly requested rewriting the existing history without
+flattening, rebasing or changing its chronological structure. Private content
+was sanitized across the checkout and historical snapshots. The rewrite preserved
+the original 82 commits and 15 refs, ordered parents, timestamps and attribution;
+commit IDs changed. Historical reports can quote original IDs. Runtime logs, fixture
+identities and credentials must stay outside tracked artifacts. The user then
+explicitly approved permanent reflog expiration and pruning, including the 61
+additional unreachable recovery commits. That cleanup is complete: repository
+integrity, the preserved graph and absence of old mapped objects, unreachable
+objects and reflog entries were verified.
+
+Dev scripts now require runtime fixture inputs rather than a private target;
+the old spike relay no longer prints the connection token. The obsolete local
+spike token and pre-cleanup VSIX were removed. The user subsequently requested
+committing the cleanup and this handover. No deployment, live instance access,
+credential rotation, push or publication was performed.
+
+Final independent verification confirmed that all 83 replaced old mapped
+objects are unavailable and no unreachable objects or reflog entries remained
+at cleanup completion. The original 82-commit graph and 15 refs retained their
+verified structure and metadata. Subsequent normal commits add to that history.
+The local evidence map lives only in Git metadata and is not packaged.
+
+Validation passed: 177 offline tests, strict typecheck/lint/format gates, all
+six relay checks, shell target guards and syntax checks, 75 local documentation
+file links, repository integrity and checkout/history/package privacy scans.
+The independently reviewed 33-entry VSIX retains the entry point, relay and
+licenses; eight synthetic probes confirmed private-file archive exclusions.
+These are scoped audit results, not a universal secret-detection guarantee.
+
+Next step: decide the final display name, extension name, publisher and public
+repository, then update the manifest and opt-in guidance consistently. After
+that, implement repeatable CI VSIX packaging using the lockfile-installed
+packager and an explicit production build. Keep CI limited to local fixtures;
+registry publication is a separate decision and authorization. The current
+manifest still uses placeholder identity/repository metadata and the package
+command still requests `vsce@latest` without compiling first.
+
+See [release readiness](RELEASE-READINESS.md) for evidence and the remaining
+client/platform coverage limits. No next implementation task or publication
+is authorized merely by this handover.
+
+## Previous state: release-readiness review (2026-10-25)
+
+The user confirmed manual normal-profile identical-folder new-window acceptance,
+then authorized proceeding with the release-readiness review. README and DESIGN
+now reflect the completed resolver, Alpine/shell, diagnostics, Ports and folder
+work, with tested coverage separated from declared compatibility.
+
+[Release-readiness findings](RELEASE-READINESS.md) record publication blockers:
+private details in tracked files, reachable history and the inspected VSIX;
+placeholder identity/repository metadata; and packaging that uses an unpinned
+packager without an automatic build. A production VSIX was built for local
+inspection only. Initial sandbox file enumeration failed; the same operations
+outside the sandbox succeeded. No private targets were contacted.
+
+Next decisions: choose final name/publisher/repository and the public source
+route (sanitized export versus separately authorized history cleanup), then
+prepare repeatable CI packaging and the distribution route. Do not publish the
+current archive or history. No commit, push, deployment, history rewrite or
+publication occurred during this review. Detailed validation is recorded in
+the review report.
+
+## Previous state: IPv4 helper deployed and accepted (2026-10-25)
 
 The user accepted the normal-profile IPv4 helper workflow and requested
 committing the implementation, regression coverage and documentation together.
@@ -88,8 +154,9 @@ Ports work; audit tracked files/history and the VSIX contents for publication
 privacy; and decide the final extension name/publisher before publication.
 Then prepare repeatable CI VSIX packaging and the chosen distribution route.
 This is a recommendation, not authorization to publish or begin another task.
-The remaining normal-profile identical-folder UX acceptance and untested
-client/platform matrix should remain explicit limitations.
+The user manually tested and confirmed the normal-profile identical-folder
+new-window workflow on 2026-10-25; that acceptance check is complete. The
+untested client/platform matrix remains an explicit limitation.
 
 ## Previous state: IPv4 forwarding investigation (2026-10-25)
 
@@ -312,8 +379,8 @@ prior-turn deployment observations, not fresh live checks during this update.
 No further redeploy, live mutation, push or publication occurred here.
 
 The identical-folder fix passed the isolated three-window and workspace
-reopening checks below. The user's manual Ports confirmation does not
-separately confirm normal-profile identical-folder UX acceptance. The
+reopening checks below. Normal-profile identical-folder UX acceptance was
+subsequently completed by the user's manual test on 2026-10-25. The
 IPv6-only-networked local fixture's IPv4-loopback resolution edge case also
 remains open; successful IPv4 forwarding on the TLS/cluster fixture and the
 user's Ports acceptance do not resolve it for that different environment.
@@ -592,7 +659,7 @@ next-step instruction before implementation, optimization or further live work.*
 ## Previous state (2026-10-23, Task 3 worktree)
 
 Task 3 is complete offline and **stopped for discussion** in
-`/path/to/task-worktree`. The user authorized
+`<task-worktree>`. The user authorized
 Task 3 after Task 2 acceptance and then explicitly included newly found
 regressions in this session. Changes remain uncommitted.
 
@@ -621,7 +688,7 @@ accepted by the user**, including the review correction below. Task 1's result
 was discussed and accepted in its own session; the user explicitly confirmed
 that prerequisite before Task 2 implementation. Task 1 harness commit:
 `49c0ac0`. Task 2 changes remain uncommitted in
-`/path/to/task-worktree`.
+`<task-worktree>`.
 
 - Verification after the review correction: `npm test` **59 passed, 0 failed,
   0 skipped**; `npm run typecheck`, `npm run compile` and `git diff --check`
@@ -650,7 +717,7 @@ that prerequisite before Task 2 implementation. Task 1 harness commit:
 `TASK-03-CONNECTION-CORRECTNESS.md`, `REGRESSION_TEST_PLAN.md` and the coverage
 report before correctness work; demonstrate failures before repairs. The task
 documents and plan were available in the primary checkout at
-`/path/to/repository/`, not in this worktree. Task 3 has not
+`<repository-root>/`, not in this worktree. Task 3 has not
 begun. No live Incus/VS Code checks, executable script/relay checks, real
 downloads, redeploy, commit or push occurred during Task 2. Updating this
 handover does not authorize those actions.
@@ -814,62 +881,31 @@ authority-aware active row).
   contract/matrix suites open; item 7 packaging (CI VSIX + OpenVSX +
   README). Naming decision (§11.1) before OpenVSX. Item 8 (§14 version
   compat layer) planned, not implemented.
-- Repo: `/path/to/repository`, git `main`.
+- Repository paths are relative to the checkout root; the development branch was `main`.
 
-## Environment snapshot (verified facts — updated 2026-10-20 evening)
+## Runtime context and isolation
 
-- **incus 7.5.1 client + server on this host** (zabbly repo since the
-  2026-10-20 evening reinstall; was Ubuntu-archive 6.0.5). The local unix
-  socket IS group-accessible now (user `<local-user>` joined the `incus` group —
-  the old EACCES note is obsolete). `incus port-forward` is available
-  (≥ 7.3) but NOT used — exec-stdio bridges stay the transport (frozen).
-- **Incus version/packaging trap**: Ubuntu-archive incus debs on Ubuntu
-  25.04+ hosts deny every in-container signal (AppArmor hardening +
-  missing compat sysctl — Launchpad #2109394); the extension pre-flights
-  this (`probeSignalSupport`) and design sketch §14 plans the general
-  version-compat layer. See §8 for the full evidence.
-- **The default incus remote is still `fixture-remote`** — which is now known to be
-  a 2-member CLUSTER: member `fixture-remote` (192.0.2.10, Ubuntu 24.04/kernel
-  6.8) and member `member-b` (192.0.2.11, Tailscale, kernel 7.0.0-38).
-  `fixture-container` runs on member `member-b`. Address instances as
-  `<remote>:<name>`; never assume a member.
-- **VS Code stable 1.143.0** (commit `2d0b7506…` as of 2026-10-22), weekly
-  auto-updates.
-- Node v24.21.0 / npm 11.19.0; esbuild + tsc + @vscode/vsce devDependencies.
-- Companion container: **`fixture-container`** (cluster member `member-b`, Ubuntu
-  24.04, RUNNING):
-  - `~ubuntu/.vscode-server` holds the 1.142.0 install (commit dir +
-    `.incus-install-ok` marker), the staged relay at
-    `~ubuntu/.vscode-server/relay.js`, the 0600 token at
-    `data/Machine/.incus-conn-token`, log at `data/Machine/server.log`.
-  - Server NOT running right now: it **exits promptly after a graceful
-    client disconnect** (log-verified 21:56:33) and lingers with the default
-    3 h reconnection grace only after ungraceful deaths. Next connect
-    re-starts it via the fast path (~15-20 s). No correctness impact; do not
-    "fix" this.
-  - **No sshd / no openssh — keep it that way.**
-- Client-side tarball cache:
-  `~/.config/Code/User/globalStorage/local-dev.remote-incus/server-cache/`
-  (217 MB tarball + sha sidecar for the current commit).
-- Local test instance: **`local-fixture`** (RUNNING on the local daemon,
-  Ubuntu "resolute" daily image; `previous-local-fixture` was wiped — recreated
-  under a new random name, presumably by the user 2026-10-22). Earlier
-  test instances (`previous-local-fixture`, `previous-fixture-a`, `previous-fixture-b`,
-  `signal-fixture`) were lost in the 2026-10-20 daemon reinstall.
+Verified runtime coverage and historical versions are recorded in DESIGN's
+support matrix and the dated results above. Runtime state changes; no tracked
+inventory, addresses, instance names or cached process state is authoritative.
 
-## ISOLATION RULE (important)
-
-The user's Incus daemon also runs **production instances** (`production-instance-a`,
-`production-instance-b`, `production-instance-e`, `production-instance-c`, `production-instance-d` — some with Docker
-inside). **Never touch, stop, or configure them.** All testing targets
-`fixture-container` only. When enumerating instances in code/tests, filter or
-select explicitly; never "first instance".
+- Select a test-owned idle fixture using an explicitly supplied `remote:instance`.
+  Never use the default remote or the first enumerated instance as a test target.
+- Never touch production instances. Confirm fixture ownership and obtain explicit
+  authorization before destructive checks, daemon changes or editor restarts.
+- A cluster's members may differ in kernel/packaging behavior. Check the selected
+  fixture's actual behavior without recording private topology in the repository.
+- Keep raw diagnostics, credentials and host-specific configuration outside tracked
+  files. Do not commit runtime tokens, inventories or personal checkout paths.
+- Graceful client disconnect can stop the server promptly; the reconnection grace
+  after ungraceful disconnect is a different case, not a reason to change policy.
 
 ## Dev loop
 
-- `./redeploy.sh` — build, package, install, restart VS Code, reopen the
-  remote window on `--remote=incus+fixture-remote:fixture-container /home/ubuntu`.
-- Extension log: `/tmp/remote-incus-dev/fixture-container/ext.log` (via
+- `./redeploy.sh <remote:instance> <absolute-folder>` — build, package, install,
+  restart VS Code, reopen the
+  remote window using explicit runtime target and folder arguments.
+- Extension log: `/tmp/remote-incus-dev/redeploy/ext.log` (via
   `REMOTE_INCUS_DEBUG_LOG`, which redeploy.sh sets) plus the
   "Remote - Incus" output channel.
 - Offline smoke: `npx esbuild scripts/smoke.ts --bundle --platform=node
@@ -956,7 +992,7 @@ timed out): <stderr line 1>`; catches log the FULL message, toasts take
 - Residual risk: proposal-shape change in a future client → extension fix
   release; the runtime guard errors loudly (never silently).
 
-## Phase 1 — remaining work (DESIGN §12)
+## Historical Phase-1 checklist (superseded by current stopping point)
 
 1. ~~Project / tree+commands / bootstrap / progress UX~~ **DONE 2026-10-19**.
 2. Diagnostics refinement (§12.5): error-surfacing done 2026-10-20 (IncusError
@@ -1014,7 +1050,7 @@ src/
   terminal.ts              escape-hatch exec terminal (script-PTY)
   progress.ts              connection progress toast (log-link title, reports)
   logging.ts               output channel (+ REMOTE_INCUS_DEBUG_LOG mirror)
-  types/                   proposal d.ts pinned to vscode 1.142.0
+  types/                   proposal d.ts pinned to vscode 1.143.1
 assets/relay.js            bundled relay (staged in-instance per install)
 tests/                     regression/script suite and fixtures
 scripts/                   portable relay check, opt-in live verifier, older harnesses

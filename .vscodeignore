@@ -9,3 +9,21 @@ redeploy.sh
 .gitignore
 *.vsix
 tests/**
+# Development configuration and private runtime material are never published.
+.githooks/**
+.vscode/**
+.agents/**
+.codex/**
+.aws/**
+.ssh/**
+.prettier*
+eslint.config.mjs
+**/.env
+**/.env.*
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*.log
+**/*.map
+**/.state/**

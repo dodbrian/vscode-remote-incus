@@ -39,9 +39,13 @@ and opt in once via `~/.vscode/argv.json`:
 ```
 
 Then install the VSIX: `code --install-extension remote-incus.vsix`.
-Target requirements: incus ≥ 6.0, Linux client, instances with glibc (x64/arm64).
-Task 4 verified Linux x64 with Stable 1.143.1 and Incus 7.5.1; arm64 and
-Insiders were not exercised in that verification.
+Current verified configuration: Linux x64 client, Stable VS Code 1.143.1 and
+Incus 7.5.1, with scoped Ubuntu glibc x64 and Alpine musl x64 instance checks.
+The manifest declares VS Code `^1.140.0`, and bootstrap implements glibc arm64
+selection, but these are not evidence that every matching version or architecture
+works. ARM64, Insiders, macOS and Windows remain unverified. Incus 6.0.5 has
+historical evidence with packaging-specific signal restrictions; see the
+[design support matrix](docs/DESIGN.md#10-support-matrix-mvp).
 
 Bootstrap requires `/bin/sh`; Bash is optional. The rescue terminal additionally
 requires util-linux `script`. Minimal Alpine x64 images need `libstdc++` and
@@ -115,7 +119,10 @@ service on the TLS/cluster fixture and an IPv6-loopback service locally.
 After redeploy, the user manually verified Ports and reported it working
 on 2026-10-25. A local fixture with IPv6-only external networking exposed a
 separate IPv4-loopback address-resolution edge
-case; see [the handover](docs/HANDOVER.md) for the diagnosis.
+case. The **Forward over IPv4** helper above passed isolated HTTP checks and
+manual acceptance in the normal installed profile on 2026-10-25; ordinary
+forwarding still has that address-resolution limitation. See
+[the handover](docs/HANDOVER.md) for the evidence.
 
 “Connect in New Window” opens a separate workspace containing the chosen or
 last-used remote folder. Each request has its own workspace identity, so an
@@ -124,7 +131,9 @@ to open the folder directly. Instances without folder history open an empty
 remote window. The small workspace files live in the extension's local storage
 (`window-workspaces`), remain available for reload/reopening, and do not modify
 the remote project. Successful files are retained rather than automatically
-pruned; failed open requests remove their generated workspace.
+pruned; failed open requests remove their generated workspace. Isolated
+three-window and reopening checks passed; the user also manually confirmed the
+normal-profile identical-folder new-window workflow on 2026-10-25.
 
 ## Development
 
@@ -170,13 +179,27 @@ client's signing-module path. Establish that the fixture is test-owned and idle
 before use. No instance is created/deleted automatically, and target values or
 raw private logs belong outside tracked artifacts. See
 [testing guide](docs/tests/README.md) for commands and boundaries. The older
-smoke/fresh-install scripts are not CI entry points.
+smoke/fresh-install scripts are not CI entry points. Smoke runs only pure checks
+without a target argument; live smoke requires an explicit `remote:instance`.
+Fresh-install checks also require `INCUS_TEST_ALLOW_DESTRUCTIVE=yes`. Run these
+manual harnesses from the repository root against a test-owned idle fixture.
 
 ```
 npm install
 npm run typecheck
-./redeploy.sh        # build + package + install + reopen the remote window
+./redeploy.sh <remote:instance> <absolute-folder>  # install + restart + reopen explicit fixture
 ```
+
+## Publication privacy
+
+Run `npm run audit:privacy` on the checkout and
+`node scripts/audit-privacy.cjs --history` on reachable Git history. For an
+extracted VSIX or source export, use
+`node scripts/audit-privacy.cjs --root <directory>`. Findings report file, line
+and category without printing the matched value. This bounded pattern check
+supplements manual review; it cannot recognize arbitrary private hostnames or
+every secret format. Keep fixture identities in runtime inputs and keep raw
+logs, token files and credentials out of tracked files and published archives.
 
 ## Icon licensing
 
@@ -188,4 +211,6 @@ for source and license details.
 ## Documentation
 
 See the [documentation index](docs/README.md) for architecture, testing, task plans,
-verification results, and project history.
+verification results, and project history. The
+[release-readiness review](docs/RELEASE-READINESS.md) records publication blockers
+and the remaining naming, packaging and distribution decisions.

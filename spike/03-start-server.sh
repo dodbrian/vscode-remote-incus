@@ -4,10 +4,19 @@
 # and publish host-side state under spike/.state/.
 set -euo pipefail
 
-CONTAINER=fixture-container
+: "${INCUS_SPIKE_TARGET:?Set INCUS_SPIKE_TARGET to an explicit test-owned remote:instance}"
+case "$INCUS_SPIKE_TARGET" in
+  -*|:*|*:|*:*:*|*[!a-zA-Z0-9:_.-]*) echo "Expected an explicit remote:instance" >&2; exit 2 ;;
+  *:*) ;;
+  *) echo "Expected an explicit remote:instance" >&2; exit 2 ;;
+esac
+CONTAINER=$INCUS_SPIKE_TARGET
 DBG_USER=ubuntu
 DBU_UID=1000
 STATE="$(pwd)/spike/.state"
+umask 077
+mkdir -p "$STATE"
+chmod 700 "$STATE"
 
 COMMIT=$(cat "$STATE/server.commit")
 echo "== commit: $COMMIT"

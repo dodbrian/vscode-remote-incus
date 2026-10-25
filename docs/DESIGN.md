@@ -24,7 +24,8 @@ news was Copilot Chat only), so forking is not available either.
 provider — the same proposed-API surface third parties already use in production
 (e.g. `jeanp413/open-remote-ssh`):
 
-- proposed APIs: `resolvers` + `contribViewsRemote` (tree view inside the Remote Explorer)
+- proposed APIs: `resolvers`, `contribViewsRemote` (Remote Explorer tree), and
+  `tunnels` (selected-row IPv4 helper)
 - authority prefix: `incus` → `vscode-remote://incus+<remote>/<instance>/…`
 - distribution: VSIX / OpenVSX; on Microsoft stable builds the user opts in once via
   `~/.vscode/argv.json`: `"enable-proposed-api": ["<publisher>.remote-incus"]`
@@ -59,12 +60,13 @@ Wiring through the VS Code API:
 - terminal/PTY traffic is **multiplexed over the management channel** (no extra dial);
 - if no custom `tunnelFactory` is returned, **core synthesizes one for forwarded app
   ports** — dialing `makeConnection()` once per forwarded port and running the server's
-  tunnel protocol itself. This API path still requires Ports feature activation:
-  Task 4 found the Ports view unavailable, so actual forwarding remains unverified
-  ([evidence](TASK-04-RESULTS.md#observed-integration-gap-ports-view-unavailable)).
-  Phase 1 intends to use the core path; phase 2 may optimize per-port via
-  `incus port-forward` (Incus ≥ 7.3, not available on the 6.0.5 dev host) or hotplug
-  ephemeral proxy devices.
+  tunnel protocol itself. The resolver now enables the Ports view using
+  `forwardedPortsViewEnabled`; actual forwarding and manual Ports acceptance
+  passed on the scoped Stable 1.143.1 fixtures. The selected-row IPv4 helper
+  uses core forwarding with `::ffff:127.0.0.1` for the IPv6-only-networking
+  address-resolution edge case. It does not replace the tunnel factory or
+  intercept ordinary forwarding. See the current [handover](HANDOVER.md).
+  Per-port `incus port-forward` or proxy devices remain future alternatives.
 
 Precedent (verified by autopsy of issue logs): the official Dev Containers "attach to
 running container" flow uses exactly this architecture with `docker exec` — server
@@ -217,13 +219,20 @@ manual-selection policy at the user's request; no keepalive setting is changed.
 
 Pre-flight before every resolve, from `incus list` / daemon state:
 
-| situation                                                   | behavior                                                                         |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| instance stopped                                            | offer "Start & connect" (progress UI), then proceed                              |
-| instance deleted (404)                                      | distinct error + tree refresh; never auto-recreate                               |
-| recreated instance (stale `~/.vscode-server`, wrong commit) | detect, restart server under correct commit                                      |
-| container stopped mid-session                               | all bridges die at once → fatal "Connection lost" + "Start and reconnect" action |
-| glibc/musl/arch mismatch                                    | refusal names the exact constraint (via check-requirements)                      |
+| Situation                                          | Current behavior                                                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Instance stopped                                   | Start during resolve with progress, then recheck state                                                             |
+| Instance deleted or renamed                        | `NotAvailable`, refresh tree; never auto-recreate                                                                  |
+| Instance starting, including after a start request | `TemporarilyNotAvailable`; do not issue another start for an already-starting instance                             |
+| Unexpected state or daemon/transport failure       | Preserve cause in logs and wrap unexpected errors with authority and first-line detail                             |
+| Stale server commit or missing install             | Detect and replace/reinstall as appropriate before reuse                                                           |
+| Container stopped mid-session                      | Bridges close; core can re-resolve through the same pre-flight                                                     |
+| Unsupported architecture/libc                      | Refuse with the detected constraint                                                                                |
+| New server startup prerequisites                   | Check `nohup`, executable launcher and bundled `node --version` before detaching; preserve previous log on failure |
+
+The runtime probe catches loader and executable failures, not every later
+server requirement. Error classification has offline regression coverage;
+error-dialog UX has not been reverified live.
 
 Parity commands (with official Remote-SSH): Kill VS Code Server on Instance, Uninstall
 from Instance, plus an escape-hatch **open terminal over exec** (no sshd → no plain
@@ -258,7 +267,7 @@ Shell hygiene traps (spike-caused, now codified):
 - `pkill -f` self-match twice over: the pattern AND any comment text inside the same
   `bash -c` payload are matchable — bracket-class every pattern, keep payloads free of
   plain names
-- direct exec args expand `~` **client-side** (`/home/developer/...` leaks into container
+- direct exec args expand `~` **client-side** (`<client-home>/...` leaks into container
   paths) — always pass absolute in-container paths
 - installed-VSIX `extensionPath` lives in `~/.vscode/extensions/<id>` — never derive
   repo/script paths from it
@@ -292,9 +301,8 @@ Remote Explorer tree (`contribViewsRemote`, verified on stable 1.142.0, spike ex
 { remoteAuthority, reuseWindow })` — the open-remote-ssh pattern, works for
   third-party authorities; extension activates via `onView:<viewId>`
 - env fact discovered during verification: on this dev host the **default incus
-  remote is `fixture-remote` (TLS daemon)** and the local unix socket is NOT group-accessible
-  (`incus list local:` → EACCES). All instances incl. `fixture-container` live on
-  `fixture-remote`. Tree remotes must be filtered by `Protocol === 'incus'` (drops the
+  remote was a TLS daemon** and the local unix socket is NOT group-accessible
+  (`incus list local:` → EACCES). The tested fixture was hosted on that TLS daemon. Tree remotes must be filtered by `Protocol === 'incus'` (drops the
   simplestreams `images` remote) and per-remote listing must degrade gracefully.
 
 Phase-1 extension (TypeScript + esbuild, verified on stable 1.142.0, 2026-10-19 —
@@ -515,16 +523,15 @@ after reuse returns. This does not test an actual old server binary.
 
 Stable 1.143.1 development windows passed files, integrated/rescue terminals,
 remote Restricted Mode, history removal, distinct-folder concurrent windows
-and reload/one-step reconnect. Two findings remain: an already-open identical
+and reload/one-step reconnect. At Task 4 completion, two findings remained: an already-open identical
 folder is reused despite a new-window request; Ports is unavailable, so the
 forwarded application path remains unverified. Runtime-source inspection and
 reproductions are recorded in [TASK-04-RESULTS.md](TASK-04-RESULTS.md).
 
 No production code or frozen policy was changed. Test fixtures/processes,
 private profile and temporary artifacts were cleaned. The user subsequently
-discussed the results and resolved the Task 4 discussion gate. The findings
-remain open; implementation, optimization and further live work still require
-explicit next-step authorization.
+discussed the results and resolved the Task 4 discussion gate. These findings were open at Task 4 completion and were subsequently addressed
+by the follow-ups below. The original results report remains historical evidence.
 
 ### Identical-folder window follow-up (2026-10-24)
 
@@ -552,8 +559,9 @@ workspace and folder-action workspace. All three concurrently read the exact
 remote marker; the path contained spaces, hash, question mark and Unicode.
 The first attempt omitted remote authority metadata and failed; it is not
 counted as a pass. See [HANDOVER.md](HANDOVER.md) for current status and limits.
-Manual Ports interaction is deferred by the user; successful automated IPv4
-forwarding is recorded in the handover.
+The user manually confirmed the normal-profile identical-folder new-window
+workflow on 2026-10-25. Ports controls and the IPv4 helper also subsequently
+received normal-profile manual acceptance; see the handover for their scope.
 
 ## 9. Distribution & licensing constraints
 
@@ -571,15 +579,21 @@ forwarding is recorded in the handover.
 
 ## 10. Support matrix (MVP)
 
-| dimension                | MVP                                                                                                                                                                                                         | later                                                                                                          |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| client OS                | Linux                                                                                                                                                                                                       | macOS, Windows (upstream client builds exist; CLI discovery TBD)                                               |
-| client version           | ≥ 1.140 (engine range `^1.140.0`); proposal d.ts verified byte-identical 1.140→1.142; historically verified on 1.142.0; Task 4 verified scoped behavior on Stable 1.143.1, with window/Ports findings below | proposal-shape change in a future client → extension fix release (runtime guard errors loudly, never silently) |
-| daemon                   | local unix socket, remote TLS (`--remote`)                                                                                                                                                                  | restricted remotes/projects                                                                                    |
-| Incus CLI (client)       | ≥ 6.0 — verified on 6.0.5 and 7.5.1 (list-filter quirk: §14)                                                                                                                                                | —                                                                                                              |
-| Incus server / packaging | ≥ 6.0 — verified 6.0.5 (Ubuntu deb) and 7.5.1 (zabbly); packaging variant changes behavior (§14)                                                                                                            | port-forward on ≥ 7.3                                                                                          |
-| instance arch            | x64, arm64 (glibc) intended; Task 4 live checks cover x64 only                                                                                                                                              | alpine-musl x64                                                                                                |
-| explicit non-goals       | musl-arm64 server (doesn't exist upstream)                                                                                                                                                                  | —                                                                                                              |
+This separates implemented selection and declared ranges from verified runtime
+coverage. Earlier evidence does not establish every intermediate version.
+
+| Dimension                    | Current evidence                                                                                               | Remaining limits                                                                                                       |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Client OS/architecture       | Linux x64                                                                                                      | macOS, Windows and ARM64 clients unverified                                                                            |
+| Client version               | Scoped Stable 1.143.1 checks; historical Stable 1.142.0 evidence                                               | Manifest range `^1.140.0` is a declaration, not full range verification; Insiders unverified; proposed APIs can change |
+| Proposed APIs                | `resolvers`, `contribViewsRemote`, `tunnels`; typings pinned to 1.143.1                                        | Stable requires explicit opt-in; registry eligibility must be checked before publication                               |
+| Daemon transport             | Local Unix socket and remote TLS/cluster fixtures                                                              | Restricted remotes/projects unverified                                                                                 |
+| Incus CLI/server             | Scoped 7.5.1 checks; historical 6.0.5 evidence                                                                 | Packaging can block signals (§14); no exhaustive version/package matrix                                                |
+| Instance architecture/libc   | Ubuntu glibc x64 and Alpine 3.24 musl x64 checks                                                               | glibc ARM64 selection implemented but unverified; musl ARM64 rejected                                                  |
+| Shell/runtime                | `/bin/sh`, including BusyBox without Bash; Alpine prerequisites and normal-profile terminal workflows verified | Required runtime libraries/utilities must already be installed; rescue terminal needs util-linux `script`              |
+| Ports                        | Core forwarding plus selected-row IPv4 helper; normal-profile manual acceptance on 2026-10-25                  | Ordinary IPv4-loopback forwarding can fail with IPv6-only external networking; helper needs an existing Ports row      |
+| Identical-folder new windows | Isolated concurrent/reopening checks plus normal-profile manual acceptance on 2026-10-25                       | Uses retained local workspace files; no automatic pruning                                                              |
+| Diagnostics                  | Resolver classification and startup prerequisite regressions; scoped live startup checks                       | Error-dialog UX has not been reverified live; runtime probe does not cover every later startup failure                 |
 
 ## 11. Open questions (recorded, with leaning)
 
@@ -587,7 +601,8 @@ forwarding is recorded in the handover.
 2. ~~`contribViewsRemote` tree-view wiring~~ **Verified 2026-10-19** (see §8).
 3. Per-connection `--env`/`--cwd` surface for future devcontainer.json support — Phase 3.
 4. Multi-user-in-one-instance semantics (concurrent different-uid attaches) — Phase 2.
-5. Download-URL override setting for fully offline environments (mirror support).
+5. Download-URL override is implemented for `auto`/`client`; explicit container
+   mode rejects custom mirrors. Mirrors still require a reachable endpoint.
 
 ## 12. Phase-1 plan (next work package)
 
@@ -611,13 +626,19 @@ forwarding is recorded in the handover.
    **DONE 2026-10-19** — title-embedded command link, real download/push
    percentages, percent-first messages (see §8).
 5. Diagnostics: output channel, per-bridge structured logs, "collect diagnostics"
-   command; sensible `RemoteAuthorityResolverError` usage. _(output channel +
-   per-bridge logs + collect-diagnostics exist; error-taxonomy refinement open)_
+   command and resolver classification are implemented. Deleted instances map to
+   `NotAvailable` with tree refresh; starting states map to
+   `TemporarilyNotAvailable`; unexpected failures retain their cause. Startup
+   prerequisite probes and missing rescue-terminal `script` guidance are also
+   implemented. Offline and scoped live evidence is in the handover; error-dialog
+   UX remains unverified live.
 6. Tests: Task 3's 80-test correctness gate and Task 4's real shell/relay,
    explicit-target local/TLS handshakes and Stable development-window checks
    are complete within their recorded scope. See [Task 4 results](TASK-04-RESULTS.md).
-   Ports/identical-folder findings remain open after the completed discussion; Insiders and
-   arm64/additional image/version matrices remain unverified. Private fixtures
+   Ports and identical-folder follow-ups have passed scoped checks and
+   normal-profile manual acceptance. Alpine musl x64 and Bash-free terminal
+   follow-ups also passed. Insiders, ARM64 and additional image/version
+   combinations remain unverified. Private fixtures
    are manual runtime inputs, never CI dependencies. Do not begin further
    testing or optimization without explicit next-step authorization.
 7. Packaging pipeline: CI-built VSIX + OpenVSX publish + README with the argv.json step.
@@ -651,13 +672,13 @@ not rediscovered.
 | `incus <op> <remote>:<name>` (exec/file/start/stop/restart) | ok                                      | ok                                                                                                                                                                                                                                                                                       | —                                                                                                                                 |
 | `incus file push` progress meter                            | prints `<n>% (<speed>)` even when piped | prints NOTHING when piped — 7.x push is SFTP-based (`sftpCreateFile`), the meter is TTY-gated (`shared/cmd/progress.go` `Update()` returns unless stdout is a terminal), and a file push creates NO operation (no progress metadata to poll; verified 2026-10-22, piped and under a pty) | poll the growing target file in-instance (`stat -c %s`, 1 Hz) — the SFTP writer extends it in place; keep the meter parse for 6.x |
 
-| host stack                                                        | in-container signals          | cause                                                                                                                                       |
-| ----------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ubuntu-archive incus deb 6.0.5-8, Ubuntu 26.04 host               | ALL denied, EACCES incl. root | Ubuntu 25.04+ hardening `kernel.apparmor_restrict_unprivileged_unconfined=1`; Ubuntu packaging lacks the compat sysctl (Launchpad #2109394) |
-| zabbly incus 7.5.1, kernel 7.0.0-38 (client-host; also member member-b) | fine                          | zabbly ships `/etc/sysctl.d/50-incus.conf` (= 0)                                                                                            |
+| host stack                                                      | in-container signals          | cause                                                                                                                                       |
+| --------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ubuntu-archive incus deb 6.0.5-8, Ubuntu 26.04 host             | ALL denied, EACCES incl. root | Ubuntu 25.04+ hardening `kernel.apparmor_restrict_unprivileged_unconfined=1`; Ubuntu packaging lacks the compat sysctl (Launchpad #2109394) |
+| zabbly incus 7.5.1, kernel 7.0.0-38 (local and cluster fixture) | fine                          | zabbly ships `/etc/sysctl.d/50-incus.conf` (= 0)                                                                                            |
 
-Gotcha: server version ≠ instance behavior — `fixture-remote` is a CLUSTER (member
-`fixture-remote`: Ubuntu 24.04/kernel 6.8; member `member-b`: kernel 7.0.0-38); what an
+Gotcha: server version ≠ instance behavior. A tested cluster mixed
+Ubuntu 24.04/kernel 6.8 and kernel 7.0.0-38 members; what an
 instance sees depends on the member hosting it (`location`), so probes and
 compat decisions must be per-instance (or per-location), never per-remote.
 

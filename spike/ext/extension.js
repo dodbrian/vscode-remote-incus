@@ -31,8 +31,16 @@ const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+function requireRepoRoot() {
+  if (!process.env.INCUS_SPIKE_REPO_ROOT) throw new Error('Set INCUS_SPIKE_REPO_ROOT to the repository root');
+  return process.env.INCUS_SPIKE_REPO_ROOT;
+}
+
 // --- spike constants (deliberately hardcoded; Phase 1 generalizes) ----------
-const CONTAINER = 'fixture-container';
+const CONTAINER = process.env.INCUS_SPIKE_TARGET;
+if (!CONTAINER || !/^[^:\s-][^:\s]*:[^:\s-][^:\s]*$/.test(CONTAINER)) {
+  throw new Error('Set INCUS_SPIKE_TARGET to an explicit test-owned remote:instance');
+}
 const DBU_UID = '1000';
 const DBU_USER = 'ubuntu';
 const DBU_HOME = '/home/ubuntu';
@@ -74,7 +82,7 @@ async function ensureRelayStaged(extensionPath) {
     // Spike note: installed-VSIX extensionPath is ~/.vscode/extensions/<id>, so the
     // local relay.js must be referenced absolutely here. Phase 1 ships it as a
     // bundled asset of the extension itself.
-    const local = '/path/to/repository/spike/relay.js';
+    const local = path.join(requireRepoRoot(), 'spike', 'relay.js');
     await inc(['file', 'push', local, `${CONTAINER}${RELAY_REMOTE}`,
                '--uid', DBU_UID, '--gid', DBU_UID, '--mode', '600']);
     log('relay.js staged');
@@ -88,9 +96,9 @@ async function ensureServerRunning(extensionPath) {
 
   log('server not running — running spike 03-start-server.sh …');
   // Spike note: for an INSTALLED VSIX, extensionPath points into ~/.vscode/extensions,
-  // so relative derivation is wrong. The spike hardcodes the repo location; Phase 1
+  // so relative derivation is wrong. The spike requires a runtime repo location; Phase 1
   // inlines the bootstrap logic instead of shelling out.
-  const repoRoot = '/path/to/repository';
+  const repoRoot = requireRepoRoot();
   await new Promise((resolve, reject) => {
     cp.execFile('bash', [path.join(repoRoot, 'spike', '03-start-server.sh')],
       { cwd: repoRoot, timeout: 120_000 },

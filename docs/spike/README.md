@@ -26,14 +26,20 @@ Script paths below are relative to `spike/` in the repository root.
 |---|---|
 | `02-install-server.sh` | downloads server tarball **client-side** (air-gap pattern!), pushes via `incus file push -`, extracts as `ubuntu` into `~/.vscode-server/bin/<commit>` |
 | `03-start-server.sh` | writes/ensures `0600` token file, starts server detached via `bin/code-server --host 127.0.0.1 --port 0 --connection-token-file …`, parses the listening port from stdout log, writes `spike/.state/` |
-| `04-relay.py` | local TCP listener on `127.0.0.1:16080`; every connection spawns its own `incus exec … node -e` relay bridging stdio ↔ the in-container server port; prints the `?tkn=` URL to open |
+| `04-relay.py` | local TCP listener on `127.0.0.1:16080`; every connection spawns its own `incus exec … node -e` relay bridging stdio ↔ the in-container server port; keeps the connection token out of stdout |
 
 The verification requirements are listed above under “What must be proven”.
 
 ## Hygiene
 
-- Container name: `fixture-container` (isolated; no other instance is touched).
+- Supply `INCUS_SPIKE_TARGET` as an explicit test-owned idle `remote:instance`.
+  The archived spike assumes an Ubuntu fixture with uid 1000. It has no default
+  target. The spike extension also requires `INCUS_SPIKE_REPO_ROOT`.
 - Local state/cache under `spike/.state/` and `/tmp/remote-incus-dev/fixture-container/`.
 - 232 MB tarball cached client-side so restarts are cheap.
 - incus here is **6.0.5**: `incus port-forward` (7.3+) is NOT available — by design the
   spike relies on per-connection exec bridges only.
+
+These scripts are historical references, not CI entry points. Run destructive
+install/start steps only with explicit fixture authorization. Token state is
+private (`0700` directory / `0600` files) and ignored by Git; never publish it.

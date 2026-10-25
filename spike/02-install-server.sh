@@ -3,12 +3,19 @@
 # Client-side download (air-gap pattern) + `incus file push -` (single stdin stream).
 set -euo pipefail
 
-CONTAINER=fixture-container
+: "${INCUS_SPIKE_TARGET:?Set INCUS_SPIKE_TARGET to an explicit test-owned remote:instance}"
+case "$INCUS_SPIKE_TARGET" in
+  -*|:*|*:|*:*:*|*[!a-zA-Z0-9:_.-]*) echo "Expected an explicit remote:instance" >&2; exit 2 ;;
+  *:*) ;;
+  *) echo "Expected an explicit remote:instance" >&2; exit 2 ;;
+esac
+CONTAINER=$INCUS_SPIKE_TARGET
 DBG_USER=ubuntu
 DBU_UID=1000   # incus 6.0.5 --user takes NUMERIC uid only (verified)
 CACHE=/tmp/remote-incus-dev/fixture-container
 STATE="$(pwd)/spike/.state"
 
+umask 077
 mkdir -p "$CACHE" "$STATE"
 
 COMMIT=$(code --version | sed -n '2p')

@@ -3,3 +3,11 @@ spike/.state/
 *.vsix
 node_modules/
 dist/
+
+# Private runtime configuration, diagnostics and credentials
+.env
+.env.*
+!.env.example
+*.log
+*.key
+*.pem

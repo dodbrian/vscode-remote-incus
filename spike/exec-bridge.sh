@@ -2,10 +2,16 @@
 # Per-connection exec bridge child, spawned by socat for every accepted TCP conn.
 # Reads the CURRENT port/commit from spike state -> survives server restarts.
 set -eu
+case "$INCUS_SPIKE_TARGET" in
+  -*|:*|*:|*:*:*|*[!a-zA-Z0-9:_.-]*) echo "Expected an explicit remote:instance" >&2; exit 2 ;;
+  *:*) ;;
+  *) echo "Expected an explicit remote:instance" >&2; exit 2 ;;
+esac
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PORT=$(cat "$HERE/.state/server.port")
 COMMIT=$(cat "$HERE/.state/server.commit")
-exec incus exec fixture-container \
+: "${INCUS_SPIKE_TARGET:?Set explicit test-owned remote:instance}"
+exec incus exec "$INCUS_SPIKE_TARGET" \
   --mode non-interactive \
   --user 1000 \
   --env HOME=/home/ubuntu \

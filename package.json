@@ -305,7 +305,8 @@
     "package": "npm run check && npx --yes @vscode/vsce@latest package --allow-missing-repository -o remote-incus.vsix",
     "test": "npm run check && node tests/build.cjs",
     "test:relay": "node scripts/verify-relay.cjs",
-    "prepare": "sh scripts/setup-hooks.sh"
+    "prepare": "sh scripts/setup-hooks.sh",
+    "audit:privacy": "node scripts/audit-privacy.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

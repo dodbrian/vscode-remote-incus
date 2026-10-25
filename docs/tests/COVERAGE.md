@@ -181,7 +181,7 @@ further work awaits explicit next-step authorization.
 Task 1 acceptance was explicitly confirmed by the user in this session before
 implementation. Starting commit: `49c0ac0` (Task 1 harness). The task documents
 and regression plan were read from the primary checkout at
-`/path/to/repository/`; they are absent from this worktree.
+`<repository-root>/`; they are absent from this worktree.
 This report maps tests to that plan dated 2026-10-23. An ID here does **not**
 mean all layers or every clause of the ID are covered.
 

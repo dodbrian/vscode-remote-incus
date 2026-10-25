@@ -16,9 +16,13 @@ Teardown rules (the ones the audit demanded):
 """
 import asyncio
 import pathlib
+import os
+import re
 import sys
 
-CONTAINER = "fixture-container"
+CONTAINER = os.environ["INCUS_SPIKE_TARGET"]
+if not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9_.-]*:[a-zA-Z0-9_][a-zA-Z0-9_.-]*", CONTAINER):
+    raise ValueError("Expected an explicit remote:instance")
 DBG_USER = "ubuntu"
 DBU_UID = "1000"   # incus 6.0.5: --user accepts NUMERIC uid only (verified)
 DBU_HOME = f"/home/{DBG_USER}"
@@ -131,8 +135,8 @@ async def main():
     commit = read_state("server.commit")
     port = read_state("server.port")
     try:
-        token = read_state("server.token")
-        print(f"== open in a browser:  http://{LISTEN_HOST}:{LISTEN_PORT}/?tkn={token}")
+        read_state("server.token")
+        print("== connection token is in the private spike/.state/server.token file; it is not logged")
     except FileNotFoundError:
         print("== no token state; expect auth failure page — re-run 03-start-server.sh")
 

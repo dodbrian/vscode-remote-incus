@@ -188,8 +188,8 @@ Recommended order:
 
 Incus integration must select the full target explicitly and verify fixture
 ownership before mutation. HANDOVER forbids touching production instances;
-its existing approved target is `fixture-remote:fixture-container`. Any fresh fixture must
-be explicitly identified as test-owned. No daemon reconfiguration, container
+fixture identities are supplied only at runtime. Every fixture must be explicitly
+identified as test-owned. No daemon reconfiguration, container
 deletion/recreation, production enumeration-based selection, or VS Code
 restart was performed for this review. A cluster member need not be pinned:
 Incus routes instance operations through the cluster [I4]. Environment checks

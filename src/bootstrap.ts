@@ -378,7 +378,7 @@ async function ensureTarballInInstance(
   // must be able to remove the tarball afterwards — a root-owned file in
   // sticky /tmp (1777) is undeletable for any other uid ("Operation not
   // permitted"; hit live 2026-10-20 on the first fully fresh install —
-  // fixture-remote never exercised the extract path, its install was spike-era).
+  // the preinstalled TLS fixture never exercised extraction, its install was spike-era).
   await pushFile(ref, tar.file, tmp, {
     uid: identity.uid,
     gid: identity.gid,

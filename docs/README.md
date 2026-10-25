@@ -8,6 +8,7 @@ unless stated otherwise.
 ## Architecture and research
 
 - [Design](DESIGN.md): architecture, decisions, and spike findings.
+- [Release readiness](RELEASE-READINESS.md): publication audit and remaining decisions.
 - [Alternatives](ALTERNATIVES.md): related projects and distribution research.
 - [Phase-0 spike](spike/README.md): original transport verification.
 - [Third-party notices](ThirdPartyNotices.md): bundled asset attribution and licensing.

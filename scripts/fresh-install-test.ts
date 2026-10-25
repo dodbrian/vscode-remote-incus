@@ -6,15 +6,19 @@
  * instance lifecycle (launch before, delete after); this script assumes the
  * instance is RUNNING.
  *
- * Usage: node fresh-install-test.js [remote:]<instance>
+ * Usage (from repository root): INCUS_TEST_ALLOW_DESTRUCTIVE=yes node fresh-install-test.js <remote:instance>
  */
 import * as cp from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import * as vscode from 'vscode'; // stubbed at bundle time
 import { ensureServerReady } from '../src/bootstrap';
 import { execInInstance, InstanceRef, target } from '../src/incusCli';
 import { initLogging } from '../src/logging';
 
-const REPO = '/path/to/repository';
+const REPO = process.cwd();
+const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'remote-incus-fresh-'));
 
 function defined<T>(value: T | undefined | null, message = 'expected a defined value'): T {
   if (value === undefined || value === null) throw new Error(message);
@@ -34,7 +38,7 @@ function clientCommit(): string {
 
 function fakeContext(): vscode.ExtensionContext {
   return {
-    globalStorageUri: { fsPath: '/tmp/remote-incus-dev/freshprobe-storage' },
+    globalStorageUri: { fsPath: storage },
     asAbsolutePath: (p: string) => `${REPO}/${p}`,
     subscriptions: [],
   } as unknown as vscode.ExtensionContext;
@@ -42,15 +46,18 @@ function fakeContext(): vscode.ExtensionContext {
 
 async function main(): Promise<void> {
   const targetArg = process.argv[2];
-  // Deliberate falsy fallback: a degenerate empty instance segment opts into
-  // the default fixture name (nullish `??` would keep the empty string).
-  const instanceArg = targetArg?.split(':').pop();
-  const instance =
-    instanceArg === undefined || instanceArg === '' ? 'fresh-install-fixture' : instanceArg;
-  const ref: InstanceRef = {
-    remote: targetArg?.includes(':') ? defined(targetArg.split(':')[0]) : 'local',
-    instance,
-  };
+  if (
+    process.env.CI ||
+    !targetArg ||
+    !/^[^:\s-][^:\s]*:[^:\s-][^:\s]*$/.test(targetArg) ||
+    process.env.INCUS_TEST_ALLOW_DESTRUCTIVE !== 'yes'
+  ) {
+    throw new Error(
+      'Requires explicit remote:instance and INCUS_TEST_ALLOW_DESTRUCTIVE=yes; fixture must be test-owned and idle. Run from the repository root.',
+    );
+  }
+  const [remote, instance] = targetArg.split(':');
+  const ref: InstanceRef = { remote: defined(remote), instance: defined(instance) };
   initLogging(fakeContext());
   (vscode as unknown as { env: { appCommit?: string } }).env.appCommit = clientCommit();
   console.log(
@@ -89,10 +96,14 @@ async function main(): Promise<void> {
   console.log('ALL FRESH-INSTALL CHECKS OK');
 }
 
-main().then(
-  () => process.exit(0),
-  (err: unknown) => {
-    console.error('FAILED:', err instanceof Error ? err.message : err);
-    process.exit(1);
-  },
-);
+main()
+  .finally(() => {
+    fs.rmSync(storage, { recursive: true, force: true });
+  })
+  .then(
+    () => process.exit(0),
+    (err: unknown) => {
+      console.error('FAILED:', err instanceof Error ? err.message : err);
+      process.exit(1);
+    },
+  );
