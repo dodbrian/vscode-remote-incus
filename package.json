@@ -309,7 +309,8 @@
     "audit:privacy": "node scripts/audit-privacy.cjs",
     "vscode:prepublish": "node esbuild.js --production",
     "verify:package": "node scripts/verify-package.cjs remote-incus.vsix",
-    "test:package": "node --test tests/package-policy.test.cjs tests/package-markdown.test.cjs tests/package-build.test.cjs"
+    "test:package": "node --test tests/package-policy.test.cjs tests/package-markdown.test.cjs tests/package-build.test.cjs",
+    "test:redeploy": "node --test tests/redeploy.test.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

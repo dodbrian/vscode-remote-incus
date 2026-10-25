@@ -19,8 +19,9 @@ REDEPLOY_FOLDER=$2
 REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$REPO_ROOT"
 
-node esbuild.js --production
-./node_modules/.bin/vsce package --allow-missing-repository --no-rewrite-relative-links -o remote-incus.vsix >/dev/null
+# Build and validate a candidate before replacing the last reviewed VSIX.
+# A failed quality/build/archive gate must not install or restart the editor.
+npm run package
 code --install-extension remote-incus.vsix --force >/dev/null
 pkill -f "/usr/share/cod[e]" || true
 # Launching into a half-dead instance pops the "Another instance of Code is
