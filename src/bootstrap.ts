@@ -889,9 +889,7 @@ async function doEnsureServerReady(
     }
   }
   report?.('ready', 100);
-  log(
-    `server ready on ${target(ref)}: commit ${commit.slice(0, 10)}…, 127.0.0.1:${port}, user ${identity.username} (uid ${identity.uid})`,
-  );
+  log(`server ready on ${target(ref)}: commit ${commit.slice(0, 10)}…, 127.0.0.1:${port}`);
   return { ref, identity, commit, flavor, port, token };
 }
 

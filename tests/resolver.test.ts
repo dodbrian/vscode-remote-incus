@@ -9,6 +9,8 @@ import { defined } from './support/assert';
 for (const status of ['Running', 'Stopped', 'still-stopped', 'absent', 'daemon-failure'] as const)
   test(`C1 C2 C3 X7: resolver ${status}`, (t) =>
     withFixture(t, async (f) => {
+      const logs: string[] = [];
+      t.mock.method(console, 'log', (...args: unknown[]) => logs.push(args.join(' ')));
       const operations = installedServer(f);
       const bootstrap = defined(f.routes.get('child_process.execFile'));
       const reports = progress(f);
@@ -63,6 +65,12 @@ for (const status of ['Running', 'Stopped', 'still-stopped', 'absent', 'daemon-f
         const result = (await pending) as any;
         assert.equal(typeof result.makeConnection, 'function');
         assert.equal(result.connectionToken.length, 43);
+        const readyLog = defined(logs.find((line) => line.includes('server ready on ')));
+        const resolvedLog = defined(logs.find((line) => line.includes('resolved incus+same:')));
+        for (const line of [readyLog, resolvedLog]) {
+          assert.doesNotMatch(line, /alice|1001|1002|\/home\/|user |uid /);
+          assert.ok(!line.includes(result.connectionToken));
+        }
         assert.equal(reports.at(-1)?.message, 'ready');
         const bootstrapOperations = operations.length;
         const bridges: unknown[] = [];

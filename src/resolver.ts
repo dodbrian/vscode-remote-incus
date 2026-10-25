@@ -96,10 +96,7 @@ export class IncusAuthorityResolver implements vscode.RemoteAuthorityResolver {
       }
 
       const session = await ensureServerReady(this.context, ref, report);
-      log(
-        `resolved ${authority}: commit ${session.commit.slice(0, 10)}…, port ${session.port}, ` +
-          `user ${session.identity.username} (uid ${session.identity.uid})`,
-      );
+      log(`resolved ${authority}: commit ${session.commit.slice(0, 10)}…, port ${session.port}`);
       return new vscode.ManagedResolvedAuthority(() => openBridge(session), session.token);
     });
   }

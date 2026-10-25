@@ -44,7 +44,7 @@ for (const [output, expected] of [
   ['aarch64\nmusl', undefined],
   ['riscv64\nglibc', undefined],
 ] as const)
-  test(`C7: flavor ${output.replace('\n', '/')}`, (t) =>
+  test(`C7: flavor ${output.replaceAll('\n', '/')}`, (t) =>
     withFixture(t, async (f) => {
       f.expect('child_process.execFile', (_cmd, args, _opts, cb) => {
         assert.ok(args.includes('1001'));
