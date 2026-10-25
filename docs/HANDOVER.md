@@ -22,6 +22,19 @@ with a Docker container".
 
 ## Current stopping point: reviewed build deployed and connection-verified (2026-10-25)
 
+The user accepted the completed deployment/verification result and requested
+this handover checkpoint. The deployment helper fix is committed as `2b49bd9`;
+live evidence and support-matrix updates are committed as `c5c8af0`. The scoped
+Ubuntu/Rocky connection and missing-tool task is complete; do not reopen it as
+pending or expand acceptance beyond the checks recorded below.
+
+Naming/publication decisions remain deferred. A focused next technical candidate
+is Linux x64 Insiders compatibility verification in an isolated profile, keeping
+the normal Stable session intact. Broader platform coverage, hosted CI and
+optional future architecture remain separate workstreams in the current task
+status below. No additional test, client installation, push or publication is
+authorized merely by this recommendation.
+
 The user explicitly authorized deployment and connection/error verification,
 including the reported Rocky Linux target, then separately approved installing
 `tar` there. The normal-profile VSIX was installed and VS Code restarted through
