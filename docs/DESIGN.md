@@ -97,9 +97,13 @@ tries container HTTPS download and falls back to this route if needed:
    the exec channel and is never persisted by the client.
 
 Variants: `server-linux-alpine` (musl, **x64 only**) for Alpine instances; `arm64`
-supported; armhf dropped upstream after VS Code 1.122. Requirements since VS Code
-1.99: kernel ≥ 4.18, glibc ≥ 2.28, libstdc++ ≥ 3.4.25 — pre-flight via the bundled
-`bin/helpers/check-requirements.sh` for clean refusals.
+selection is implemented but live ARM64 coverage is absent. Historical upstream
+requirements are recorded in the evidence ledger; declared compatibility does
+not establish runtime coverage. Missing/incomplete installations check setup
+tools in the selected user's PATH before download or extraction. Startup probes
+the bundled Node executable with `--version` and checks launcher permissions and
+`nohup`; it does not invoke `bin/helpers/check-requirements.sh` as a separate
+pre-flight or validate every kernel/library version.
 
 Task 5 is complete and manually accepted; consolidated evidence and limitations
 are in [TASK-05-RESULTS.md](TASK-05-RESULTS.md). The historical roughly 2 MB/s CLI
@@ -604,7 +608,7 @@ coverage. Earlier evidence does not establish every intermediate version.
 5. Download-URL override is implemented for `auto`/`client`; explicit container
    mode rejects custom mirrors. Mirrors still require a reachable endpoint.
 
-## 12. Phase-1 plan (next work package)
+## 12. Phase-1 implementation status and deferred work
 
 1. ~~TypeScript + esbuild project; extension skeleton from spike (inline bootstrap, no
    script shell-outs; relay.js as bundled asset).~~ **DONE 2026-10-19** — repo-root
@@ -641,7 +645,10 @@ coverage. Earlier evidence does not establish every intermediate version.
    combinations remain unverified. Private fixtures
    are manual runtime inputs, never CI dependencies. Do not begin further
    testing or optimization without explicit next-step authorization.
-7. Packaging pipeline: CI-built VSIX + OpenVSX publish + README with the argv.json step.
+7. Packaging pipeline: lockfile-installed VSCE, production prepublish build,
+   actual-archive policy checks and headless local-fixture CI are implemented.
+   Hosted CI execution remains unverified. Final identity and distribution
+   eligibility/route are deferred; registry publication is separately authorized.
 8. Incus version-compat layer (design sketch §14 — NOT yet implemented):
    version probe, behavioral adapter table, per-member/per-instance feature gates.
 
@@ -657,12 +664,20 @@ Current bootstrap and relay implementations live in `src/bootstrap.ts` and
 in `scripts/`. The manual development deployment helper is
 `scripts/redeploy.sh`.
 
-## 14. Incus version & packaging compatibility (design sketch — NOT yet implemented)
+## 14. Incus version & packaging compatibility (centralized layer deferred)
 
 Trigger (2026-10-20): the user's full reinstall of the local daemon from the
 zabbly repo bumped the CLI 6.0.5→7.5.1 and broke two assumptions in one go
 (§8). Version and PACKAGING differences must become explicit and versioned,
 not rediscovered.
+
+The centralized version probe, adapter table and feature gates below remain
+unimplemented. Individual compatibility fixes are already implemented: universal
+list syntax, 7.x push progress, signal probes and resolver classification. This
+proposal is optional follow-up architecture, not evidence that those fixes are
+missing. Later-phase multi-user and devcontainer.json work in §11 is future
+scope. Current reported bugs and deferred release work are tracked in the
+[handover](HANDOVER.md#current-task-status-2026-10-25).
 
 ### 14.1 Verified version-dependent behaviors
 
@@ -696,7 +711,7 @@ compat decisions must be per-instance (or per-location), never per-remote.
    REACHABLE — both daemons at 7.5.1; re-evaluates the §2 phase-2 transport
    note), proxy-device hotplug, project scoping, etc.
 4. **Pre-flight guards** per instance (signal-support probe implemented
-   2026-10-20; check-requirements.sh planned §3; future: probe host OS +
+   2026-10-20; setup-tool and executable runtime probes implemented §3; future: probe host OS +
    packaging variant and warn on known-bad combos).
 5. **Error taxonomy**: changed CLI semantics (empty match sets, new warnings)
    must map to precise, actionable resolver errors — never silently degrade

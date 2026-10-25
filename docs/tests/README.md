@@ -1,9 +1,8 @@
 # Regression, script and relay verification
 
 Run `npm test` with installed dependencies and Node 22.13+ (the extension build
-also targets Node 22). Verified locally with Node 24.21.0. No additional test
-framework or dependency is installed. `npm run typecheck` checks production and
-test TypeScript separately; `npm run compile` retains the production build.
+also targets Node 22). Verified locally with Node 24.21.0. Tests use Node's built-in runner; archive tooling uses locked development dependencies. `npm run typecheck` checks production and
+test TypeScript separately; `npm run compile` creates a development bundle.
 
 ## CI
 
@@ -14,8 +13,9 @@ from the repository root. The existing lockfile supplies dependency versions:
 npm ci --include=dev
 npm test
 npm run test:relay
-npm run typecheck
-npm run compile
+npm run test:package
+npm run audit:privacy
+npm run package
 ```
 
 Only dependency installation needs registry access (or a populated npm cache).
@@ -26,9 +26,22 @@ missing test files. Each test file has a 30-second runner timeout to bound
 hangs. Normal test completion/failure cleans temporary output; forced process
 termination relies on the CI runner's temporary-directory cleanup.
 
-These commands are CI-ready; no provider-specific workflow is added in task 1.
-Verification is local, not a run on a hosted CI worker. Task 2 coverage and
-its exact limits are recorded in [COVERAGE.md](COVERAGE.md).
+The tracked `.github/workflows/offline-ci.yml` runs this sequence on a headless
+Ubuntu runner with Node 24.21.0, read-only repository permissions and no Incus,
+credentials or private targets. Actions are pinned to commit IDs. After package
+validation it retains `remote-incus.vsix` as a workflow artifact for 14 days;
+it performs no registry publication. Dependency/action installation and artifact
+upload use the network; tests use only local fixtures and relay loopback sockets.
+Hosted workflow execution remains unverified until the repository is pushed and
+GitHub Actions runs it. Local checks do not substitute for that evidence.
+
+`npm run package` invokes the lockfile-installed VSCE, runs the production
+`vscode:prepublish` hook and checks actual archive contents. `npm run
+verify:package` rechecks the existing VSIX; `npm run test:package` exercises
+synthetic archive policy failures. The file allowlist retains runtime, licenses
+and linked documentation, and rejects unexpected or private/development files.
+Privacy scanning is bounded pattern detection, not a universal secret guarantee.
+Coverage and its exact limits are recorded in [COVERAGE.md](COVERAGE.md).
 
 ## Structure
 

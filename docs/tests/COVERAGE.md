@@ -1,3 +1,20 @@
+# Current verification scope (2026-10-25)
+
+Resolver classification, startup diagnostics, Alpine/Bash-free support, IPv4
+helper forwarding and identical-folder windows are implemented with the scoped
+acceptance recorded below. Later descriptions of pending checks belong to the
+historical stage in which they were written; the handover and DESIGN support
+matrix state current limits.
+
+Setup-tool prerequisite regressions now execute generated `/bin/sh` scripts
+with a controlled PATH, including missing `tar`/`gzip`, selected-user handling,
+all download strategies and refusal before destructive extraction. This is
+offline evidence, not reproduction on Rocky Linux or a live deployment.
+
+Package policy regressions use synthetic ZIPs; production packaging validates
+actual VSIX contents. The tracked headless workflow uses local fixtures only.
+Hosted CI, rendered error-dialog UX and additional platforms remain unverified.
+
 # Detected-port IPv4 helper follow-up (2026-10-25)
 
 `forwarding.test.ts` exercises the registered Ports-row command with detected
@@ -18,7 +35,7 @@ normal-profile deployment succeeded, but the user's screenshot showed no Ports
 row for an externally launched service. The test setup had assumed raw candidates
 were displayed; core only displays forwarded/environment-detected rows. With the
 user's hybrid discovery, a service URL in terminal output is needed to trigger
-ordinary auto-forwarding. Manual acceptance remains pending after correcting
+ordinary auto-forwarding. At that stage manual acceptance remained pending after correcting
 the setup; synthetic command-payload tests do not prove candidate-to-row discovery.
 The URL then created an auto-forwarded row, but the user's next screenshot
 exposed a hidden menu action. Its manifest comparison to literal `undefined`

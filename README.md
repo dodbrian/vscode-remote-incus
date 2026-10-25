@@ -47,7 +47,12 @@ works. ARM64, Insiders, macOS and Windows remain unverified. Incus 6.0.5 has
 historical evidence with packaging-specific signal restrictions; see the
 [design support matrix](docs/DESIGN.md#10-support-matrix-mvp).
 
-Bootstrap requires `/bin/sh`; Bash is optional. The rescue terminal additionally
+Bootstrap requires `/bin/sh`; Bash is optional. Before a missing or incomplete
+installation is downloaded or extracted, setup checks `tar`, `gzip` and its
+required file/checksum utilities in the selected user's PATH. A missing tool
+produces a direct prerequisite error; install it or make it available in that
+user's PATH before reconnecting. The extension does not repair PATH or install
+packages automatically. The rescue terminal additionally
 requires util-linux `script`. Minimal Alpine x64 images need `libstdc++` and
 `libgcc` for the musl server runtime; installing Bash does not supply those
 libraries. Install prerequisites explicitly; the extension does not install
@@ -144,12 +149,24 @@ npm test
 npm run test:relay
 npm run typecheck
 npm run compile
+npm run test:package
+npm run package
 ```
 
 `npm test` needs no VS Code installation, Incus binary/daemon, credentials,
 internet access or server download. `npm run test:relay` additionally needs
 local loopback TCP sockets and runs the bundled relay as real child processes.
-These portable checks can run in CI without private infrastructure.
+These portable checks are configured in the tracked offline CI workflow (`.github/workflows/offline-ci.yml`)
+without private infrastructure. CI installs locked dependencies, runs the checks,
+and retains a verified VSIX as a build artifact. It does not publish a release.
+
+`npm run package` uses the lockfile-installed VSCE. Its `vscode:prepublish` hook
+builds minified production output and removes stale source maps. The package
+validator inspects the actual ZIP contents against an explicit file policy,
+checks required runtime/licenses and documentation links, and scans privacy
+patterns. Packaging adjusts root README/license references to VSCE's emitted
+filenames so the archive's relative links remain valid. `npm run test:package` tests that policy with synthetic archives.
+Local validation does not establish that the workflow has run on GitHub.
 
 ### Mandatory quality gates
 
