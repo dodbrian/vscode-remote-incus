@@ -44,6 +44,11 @@
     },
     "commands": [
       {
+        "command": "remote-incus.showInstances",
+        "title": "Show Incus",
+        "category": "Remote - Incus"
+      },
+      {
         "command": "remote-incus.connectToInstance",
         "title": "Connect in Current Window...",
         "category": "Remote - Incus",

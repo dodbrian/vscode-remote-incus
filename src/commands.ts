@@ -35,6 +35,15 @@ export function registerCommands(
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
   };
 
+  reg('remote-incus.showInstances', async () => {
+    try {
+      // Opening the view also selects its remote target in the built-in container.
+      await vscode.commands.executeCommand('remote-incus.instances.focus');
+    } catch (err) {
+      log(`showInstances: ${fullMessage(err)}`);
+      showErrorWithLog(err);
+    }
+  });
   reg('remote-incus.refresh', () => {
     tree.refresh();
   });
