@@ -19,6 +19,32 @@ const node = (remote = 'one', status = 'Running'): InstanceNode =>
     { online: false, hasFolders: false, icon: new vscode.ThemeIcon('vm') },
   );
 
+test('Show Incus is accessible without the tree and focuses its view', (t) =>
+  withFixture(t, async (f) => {
+    const ctx = context(f);
+    const history = new FolderHistory(ctx);
+    registerCommands(ctx, new InstancesTree(history, 'assets'), history);
+    const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
+    assert.ok(
+      manifest.contributes.commands.some((c: any) => c.command === 'remote-incus.showInstances'),
+    );
+    assert.equal(
+      manifest.contributes.menus.commandPalette.some(
+        (c: any) => c.command === 'remote-incus.showInstances' && c.when === 'false',
+      ),
+      false,
+    );
+    assert.equal(
+      manifest.extensionDependencies?.includes('ms-vscode.remote-explorer') ?? false,
+      false,
+    );
+    f.expect('vscode.execute', (id) => {
+      assert.equal(id, 'remote-incus.instances.focus');
+    });
+    const callbacks = f.state.get('commands') as Map<string, () => Promise<void>>;
+    await defined(callbacks.get('remote-incus.showInstances'))();
+  }));
+
 test('X4: history full authority isolation, cap, reorder, idempotence and remove', (t) =>
   withFixture(t, (f) => {
     const history = new FolderHistory(context(f));

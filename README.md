@@ -56,6 +56,15 @@ Restart VS Code after changing the runtime arguments. The extension ID is
 extension marketplace. The Open VSX namespace is currently unverified;
 ownership verification is pending.
 
+Open the Command Palette and run **Remote - Incus: Show Incus** to reveal the
+Incus view, including when Remote Explorer is hidden or another target is
+selected. You can also open **Remote Explorer** in the Activity Bar and select
+**Incus** from its target dropdown. The Remote Explorer container is built into
+VS Code; Microsoft's separate `ms-vscode.remote-explorer` extension is not
+required. If the Incus view is unavailable, check that Remote - Incus is enabled
+and that the proposed-API runtime argument above is configured, then restart
+VS Code.
+
 Current verified configuration: Linux x64 client, Stable VS Code 1.143.1 and
 Incus 7.5.1, with scoped Ubuntu/Rocky Linux 9.8 glibc x64 and Alpine musl x64
 instance checks.
