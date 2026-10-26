@@ -89,6 +89,26 @@ runtime and reports loader or permission failures immediately; it also checks
 for `nohup` and an executable launcher. The rescue terminal names a missing
 `script` utility directly.
 
+## Incus setup
+
+Follow the [official Incus installation guide](https://linuxcontainers.org/incus/docs/main/installing/)
+to install the Incus CLI on the computer running VS Code. Configure either a local
+Incus server or a remote server; a local daemon is optional when using remotes.
+
+- For a local server, ensure the Incus service is running. On a new installation,
+  run `incus admin init` in a terminal and follow its prompts. Ensure your user
+  has permission to access the Incus socket; group changes may require signing
+  out and back in.
+- For a remote server, configure its address and authentication with
+  `incus remote add`, following your server administrator’s instructions.
+- Check `incus remote list` and `incus list <remote>:` in a terminal. Replace
+  `<remote>` with the configured remote name, such as `local`.
+
+If a server is unavailable, expand its node for setup guidance, **Try again**,
+and **Show connection details**. Once the server is ready, select **Try again**
+or the view’s **Refresh** button; an editor restart is unnecessary. Listing
+failures do not prevent browsing other configured servers.
+
 ## IPv4 forwarding on IPv6-only containers
 
 If an IPv4-only service fails through ordinary forwarding on an IPv6-only

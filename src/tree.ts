@@ -20,7 +20,7 @@ import * as vscode from 'vscode';
 import { AUTHORITY_PREFIX, formatAuthority } from './authority';
 import { getDefaultRemote, InstanceRef, listInstances, listRemotes, RemoteInfo } from './incusCli';
 import { FolderHistory } from './history';
-import { firstLine, log } from './logging';
+import { log } from './logging';
 
 /** This window's remote session, if it sits on one of our authorities. */
 interface Session {
@@ -129,6 +129,45 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
     return element;
   }
 
+  private unavailable(err: unknown, remote?: RemoteInfo): vscode.TreeItem[] {
+    // Keep diagnostics available without putting raw CLI commands or socket
+    // paths in the first-run tree. A failed listing is not an empty server.
+    log(
+      `tree${remote ? ` (${remote.name})` : ''}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    const local = remote?.address.startsWith('unix:');
+    const message = new MessageNode(
+      local
+        ? 'Local Incus is not ready'
+        : remote
+          ? 'Cannot reach this Incus server'
+          : 'Set up Incus to get started',
+      'info',
+    );
+    message.tooltip = local
+      ? 'Check that the Incus service is running, initialize it with incus admin init if needed, and ensure your user has access. Then select Refresh.'
+      : remote
+        ? 'Check this remote’s address, network connection and authentication, then select Refresh. Other remotes are still available.'
+        : 'Install the Incus CLI and configure a local server or add a remote server, then select Refresh.';
+    const setup = new MessageNode('Open Incus setup guide', 'book');
+    setup.command = {
+      command: 'vscode.open',
+      title: 'Open Incus setup guide',
+      arguments: [
+        vscode.Uri.from({
+          scheme: 'https',
+          authority: 'linuxcontainers.org',
+          path: '/incus/docs/main/installing/',
+        }),
+      ],
+    };
+    const retry = new MessageNode('Try again', 'refresh');
+    retry.command = { command: 'remote-incus.refresh', title: 'Refresh Incus servers' };
+    const details = new MessageNode('Show connection details', 'output');
+    details.command = { command: 'remote-incus.showLog', title: 'Show Incus log' };
+    return [message, setup, retry, details];
+  }
+
   private icon(name: string): vscode.IconPath {
     // Public microsoft/vscode-icons assets, unchanged under CC BY 4.0.
     // Source revision and attribution: docs/ThirdPartyNotices.md.
@@ -166,7 +205,7 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
             });
           });
         } catch (err) {
-          return [new MessageNode(`unavailable: ${firstLine(err)}`, 'warning')];
+          return this.unavailable(err, element.info);
         }
       }
       if (element instanceof InstanceNode) {
@@ -192,8 +231,7 @@ export class InstancesTree implements vscode.TreeDataProvider<vscode.TreeItem> {
       }
       return [];
     } catch (err) {
-      log(`tree: ${firstLine(err)}`);
-      return [new MessageNode(`error: ${firstLine(err)}`, 'error')];
+      return this.unavailable(err);
     }
   }
 }

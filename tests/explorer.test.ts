@@ -6,7 +6,7 @@ import { withFixture } from './support/fixture';
 import { context, progress } from './support/scenario';
 import { defined } from './support/assert';
 import { FolderHistory } from '../src/history';
-import { FolderNode, InstanceNode, InstancesTree } from '../src/tree';
+import { FolderNode, InstanceNode, InstancesTree, RemoteNode } from '../src/tree';
 import { registerCommands } from '../src/commands';
 import { activate } from '../src/extension';
 import { withProgressReport } from '../src/progress';
@@ -181,7 +181,9 @@ test('X2 X5 X6: tree isolation, icons/assets, selection, warning child and refre
     const warningItem = defined(warnings[0]);
     const labelValue = warningItem.label;
     const warningLabel = typeof labelValue === 'string' ? labelValue : (labelValue?.label ?? '');
-    assert.match(warningLabel, /unavailable.*offline/);
+    assert.equal(warningLabel, 'Cannot reach this Incus server');
+    assert.equal(warnings[2]?.command?.command, 'remote-incus.refresh');
+    assert.equal(warnings[3]?.command?.command, 'remote-incus.showLog');
     let changes = 0;
     tree.onDidChangeTreeData(() => changes++);
     tree.refresh();
@@ -354,4 +356,47 @@ test('X8: registered lifecycle, kill, uninstall and rescue commands use clicked 
     });
     await defined(callbacks.get('remote-incus.openTerminal'))(node('clicked'));
     assert.equal(f.state.get('terminal-shown'), true);
+  }));
+
+test('first-run setup failures offer guidance and retry recovers without hiding other remotes', (t) =>
+  withFixture(t, async (f) => {
+    const tree = new InstancesTree(new FolderHistory(context(f)), 'assets');
+    let ready = false;
+    f.routes.set('child_process.execFile', (_cmd, args, _opts, cb) => {
+      if (!ready)
+        cb(new Error('connect ENOENT private/socket'), '', 'connect ENOENT private/socket');
+      else if (args[0] === 'list')
+        cb(null, JSON.stringify([{ name: 'ready', status: 'Running' }]), '');
+      else if (args[1] === 'list')
+        cb(
+          null,
+          JSON.stringify({ local: { Addrs: ['unix:///fixture/socket'], Protocol: 'incus' } }),
+          '',
+        );
+      else cb(null, 'local', '');
+    });
+    const initial = await tree.getChildren();
+    assert.equal(initial[0]?.label, 'Set up Incus to get started');
+    assert.equal(initial[1]?.command?.command, 'vscode.open');
+    const local = new RemoteNode(
+      { name: 'local', address: 'unix:///fixture/socket', authType: '', protocol: 'incus' },
+      true,
+    );
+    const children = await tree.getChildren(local);
+    assert.equal(children[0]?.label, 'Local Incus is not ready');
+    assert.equal(typeof children[0]?.tooltip, 'string');
+    assert.match(children[0]?.tooltip as string, /incus admin init/);
+    assert.equal(children[2]?.command?.command, 'remote-incus.refresh');
+    assert.ok(
+      children.every(
+        (child) => typeof child.label === 'string' && !child.label.includes('private/socket'),
+      ),
+    );
+    ready = true;
+    tree.refresh();
+    const roots = await tree.getChildren();
+    assert.equal(roots[0]?.label, 'local');
+    assert.equal((roots[0] as RemoteNode).info.address, 'unix:///fixture/socket');
+    const instances = await tree.getChildren(defined(roots[0]));
+    assert.equal(instances[0]?.label, 'ready');
   }));

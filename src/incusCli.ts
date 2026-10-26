@@ -263,13 +263,16 @@ export interface RemoteInfo {
 export async function listRemotes(): Promise<RemoteInfo[]> {
   const raw = JSON.parse(await incus(['remote', 'list', '--format', 'json'])) as Record<
     string,
-    { Addr?: string; Protocol?: string; AuthType?: string } & Record<string, unknown>
+    { Addr?: string; Addrs?: string[]; Protocol?: string; AuthType?: string } & Record<
+      string,
+      unknown
+    >
   >;
   return Object.entries(raw)
     .filter(([, r]) => r.Protocol === 'incus')
     .map(([name, r]) => ({
       name,
-      address: r.Addr ?? '',
+      address: r.Addr ?? r.Addrs?.[0] ?? '',
       protocol: r.Protocol ?? '',
       authType: r.AuthType ?? '',
     }));
