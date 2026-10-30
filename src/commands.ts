@@ -248,7 +248,7 @@ async function killServerCommand(node: InstanceNode, tree: InstancesTree): Promi
 async function uninstallServerCommand(node: InstanceNode, tree: InstancesTree): Promise<void> {
   const ref = node.ref;
   const answer = await vscode.window.showWarningMessage(
-    `Uninstall the VS Code server from "${ref.instance}"? Server data (per-instance extensions, workspace state) is removed. The container itself is not touched.`,
+    `Uninstall the VS Code server from "${ref.instance}"? Connected windows will disconnect. Server data (per-instance extensions, workspace state) is removed. The container itself is not touched.`,
     { modal: true },
     'Uninstall',
   );

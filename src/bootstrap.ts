@@ -50,6 +50,7 @@ import {
   downloadInContainer,
 } from './serverDownload';
 import { Report } from './progress';
+import { shutdownScript } from './serverShutdown';
 
 export const VS_SERVER_DIR = '.vscode-server';
 
@@ -903,6 +904,7 @@ export async function uninstallServer(ref: InstanceRef, identity: Identity): Pro
     ref,
     [
       `set -e`,
+      shutdownScript(`${identity.home}/${VS_SERVER_DIR}`),
       `rm -rf ${sq(`${identity.home}/${VS_SERVER_DIR}`)}`,
       `rm -f /tmp/vscode-server-*.tar.gz`,
     ].join('\n'),
