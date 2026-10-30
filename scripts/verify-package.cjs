@@ -13,6 +13,7 @@ const { findings } = require('./audit-privacy.cjs');
 
 const required = [
   'package.json',
+  'changelog.md',
   'readme.md',
   'LICENSE.txt',
   'dist/extension.js',
@@ -29,6 +30,7 @@ const documentation = [
   'HANDOVER.md',
   'README.md',
   'RELEASE-READINESS.md',
+  'RELEASING.md',
   'REGRESSION_TEST_PLAN.md',
   'TASK-01-OFFLINE-TEST-HARNESS.md',
   'TASK-02-REGRESSION-BASELINE.md',

@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump: patch fixes, minor features, major for 1.0 or breaking changes after 1.0'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+        required: true
+      dry_run:
+        description: 'Test and build a preview without committing, tagging or publishing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Require main for publication
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: test "$DRY_RUN" = true || test "$GITHUB_REF" = refs/heads/main
+      - name: Check out release source and history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.21.0'
+          cache: npm
+      - name: Prepare version and changelog
+        id: prepare
+        env:
+          RELEASE_BUMP: ${{ inputs.bump }}
+        run: node scripts/release.cjs prepare "$RUNNER_TEMP/release"
+      - name: Install locked dependencies
+        run: npm ci --include=dev --no-audit --no-fund
+      - name: Format generated release metadata
+        run: npx --no-install prettier --write package.json CHANGELOG.md
+      - name: Check types, lint, formatting and offline regressions
+        run: npm test
+      - name: Verify relay with local loopback fixtures
+        run: npm run test:relay
+      - name: Test archive policy with synthetic fixtures
+        run: npm run test:package
+      - name: Test deployment guards with mocked commands
+        run: npm run test:redeploy
+      - name: Audit checkout privacy patterns
+        run: npm run audit:privacy
+      - name: Build production VSIX and verify packaged contents
+        run: npm run package
+      - name: Collect versioned VSIX and checksum
+        run: node scripts/release.cjs collect "$RUNNER_TEMP/release"
+      - name: Retain release preview
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ steps.prepare.outputs.tag }}
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+          retention-days: 14
+      - name: Commit, tag and publish GitHub release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          node scripts/release.cjs publish "$RUNNER_TEMP/release"
+      - name: Summarize release
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          TAG: ${{ steps.prepare.outputs.tag }}
+        run: |
+          if [ "$DRY_RUN" = true ]; then
+            echo "Preview for $TAG passed. No version, commit, tag or release was published." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Released [$TAG](https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG) with the verified VSIX and SHA256SUMS." >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-// VSCE renames the root README/license. Keep source links useful in a checkout,
+// VSCE renames the root README, changelog and license. Keep source links useful in a checkout,
 // and make emitted Markdown point to the literal filenames inside the VSIX.
 const fs = require('node:fs');
 const os = require('node:os');
@@ -19,12 +19,11 @@ function finalizeRecords(records) {
     const rewritten = rewriteMarkdownLinks(bytes.toString('utf8'), (href) => {
       const local = resolveLocalLink(name, href);
       if (!local) return null;
-      const canonical =
-        local.target === 'extension/README.md'
-          ? 'extension/readme.md'
-          : local.target === 'extension/LICENSE'
-            ? 'extension/LICENSE.txt'
-            : null;
+      const canonical = {
+        'extension/README.md': 'extension/readme.md',
+        'extension/CHANGELOG.md': 'extension/changelog.md',
+        'extension/LICENSE': 'extension/LICENSE.txt',
+      }[local.target];
       if (!canonical) return null;
       const suffix = href.slice(href.split(/[?#]/)[0].length);
       return path.posix.relative(path.posix.dirname(name), canonical) + suffix;

@@ -105,3 +105,10 @@ test('HTML anchors use actual attributes without parsing comments or script exam
     '<a class="example" id="some&gt;anchor" name="legacy"></a>\n\n<!-- <a id="fake-comment"> -->\n\n<script>const example = \'<a id="fake-script">\';</script>\n\n<a data-id="fake-data"></a>';
   assert.deepEqual([...inspectMarkdown(source).anchors], ['some>anchor', 'legacy']);
 });
+
+test('finalization rewrites changelog links to the VSCE archive filename', () => {
+  assert.equal(
+    finalize('[changes](../CHANGELOG.md#unreleased)'),
+    '[changes](../changelog.md#unreleased)',
+  );
+});

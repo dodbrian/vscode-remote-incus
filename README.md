@@ -196,6 +196,9 @@ normal-profile identical-folder new-window workflow on 2026-10-25.
 
 ## Development
 
+See the [release policy and process](docs/RELEASING.md) and [changelog](CHANGELOG.md)
+for versioning and publication.
+
 The offline Node suite uses the existing local dependencies. After `npm ci`:
 
 ```sh
