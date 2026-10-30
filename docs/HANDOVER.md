@@ -20,7 +20,107 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: Open VSX release available (2026-10-25)
+## Current stopping point: release workflow ready (2026-10-30)
+
+Routine CI and deliberate releases are now separate. The final trigger split is
+on `main` in `b41f2e1` and `e0bd756`. Use the [release guide](RELEASING.md) for the
+operator steps and automatic versioning rules.
+
+- **Normal push:** [Build and test](https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml) runs the
+  complete local-fixture verification and packages a VSIX, then finishes. It has
+  no release or publishing continuation and does not consume a version.
+- **Manual Release:** open **Actions → Release → Run workflow** on `main`.
+  Its connected graph is **Build and test candidate → Create GitHub release →
+  Approve Open VSX publication**. Starting the workflow authorizes GitHub release
+  creation after its checks pass; there is no separate release approval gate.
+- **Publishing:** the final job waits for the `open-vsx` environment approval.
+  It downloads this run's GitHub release assets, checks identity/version and
+  `SHA256SUMS`, publishes that exact VSIX, and compares the registry download.
+  It does not rebuild or select a different release. The environment currently
+  requires `dodbrian`'s review and permits only `main`.
+- Versions are inferred from conventional commits. Optional bump/exact-version
+  overrides and `dry_run` are available on manual dispatch. The same version,
+  source/run identity, notes, checksum and artifacts pass through the jobs.
+  No version or artifact must be entered again at publishing approval.
+
+Fresh distribution and verification evidence:
+
+| Item                   | Verified stopping point                                                                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub                 | [v0.2.0](https://github.com/dodbrian/vscode-remote-incus/releases/tag/v0.2.0) is public, tagged at version commit `f84f4a9`, with VSIX and checksum assets                                                 |
+| Release asset          | `remote-incus-0.2.0.vsix` matches `SHA256SUMS`; SHA-256 `523b7eb82225704203592618dc19e501b0311aa5e79ceef01fe4d7a84ae0a51a`; archive validation passed with 35 files and 93 local documentation links       |
+| Open VSX               | Fresh public API reports latest version `0.1.0`; namespace `dodbrian` now reports `verified: true`                                                                                                         |
+| Original release run   | [41118975496](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41118975496) created GitHub v0.2.0; its Open VSX job was cancelled. It used the superseded two-approval/push-triggered workflow |
+| Final ordinary push CI | [41122467146](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41122467146) passed on `e0bd756`, with only the build/test job and no waiting deployment                                        |
+| Release dry run        | [41123119347](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41123119347) passed on `e0bd756`; build succeeded and both release/publish jobs were skipped                                    |
+| CodeQL                 | [41122466578](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41122466578) passed on `e0bd756`                                                                                                |
+
+The final manual-only trigger arrangement has hosted build and dry-run evidence;
+a real release/publication has not yet completed through that final arrangement.
+GitHub v0.2.0 and Open VSX v0.1.0 are distinct distribution states. Do not treat a
+successful dry run as publication, silently restart the cancelled publishing job,
+or create a replacement release merely to retry registry distribution. Publishing
+an existing release needs the user's explicit decision and the publishing gate.
+
+The current source version is `0.2.0`; later workflow/documentation commits are
+unreleased. Rebuilding the checkout can produce different bytes at that same
+manifest version. Existing release assets stay frozen; publication uses their
+stored bytes, not a newly rebuilt local `remote-incus.vsix`.
+
+No runtime deployment, editor restart or live target operation was performed for
+this workflow work. The last recorded live uninstall acceptance is preserved
+below. Broader compatibility coverage remains separately scoped. This handover
+update authorizes documentation and its push, not release execution or publishing.
+
+## Previous checkpoint: uninstall cleanup accepted, issue #6 closed (2026-10-30)
+
+The uninstall lifecycle fix is committed and pushed to `main` as
+[`a233ef6`](https://github.com/dodbrian/vscode-remote-incus/commit/a233ef6ec1d593c05671d02056748c60a92fd7ec).
+[Issue #6](https://github.com/dodbrian/vscode-remote-incus/issues/6) is closed as
+completed, with a resolution comment linking the implementation and validation.
+The user confirmed the fix works after local redeployment. This task is complete.
+
+Previously, uninstall removed `.vscode-server` without terminating its processes.
+Server shutdown in `src/serverShutdown.ts`, called by
+`uninstallServer` in `src/bootstrap.ts`, now scopes cleanup to the selected
+installation's executables and descendants. It resolves symlinked installation
+paths, recognizes already-deleted executables, records process start times when
+tracking PIDs, sends SIGTERM, escalates to SIGKILL when necessary, and verifies
+exit before removal. Shutdown failures preserve installation files and report an
+error. The uninstall confirmation warns that connected windows will disconnect.
+The separate `killServer` command was not changed by this fix.
+
+Tests were written first and reproduced the original surviving-process failure.
+The five process-level regression cases in `tests/uninstall.test.ts` cover normal
+cleanup, deleted executables, symlinked homes, denied signals, and shutdown
+timeouts. They also check termination of a TERM-resistant runtime and an external
+child executable, while preserving an unrelated installation. These tests use
+temporary local processes, not live Incus targets.
+
+Validation and acceptance:
+
+- `npm test` passed all 17 test-file entries, including type, lint, and formatting
+  checks; `npm run compile`, `npm run package`, and `git diff --check` passed.
+- The privacy audit passed with zero findings. Hosted
+  [Offline verification and VSIX](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41109277047)
+  and [CodeQL](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41109278019)
+  both passed for the exact pushed commit.
+- The validated VSIX was force-installed into the normal local VS Code profile.
+  Its installed bundle matched the package byte for byte, with SHA-256
+  `271fb810e37ee46dd40a5f3d7b05d17297f88197fbd038d2eb548ff4f0239992`.
+  VS Code was restarted and reopened on this repository; main and renderer
+  processes were verified. The user then reported "confirmed working".
+  This is user acceptance, not a separately recorded live process census.
+
+At this uninstall checkpoint, the accepted runtime build was version `0.1.0`.
+Subsequent GitHub release and registry state are recorded in the current stopping
+point above. Do not republish an existing registry version.
+No further uninstall, remote cleanup, deployment, or compatibility experiment is
+pending under this issue. Earlier release and compatibility follow-ups below are
+historical checkpoints or separate workstreams, not instructions to repeat the
+accepted test.
+
+## Previous checkpoint: Open VSX release available (2026-10-25)
 
 The user authorized a public repository and Open VSX publication, completed
 the account/agreement setup and configured the `OVSX_PAT` repository secret.
@@ -41,8 +141,8 @@ is byte-identical to the publishing run's artifact. The listing is
 https://open-vsx.org/extension/dodbrian/remote-incus.
 Next release-administration step: claim verified namespace ownership through
 Open VSX's documented public issue process. No ownership claim has been filed.
-Namespace verification is separate from publication; the namespace API reports
-`verified: false`. Future publication remains manual; a new version requires a
+Namespace verification is separate from publication; at this checkpoint the
+namespace API reported `verified: false` (now superseded by the fresh check above). Future publication remains manual; a new version requires a
 version bump and fresh authorization. Do not rerun upload for version `0.1.0`.
 The identity build has not been installed or live-tested locally.
 
@@ -195,7 +295,13 @@ unresolved implementation defect was identified within this reviewed scope.
 These changes have not been deployed or live-accepted. No push or publication
 is part of the authorization.
 
-## Current task status (2026-10-25)
+<a id="current-task-status-2026-10-25"></a>
+
+## Historical task status (2026-10-25)
+
+This dated snapshot is superseded by the current stopping point above for
+release identity, hosted CI and distribution. It is retained for the original
+scope and acceptance boundaries.
 
 Release identity is selected above; publication remains deferred. The accepted
 Linux x64 MVP includes resolver classification, startup prerequisite diagnostics,

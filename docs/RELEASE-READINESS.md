@@ -1,4 +1,59 @@
-# Release-readiness review — 2026-10-25
+# Release readiness and historical review
+
+## Current release checkpoint (2026-10-30)
+
+The release workflow and ordinary CI are implemented and pushed to `main`.
+The final trigger corrections are `b41f2e1` and `e0bd756`. The
+[current handover](HANDOVER.md#current-stopping-point-release-workflow-ready-2026-10-30)
+records the stopping point; [Releasing](RELEASING.md) is the operator guide.
+
+| Stage          | Trigger and resulting behavior                                                                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Build and test | Normal branch push/PR or manual CI run; verifies and packages the current source, then finishes with no release continuation                                                                                 |
+| Release        | Manually start **Release** on `main`; infer a candidate version (or use an optional override), prepare changelog/notes, run all checks, and automatically create the GitHub release after a successful build |
+| Publish        | Final job in the same connected graph; requires approval of `open-vsx`, then distributes the exact GitHub release VSIX without rebuilding or re-entering versions                                            |
+
+The publishing environment requires `dodbrian`'s approval and allows only `main`.
+The former release approval environment is not referenced by the current
+workflow. `dry_run` builds and verifies a candidate while skipping release and
+publication. Versions, source/run identity and artifacts are passed explicitly;
+concurrent changes to `main`, conflicting tags and mismatched released/registry
+bytes stop the relevant operation. Failed jobs can be retried for the same
+release without another version bump.
+
+Fresh evidence, superseding the queued statuses recorded during implementation:
+
+- [Build and test 41122467146](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41122467146)
+  passed on `e0bd756`; it has no release job or approval wait.
+- [Release dry run 41123119347](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41123119347)
+  passed on the same source; candidate build succeeded and release/publication
+  were skipped. [CodeQL 41122466578](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41122466578)
+  also passed.
+- [GitHub v0.2.0](https://github.com/dodbrian/vscode-remote-incus/releases/tag/v0.2.0)
+  exists at version commit `f84f4a9`, created by the earlier
+  [run 41118975496](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41118975496).
+  Its GitHub release job succeeded; its publishing job was cancelled. That run
+  predates the final manual-only release trigger and removal of the release gate.
+- Downloaded `remote-incus-0.2.0.vsix` matches the release's `SHA256SUMS`:
+  `523b7eb82225704203592618dc19e501b0311aa5e79ceef01fe4d7a84ae0a51a`.
+  Actual-archive validation passed with 35 files, 93 local documentation links
+  and no findings. README/changelog are packaged; release notes link to the
+  README at the release tag. Source archives are available from GitHub.
+- The fresh [Open VSX version API](https://open-vsx.org/api/dodbrian/remote-incus/latest)
+  still reports `0.1.0`. The [namespace API](https://open-vsx.org/api/dodbrian)
+  now reports `verified: true`. Ownership verification is complete; publication
+  of GitHub v0.2.0 to that registry is not established.
+
+Remaining release-scope limits: the final workflow has not yet completed a real
+release plus approval-gated publication, and no new runtime installation/live
+acceptance was performed for this workflow work. Do not republish a locally
+rebuilt VSIX under an existing version: post-release documentation changes can
+change package bytes, while stored GitHub release assets remain the publishing
+source of truth. No release or registry upload is authorized by this document.
+
+The sections below preserve dated review, cleanup and acceptance evidence. Their
+statements about pending repository creation, namespace verification or first
+hosted CI execution describe earlier checkpoints, not the current backlog.
 
 ## Dependency security follow-up
 
@@ -27,8 +82,9 @@ After an initial visibility delay, the public API confirmed version `0.1.0` is
 downloadable. The public VSIX passed archive validation and is byte-identical
 to the publishing run's artifact. The
 [Open VSX listing](https://open-vsx.org/extension/dodbrian/remote-incus) is available;
-namespace ownership verification remains pending.
-See the [current handover](HANDOVER.md#current-stopping-point-open-vsx-release-available-2026-10-25).
+namespace ownership verification was pending at that checkpoint and is now
+confirmed above. See the
+[current handover](HANDOVER.md#current-stopping-point-release-workflow-ready-2026-10-30).
 The sections below preserve the earlier review and its dated evidence.
 
 The extension has scoped functional acceptance. The private content identified
@@ -56,7 +112,7 @@ unverified live. Ordinary forwarding retains the IPv4-loopback lookup
 limitation on IPv6-only-networked containers; the accepted helper works from an
 existing Ports row. None of these is evidence of failure on an untested system.
 
-## Current backlog classification
+## Historical backlog classification (2026-10-25)
 
 Release identity is now selected below; publication remains deferred. The user
 subsequently authorized offline reliability and release tooling with local
@@ -70,8 +126,8 @@ The coverage limits above are verification gaps, not missing implementations.
 The centralized Incus compatibility layer and later-phase multi-user or
 devcontainer.json work are separate future scope.
 
-The current workstream backlog is maintained in the
-[handover task status](HANDOVER.md#current-task-status-2026-10-25). The reviewed build is now deployed. Normal-profile Ubuntu/Rocky connection
+The original workstream backlog is preserved in the
+[historical handover task status](HANDOVER.md#current-task-status-2026-10-25). The reviewed build is now deployed. Normal-profile Ubuntu/Rocky connection
 checks, signed authentication/reuse and Rocky's missing-tool dialog passed;
 other UI/error cases remain separately scoped. First hosted CI execution
 is pending. Local implementation, clean-copy checks and independent review

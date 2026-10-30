@@ -53,8 +53,7 @@ code --install-extension dodbrian.remote-incus-0.1.0.vsix
 For a local build, the filename is `remote-incus.vsix`.
 Restart VS Code after changing the runtime arguments. The extension ID is
 `dodbrian.remote-incus`. Open VSX hosting does not change VS Code's default
-extension marketplace. The Open VSX namespace is currently unverified;
-ownership verification is pending.
+extension marketplace. Ownership of the Open VSX namespace `dodbrian` is verified.
 
 Open the Command Palette and run **Remote - Incus: Show Incus** to reveal the
 Incus view, including when Remote Explorer is hidden or another target is
