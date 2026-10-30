@@ -1,8 +1,6 @@
-name: Build, release and publish
+name: Release
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       bump:
@@ -15,7 +13,7 @@ on:
         type: string
         default: ''
       dry_run:
-        description: 'Build and verify only; do not request release or publish approval'
+        description: 'Build and verify only; do not release or request publishing approval'
         type: boolean
         default: false
 
@@ -76,10 +74,9 @@ jobs:
           cat "$RUNNER_TEMP/release/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
 
   release:
-    name: Approve GitHub release
+    name: Create GitHub release
     needs: build
-    if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
-    environment: release
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.dry_run }}
     concurrency:
       group: github-release
       cancel-in-progress: false

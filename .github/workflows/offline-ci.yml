@@ -1,8 +1,7 @@
-name: Offline verification and VSIX
+name: Build and test
 
 on:
   push:
-    branches-ignore: [main]
     tags-ignore: ['**']
   pull_request:
   workflow_dispatch:

@@ -12,7 +12,7 @@ unless stated otherwise.
 - [Alternatives](ALTERNATIVES.md): related projects and distribution research.
 - [Phase-0 spike](spike/README.md): historical transport findings; implementation retained in Git history.
 - [Third-party notices](ThirdPartyNotices.md): bundled asset attribution and licensing.
-- [Release policy and process](RELEASING.md): one CI chain with manual release and publishing approvals.
+- [Release policy and process](RELEASING.md): manual release runs with an approval gate for publishing.
 
 ## Testing and verification
 

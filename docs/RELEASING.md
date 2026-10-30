@@ -1,24 +1,28 @@
 # Build, release and publish
 
-Every push to `main` starts **Actions → Build, release and publish**. One run
-carries the candidate through the complete chain:
+Normal pushes run **Actions → Build and test**. That workflow verifies the source,
+builds a VSIX, and finishes. It does not calculate a new version, create a release,
+or wait for an approval.
 
-1. **Build and test candidate** runs automatically. It calculates a candidate
-   version, prepares the changelog, runs all checks, and retains the verified
-   VSIX, checksum, release notes and exact version metadata as one artifact.
-2. **Approve GitHub release** waits for your approval of the `release`
-   environment. In the run, choose **Review deployments**, select **release**,
-   then **Approve and deploy**. It uses that run's candidate to commit the version
-   and changelog, push an annotated tag, and create the GitHub release.
-3. **Approve Open VSX publication** then waits for a separate approval of the
-   `open-vsx` environment. It downloads the VSIX from the GitHub release created
-   by this chain, verifies its identity and checksum, and publishes those exact
-   bytes. It never rebuilds or chooses a different release.
+When ready to release, open **Actions → Release → Run workflow** and select
+`main`. Starting this workflow authorizes GitHub release creation after its
+checks pass. It shows three connected stages in one Actions graph:
 
-You do not enter version numbers or select artifacts at either approval gate.
-You can inspect or install the candidate before release, and inspect the GitHub
-release before publishing to the registry. The README is inside the VSIX and
-source archives; release notes also link to the README at that release's tag.
+1. **Build and test candidate** calculates the next version, prepares the
+   changelog, runs all checks, and retains the verified VSIX, checksum, release
+   notes and exact version metadata as one artifact.
+2. **Create GitHub release** runs automatically after the build succeeds. It
+   uses that run's candidate to commit the version and changelog, push an
+   annotated tag, and create the GitHub release. There is no release approval gate.
+3. **Approve Open VSX publication** waits for your approval of the `open-vsx`
+   environment. In the run, choose **Review deployments**, select **open-vsx**,
+   then **Approve and deploy**. It downloads the VSIX from this chain's GitHub
+   release, verifies its identity and checksum, and publishes those exact bytes.
+   It never rebuilds or chooses a different release.
+
+Version numbers and artifacts flow automatically through all three stages. You
+can inspect or install the GitHub release before approving publication. The README
+is inside the VSIX and source archives; release notes also link to its tagged copy.
 
 ## Automatic versions and optional overrides
 
@@ -43,26 +47,27 @@ explicitly choose `1.0.0` once the core connection workflow is dependable and yo
 commit to configuration and behavior compatibility. CI does not infer readiness
 for 1.0 from a breaking change during the pre-1.0 period.
 
-To exercise the build without requesting either approval, select **dry_run**.
-The build prepares a candidate locally but consumes no version. You can also run
+To exercise the release build without creating a release or requesting publishing
+approval, select **dry_run**. The build prepares a candidate locally but consumes no version. You can also run
 a dry run on a development branch. Real releases require `main`.
 
 ## Identity, failures and retries
 
-The build artifact is associated with its source commit and workflow run. Both
-approval stages receive their tag and artifacts automatically through job
-outputs. No registry secret is passed to the build or GitHub release steps.
+The build artifact is associated with its source commit and workflow run. The
+release and publishing stages receive their tag and artifacts automatically
+through job outputs. No registry secret is passed to the build or GitHub release
+steps.
 
-Approval environments require the repository owner's review and allow only
-`main`. They must remain configured in **Settings → Environments**. This is what
-makes the two later jobs manual. Merely naming an environment in YAML does not
-establish an approval requirement.
+The `open-vsx` environment requires the repository owner's review and allows only
+`main`. Keep it configured in **Settings → Environments**. This is what makes
+publication manual. Merely naming an environment in YAML does not establish an
+approval requirement.
 
 A candidate version is consumed only when the GitHub release step atomically
-pushes its version commit and tag. If `main` changes while a candidate awaits
-approval, releasing that stale candidate fails without pushing either. Approve
-the candidate from the newer run instead. Build artifacts are retained for 30
-days; after expiry, build a new candidate.
+pushes its version commit and tag. If `main` changes during release verification,
+releasing that stale candidate fails without pushing either. Start a new Release
+run from current `main`. Build artifacts are retained for 30 days; after expiry,
+build a new candidate.
 
 Use **Re-run failed jobs** to recover the same chain. A failed GitHub upload
 recognizes the tag created by its own run and completes the release without

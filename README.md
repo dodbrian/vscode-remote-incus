@@ -216,9 +216,9 @@ internet access or server download. `npm run test:relay` additionally needs
 local loopback TCP sockets and runs the bundled relay as real child processes.
 These portable checks are configured in the tracked offline CI workflow (`.github/workflows/offline-ci.yml`)
 without private infrastructure. CI installs locked dependencies, runs the checks,
-and retains a verified VSIX as a build artifact. On `main`, the
-[release pipeline](docs/RELEASING.md) builds a numbered candidate, then waits for
-separate manual approvals to create a GitHub release and publish it to Open VSX.
+and retains a verified VSIX as a build artifact, then finishes. The separately
+started [Release workflow](docs/RELEASING.md) builds a numbered candidate, creates
+a GitHub release, then waits for manual approval to publish it to Open VSX.
 
 `npm run package` uses the lockfile-installed VSCE. Its `vscode:prepublish` hook
 builds minified production output and removes stale source maps. The package

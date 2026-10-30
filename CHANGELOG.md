@@ -4,6 +4,11 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [Unreleased]
 
+### Changed
+
+- Keep push CI limited to build and test. A manually started release workflow
+  creates the numbered GitHub release, then requires approval for Open VSX publication.
+
 ## [0.2.0] - 2026-10-30
 
 ### Changed
