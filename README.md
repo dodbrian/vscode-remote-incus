@@ -1,5 +1,7 @@
 # Remote - Incus
 
+[![Build and test](https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml/badge.svg)](https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml)
+
 Connect to [Incus](https://github.com/lxc/incus) containers (system containers;
 Incus = community fork of LXD) as a first-class remote connection type — the
 same slot Dev Containers / Remote-SSH occupy in the Remote Explorer.
