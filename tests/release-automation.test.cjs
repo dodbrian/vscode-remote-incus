@@ -7,7 +7,15 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const { test } = require('node:test');
-const { nextVersion, prepare, collect, publish } = require('../scripts/release.cjs');
+const {
+  nextVersion,
+  inferBump,
+  chooseVersion,
+  prepare,
+  collect,
+  restore,
+  publish,
+} = require('../scripts/release.cjs');
 
 function git(root, ...args) {
   return execFileSync('git', args, {
@@ -191,10 +199,8 @@ test('a failed upload resumes its own version and verifies already published ass
   const releaseCommit = git(f.root, 'rev-parse', 'v0.1.1^{commit}');
   assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/heads/main').split(/\s/)[0], releaseCommit);
   git(f.root, 'checkout', '--detach', f.options.source);
-  const resumed = prepare(f.root, f.options);
-  assert.equal(resumed.resumed, true);
-  assert.equal(resumed.version, '0.1.1');
-  collect(f.root, f.options.directory);
+  restore(f.root, f.options.directory);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.root, 'package.json'))).version, '0.1.1');
   publish(f.root, f.options.directory);
   assert.equal(JSON.parse(fs.readFileSync(path.join(state, 'release.json'))).isDraft, false);
   publish(f.root, f.options.directory);
@@ -257,4 +263,45 @@ test('a competing tag causes the atomic push to leave remote main unchanged', (t
     git(f.root, 'ls-remote', 'origin', 'refs/heads/main').split(/\s/)[0],
     f.options.source,
   );
+});
+
+for (const [current, commits, expected] of [
+  ['0.1.0', 'fix(connection): reconnect', 'patch'],
+  ['0.1.0', 'feat(explorer): show targets', 'minor'],
+  ['0.1.0', 'feat!: replace configuration', 'minor'],
+  ['1.1.0', 'fix!: replace configuration', 'major'],
+  ['1.1.0', 'refactor(api): improve protocol\n\nBREAKING CHANGE: remove old protocol', 'major'],
+]) {
+  test(`infer ${expected} from ${JSON.stringify(commits)}`, () =>
+    assert.equal(inferBump(current, commits), expected));
+}
+
+test('manual bump or exact version overrides automatic inference', () => {
+  assert.equal(chooseVersion('0.1.0', 'auto', '', 'feat(api): feature'), '0.2.0');
+  assert.equal(chooseVersion('0.1.0', 'patch', '', 'feat(api): feature'), '0.1.1');
+  assert.equal(chooseVersion('0.1.0', 'auto', '1.0.0', 'fix(api): repair'), '1.0.0');
+  for (const version of ['0.1.0', '0.0.9', '01.2.0', '1.0.0-beta'])
+    assert.throws(() => chooseVersion('0.1.0', 'auto', version, ''));
+});
+
+test('candidate metadata and pinned README survive the handoff to a separate release job', (t) => {
+  const f = fixture(t);
+  fakeGitHub(t, f);
+  environment(t, { GITHUB_REPOSITORY: 'fixture/project' });
+  prepare(f.root, f.options);
+  fs.writeFileSync(path.join(f.root, 'remote-incus.vsix'), 'verified fixture archive');
+  collect(f.root, f.options.directory);
+  assert.match(
+    fs.readFileSync(path.join(f.options.directory, 'release-notes.md'), 'utf8'),
+    /fixture\/project\/blob\/v0\.1\.1\/README\.md/,
+  );
+  git(f.root, 'restore', 'package.json', 'package-lock.json', 'CHANGELOG.md');
+  restore(f.root, f.options.directory);
+  for (const name of ['package.json', 'package-lock.json', 'CHANGELOG.md'])
+    assert.equal(
+      fs.readFileSync(path.join(f.root, name), 'utf8'),
+      fs.readFileSync(path.join(f.options.directory, 'metadata', name), 'utf8'),
+    );
+  process.env.GITHUB_RUN_ID = '54321';
+  assert.throws(() => restore(f.root, f.options.directory), /does not belong/);
 });

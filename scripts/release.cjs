@@ -26,20 +26,54 @@ function nextVersion(version, bump) {
   return parts.join('.');
 }
 
+function inferBump(version, commits) {
+  if (/^[a-z]+(?:\([^\n)]+\))?!:|^BREAKING[ -]CHANGE:/m.test(commits))
+    return version.startsWith('0.') ? 'minor' : 'major';
+  return /^feat(?:\([^\n)]+\))?:/m.test(commits) ? 'minor' : 'patch';
+}
+
+function chooseVersion(current, bump, override, commits) {
+  const version =
+    override || nextVersion(current, bump === 'auto' || !bump ? inferBump(current, commits) : bump);
+  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version))
+    throw new Error('Version override must be MAJOR.MINOR.PATCH.');
+  const parts = version.split('.').map(BigInt);
+  const old = current.split('.').map(BigInt);
+  const first = parts.findIndex((part, index) => part !== old[index]);
+  if (first < 0 || parts[first] < old[first]) throw new Error('Release version must increase.');
+  return version;
+}
+
 function releaseNotes(changelog) {
   return changelog.split(/^## /m)[2].split('\n').slice(1).join('\n').trim();
 }
 
+function writeNotes(root, directory, tag) {
+  let notes = releaseNotes(fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8'));
+  if (process.env.GITHUB_REPOSITORY)
+    notes += `\n\n## Installation and usage\n\n[README for this release](https://github.com/${process.env.GITHUB_REPOSITORY}/blob/${tag}/README.md)`;
+  fs.writeFileSync(path.join(directory, 'release-notes.md'), notes + '\n');
+}
+
 function prepare(
   root,
-  { bump, directory, runId, source, date = new Date().toISOString().slice(0, 10) },
+  {
+    bump = 'auto',
+    versionOverride = '',
+    directory,
+    runId,
+    source,
+    date = new Date().toISOString().slice(0, 10),
+  },
 ) {
   if (!/^\d+$/.test(runId) || !/^[a-f0-9]{40}$/.test(source))
     throw new Error('A workflow run ID and source commit are required.');
   const current = verifyRelease(root);
-  const version = nextVersion(current, bump);
-  const tag = `v${version}`;
   const git = (...args) => run('git', args, root);
+  const previous = git('tag', '--merged', 'HEAD', '--list', `v${current}`);
+  const range = previous ? `${previous}..HEAD` : 'HEAD';
+  const version = chooseVersion(current, bump, versionOverride, git('log', '--format=%B', range));
+  const tag = `v${version}`;
   if (git('rev-parse', 'HEAD') !== source)
     throw new Error('Checkout does not match the requested source commit.');
   if (git('status', '--porcelain'))
@@ -63,8 +97,6 @@ function prepare(
     const changelog = fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n');
     const sections = changelog.split(/^## /m);
     const authored = sections[1].slice('[Unreleased]'.length).trim();
-    const previous = git('tag', '--merged', 'HEAD', '--list', `v${current}`);
-    const range = previous ? `${previous}..HEAD` : 'HEAD';
     const commits = git('log', '--format=- %s (%h)', range);
     if (!commits) throw new Error('There are no changes since the previous release.');
     const notes = [authored, '### Commits\n\n' + commits].filter(Boolean).join('\n\n');
@@ -82,10 +114,7 @@ function prepare(
   }
   verifyRelease(root, `refs/tags/${tag}`);
   fs.mkdirSync(directory, { recursive: true });
-  fs.writeFileSync(
-    path.join(directory, 'release-notes.md'),
-    releaseNotes(fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8')) + '\n',
-  );
+  writeNotes(root, directory, tag);
   const plan = { version, tag, source, runId, resumed };
   fs.writeFileSync(path.join(directory, 'plan.json'), JSON.stringify(plan) + '\n');
   return plan;
@@ -95,10 +124,7 @@ function collect(root, directory) {
   const { version } = JSON.parse(fs.readFileSync(path.join(directory, 'plan.json'), 'utf8'));
   if (verifyRelease(root, `refs/tags/v${version}`) !== version)
     throw new Error('Release version changed.');
-  fs.writeFileSync(
-    path.join(directory, 'release-notes.md'),
-    releaseNotes(fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8')) + '\n',
-  );
+  writeNotes(root, directory, `v${version}`);
   const name = `remote-incus-${version}.vsix`;
   const bytes = fs.readFileSync(path.join(root, 'remote-incus.vsix'));
   fs.writeFileSync(path.join(directory, name), bytes);
@@ -106,6 +132,21 @@ function collect(root, directory) {
     path.join(directory, 'SHA256SUMS'),
     `${createHash('sha256').update(bytes).digest('hex')}  ${name}\n`,
   );
+  fs.mkdirSync(path.join(directory, 'metadata'), { recursive: true });
+  for (const name of ['package.json', 'package-lock.json', 'CHANGELOG.md'])
+    fs.copyFileSync(path.join(root, name), path.join(directory, 'metadata', name));
+}
+
+function restore(root, directory) {
+  const plan = JSON.parse(fs.readFileSync(path.join(directory, 'plan.json'), 'utf8'));
+  if (plan.runId !== process.env.GITHUB_RUN_ID || plan.source !== process.env.GITHUB_SHA)
+    throw new Error('Artifact does not belong to this workflow run.');
+  if (run('git', ['rev-parse', 'HEAD'], root) !== plan.source)
+    throw new Error('Checkout does not match the candidate source.');
+  for (const name of ['package.json', 'package-lock.json', 'CHANGELOG.md'])
+    fs.copyFileSync(path.join(directory, 'metadata', name), path.join(root, name));
+  if (verifyRelease(root, `refs/tags/${plan.tag}`) !== plan.version)
+    throw new Error('Artifact metadata does not match its release plan.');
 }
 
 function publish(root, directory) {
@@ -120,7 +161,23 @@ function publish(root, directory) {
     throw new Error('Release plan does not belong to this workflow run.');
   if (verifyRelease(root, `refs/tags/${tag}`) !== version)
     throw new Error('Release plan version changed.');
-  if (!resumed) {
+  const tagged = spawnSync('git', ['show-ref', '--verify', '--quiet', `refs/tags/${tag}`], {
+    cwd: root,
+  });
+  if (tagged.error || ![0, 1].includes(tagged.status))
+    throw new Error('Unable to check release tag.');
+  if (tagged.status === 0) {
+    if (
+      git('log', '-1', '--format=%B', tag).split('\n').at(-1) !== `Release-Run: ${runId}` ||
+      git('rev-parse', `${tag}^`) !== source
+    )
+      throw new Error('Existing tag belongs to another release.');
+    git('merge-base', '--is-ancestor', `${tag}^{commit}`, 'origin/main');
+    for (const name of ['package.json', 'package-lock.json', 'CHANGELOG.md']) {
+      if (git('show', `${tag}:${name}`) !== fs.readFileSync(path.join(root, name), 'utf8').trim())
+        throw new Error('Candidate metadata differs from the existing release tag.');
+    }
+  } else if (!resumed) {
     if (git('ls-remote', 'origin', 'refs/heads/main').split(/\s/)[0] !== source)
       throw new Error(
         'main changed during verification. Start a new release run from current main.',
@@ -137,7 +194,7 @@ function publish(root, directory) {
     );
     git('tag', '-a', tag, '-m', `Remote - Incus ${version}`);
     git('push', '--atomic', 'origin', 'HEAD:refs/heads/main', `refs/tags/${tag}`);
-  }
+  } else throw new Error('The release tag disappeared.');
   const assets = [`remote-incus-${version}.vsix`, 'SHA256SUMS'];
   const files = assets.map((name) => path.join(directory, name));
   const notes = path.join(directory, 'release-notes.md');
@@ -201,6 +258,7 @@ if (require.main === module) {
       const plan = prepare(root, {
         directory,
         bump: process.env.RELEASE_BUMP,
+        versionOverride: process.env.RELEASE_VERSION,
         runId: process.env.GITHUB_RUN_ID,
         source: process.env.GITHUB_SHA,
       });
@@ -208,6 +266,7 @@ if (require.main === module) {
       if (process.env.GITHUB_OUTPUT)
         fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=${plan.tag}\n`);
     } else if (command === 'collect') collect(root, directory);
+    else if (command === 'restore') restore(root, directory);
     else if (command === 'publish') publish(root, directory);
     else throw new Error('Unknown release command.');
   } catch (error) {
@@ -217,4 +276,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { nextVersion, prepare, collect, publish };
+module.exports = { nextVersion, inferBump, chooseVersion, prepare, collect, restore, publish };

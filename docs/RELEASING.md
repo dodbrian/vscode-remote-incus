@@ -1,65 +1,77 @@
-# Releases
+# Build, release and publish
 
-When ready to release, open **Actions → Release → Run workflow**, select `main`,
-choose **patch**, **minor** or **major**, and run it. No local version bump, commit,
-tag or separate GitHub release creation is needed.
+Every push to `main` starts **Actions → Build, release and publish**. One run
+carries the candidate through the complete chain:
 
-## Choosing a version
+1. **Build and test candidate** runs automatically. It calculates a candidate
+   version, prepares the changelog, runs all checks, and retains the verified
+   VSIX, checksum, release notes and exact version metadata as one artifact.
+2. **Approve GitHub release** waits for your approval of the `release`
+   environment. In the run, choose **Review deployments**, select **release**,
+   then **Approve and deploy**. It uses that run's candidate to commit the version
+   and changelog, push an annotated tag, and create the GitHub release.
+3. **Approve Open VSX publication** then waits for a separate approval of the
+   `open-vsx` environment. It downloads the VSIX from the GitHub release created
+   by this chain, verifies its identity and checksum, and publishes those exact
+   bytes. It never rebuilds or chooses a different release.
 
-| Change                                        | Before 1.0                                  | From 1.0 onward |
-| --------------------------------------------- | ------------------------------------------- | --------------- |
-| Fixes, reliability improvements, small polish | Patch: `0.1.0` → `0.1.1`                    | Patch           |
-| Compatible new capabilities                   | Minor: `0.1.0` → `0.2.0`                    | Minor           |
-| Breaking configuration or behavior changes    | Minor; explicitly document breaking changes | Major           |
+You do not enter version numbers or select artifacts at either approval gate.
+You can inspect or install the candidate before release, and inspect the GitHub
+release before publishing to the registry. The README is inside the VSIX and
+source archives; release notes also link to the README at that release's tag.
 
-Choose **major** to move from `0.x.y` to `1.0.0` when the core connection workflow
-is dependable and maintainers commit to compatibility for configuration and
-user-visible behavior. Document breaking changes and migration steps under
-`Breaking changes` in [CHANGELOG.md](../CHANGELOG.md).
+## Automatic versions and optional overrides
 
-## What the action does
+CI reads conventional commit subjects and breaking-change footers since the
+current version's tag:
 
-1. Calculates the next version from `package.json` and your selected bump.
-2. Updates the manifest and both root lockfile versions. Moves authored
-   `Unreleased` notes into a dated changelog entry and appends the commit list
-   since the current version's tag. If no such tag exists, the first automated
-   release includes the existing commit history.
-3. Runs type, lint and formatting checks, release tests, offline regressions,
-   relay fixtures, archive-policy tests, deployment-helper tests and the privacy
-   audit. Builds and validates the production VSIX.
-4. Retains a CI artifact containing the versioned VSIX, `SHA256SUMS`, release
-   notes and the release plan.
-5. Commits the version and changelog to `main` and pushes an annotated `vX.Y.Z`
-   tag together with that commit. If `main` moved during verification, the run
-   stops without pushing either.
-6. Creates a public entry under the repository's **Releases**, using the changelog
-   entry as its notes, and attaches the verified VSIX and checksum. GitHub also
-   provides source ZIP and tar archives for the tag. The action downloads the
-   uploaded assets and compares them with the verified build.
+| Changes                                                 | Before 1.0 | From 1.0 onward |
+| ------------------------------------------------------- | ---------- | --------------- |
+| Fixes, maintenance, documentation, other changes        | Patch      | Patch           |
+| `feat:` or `feat(scope):`                               | Minor      | Minor           |
+| `type!:` / `type(scope)!:` or `BREAKING CHANGE:` footer | Minor      | Major           |
 
-Merges and ordinary CI runs never publish or change versions. The release action
-uses the repository's built-in token; no new release secret is needed. `main`
-branch rules must permit its generated version commit. No checks are bypassed.
+The largest applicable bump wins. When there is no existing version tag, the
+first automated release includes the existing commit history. Authored
+`Unreleased` changelog notes are preserved and supplemented with the commit list.
+Breaking changes should include migration instructions in those notes.
 
-## Checking it without consuming a version
+Normally, leave version selection automatic. For an intentional override, use
+**Run workflow** on `main` and choose an optional **bump**, or enter an exact
+**version**. An exact version takes precedence and must increase. For example,
+explicitly choose `1.0.0` once the core connection workflow is dependable and you
+commit to configuration and behavior compatibility. CI does not infer readiness
+for 1.0 from a breaking change during the pre-1.0 period.
 
-Select **dry_run** in the same action. It prepares the next version, runs all
-checks, and provides the preview artifact. It makes no remote commit, tag or
-release and leaves the repository's numbering unchanged. Dry runs can also run
-on a development branch. A real release requires `main`.
+To exercise the build without requesting either approval, select **dry_run**.
+The build prepares a candidate locally but consumes no version. You can also run
+a dry run on a development branch. Real releases require `main`.
 
-## Failures and retries
+## Identity, failures and retries
 
-Checks finish before any version commit or tag is pushed. A failed test therefore
-consumes no version. Release runs are serialized, and existing tags are never
-moved or overwritten.
+The build artifact is associated with its source commit and workflow run. Both
+approval stages receive their tag and artifacts automatically through job
+outputs. No registry secret is passed to the build or GitHub release steps.
 
-If uploading or publishing fails after the commit and tag were pushed, use
-**Re-run failed jobs** on that same run. It recognizes its own tag, rebuilds the
-same release, completes a partial draft, or verifies an already published release
-without bumping again. Start a new run only when you intend a new version. A tag
-belonging to a different run is rejected.
+Approval environments require the repository owner's review and allow only
+`main`. They must remain configured in **Settings → Environments**. This is what
+makes the two later jobs manual. Merely naming an environment in YAML does not
+establish an approval requirement.
 
-Open VSX publication remains a separate manual action: after a GitHub release,
-run **Publish verified VSIX to Open VSX** on the new `vX.Y.Z` tag. It reruns
-verification and publishes the verified VSIX to that registry.
+A candidate version is consumed only when the GitHub release step atomically
+pushes its version commit and tag. If `main` changes while a candidate awaits
+approval, releasing that stale candidate fails without pushing either. Approve
+the candidate from the newer run instead. Build artifacts are retained for 30
+days; after expiry, build a new candidate.
+
+Use **Re-run failed jobs** to recover the same chain. A failed GitHub upload
+recognizes the tag created by its own run and completes the release without
+bumping again. Retrying publication accepts an already published version only
+when its downloaded bytes match the GitHub release. Different bytes fail;
+published versions and tags are never overwritten. Registry propagation is
+checked before reporting an upload failure.
+
+GitHub provides source ZIP and tar archives automatically. The release also
+contains the versioned VSIX, `SHA256SUMS` and changelog-based notes. `main` rules
+must permit the action's generated version commit. Open VSX publication requires
+the existing `OVSX_PAT` repository secret.

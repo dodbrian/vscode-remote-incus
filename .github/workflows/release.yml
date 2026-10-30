@@ -1,41 +1,37 @@
-name: Release
+name: Build, release and publish
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       bump:
-        description: 'Version bump: patch fixes, minor features, major for 1.0 or breaking changes after 1.0'
+        description: 'Optional bump override; normally inferred from commits'
         type: choice
-        options:
-          - patch
-          - minor
-          - major
-        default: patch
-        required: true
+        options: [auto, patch, minor, major]
+        default: auto
+      version:
+        description: 'Optional exact version override (blank means automatic)'
+        type: string
+        default: ''
       dry_run:
-        description: 'Test and build a preview without committing, tagging or publishing'
+        description: 'Build and verify only; do not request release or publish approval'
         type: boolean
         default: false
 
 permissions:
   contents: read
 
-concurrency:
-  group: release
-  cancel-in-progress: false
-
 jobs:
-  release:
+  build:
+    name: Build and test candidate
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    permissions:
-      contents: write
+    outputs:
+      tag: ${{ steps.prepare.outputs.tag }}
+      artifact: candidate-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - name: Require main for publication
-        env:
-          DRY_RUN: ${{ inputs.dry_run }}
-        run: test "$DRY_RUN" = true || test "$GITHUB_REF" = refs/heads/main
-      - name: Check out release source and history
+      - name: Check out source and history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -45,52 +41,117 @@ jobs:
         with:
           node-version: '24.21.0'
           cache: npm
-      - name: Prepare version and changelog
+      - name: Prepare candidate version and changelog
         id: prepare
         env:
-          RELEASE_BUMP: ${{ inputs.bump }}
+          RELEASE_BUMP: ${{ inputs.bump || 'auto' }}
+          RELEASE_VERSION: ${{ inputs.version }}
         run: node scripts/release.cjs prepare "$RUNNER_TEMP/release"
       - name: Install locked dependencies
         run: npm ci --include=dev --no-audit --no-fund
-      - name: Format generated release metadata
+      - name: Format generated metadata
         run: npx --no-install prettier --write package.json CHANGELOG.md
-      - name: Check types, lint, formatting and offline regressions
-        run: npm test
-      - name: Verify relay with local loopback fixtures
-        run: npm run test:relay
-      - name: Test archive policy with synthetic fixtures
-        run: npm run test:package
-      - name: Test deployment guards with mocked commands
-        run: npm run test:redeploy
-      - name: Audit checkout privacy patterns
-        run: npm run audit:privacy
-      - name: Build production VSIX and verify packaged contents
-        run: npm run package
-      - name: Collect versioned VSIX and checksum
+      - name: Run all verification and build the VSIX
         run: |
+          npm test
+          npm run test:relay
+          npm run test:package
+          npm run test:redeploy
+          npm run audit:privacy
+          npm run package
           git diff --check
           node scripts/release.cjs collect "$RUNNER_TEMP/release"
-      - name: Retain release preview
+      - name: Retain the verified candidate
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: release-${{ steps.prepare.outputs.tag }}-attempt-${{ github.run_attempt }}
+          name: candidate-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/release
           if-no-files-found: error
-          retention-days: 14
-      - name: Commit, tag and publish GitHub release
-        if: ${{ !inputs.dry_run }}
+          retention-days: 30
+      - name: Show candidate for review
+        env:
+          TAG: ${{ steps.prepare.outputs.tag }}
+        run: |
+          echo "## Verified candidate $TAG" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/release/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Approve GitHub release
+    needs: build
+    if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
+    environment: release
+    concurrency:
+      group: github-release
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      tag: ${{ needs.build.outputs.tag }}
+    steps:
+      - name: Check out tested source and history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.21.0'
+          cache: npm
+      - name: Download this run's verified candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: ${{ needs.build.outputs.artifact }}
+        run: gh run download "$GITHUB_RUN_ID" --name "$ARTIFACT" --dir "$RUNNER_TEMP/release"
+      - name: Restore tested metadata and install validation tools
+        run: |
+          node scripts/release.cjs restore "$RUNNER_TEMP/release"
+          npm ci --include=dev --no-audit --no-fund
+      - name: Revalidate the exact candidate
+        env:
+          RELEASE_VERIFY_ONLY: 'true'
+          TAG: ${{ needs.build.outputs.tag }}
+        run: node scripts/publish-openvsx.cjs "$RUNNER_TEMP/release" "$TAG"
+      - name: Commit, tag and create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh auth setup-git --hostname github.com
           node scripts/release.cjs publish "$RUNNER_TEMP/release"
-      - name: Summarize release
-        env:
-          DRY_RUN: ${{ inputs.dry_run }}
-          TAG: ${{ steps.prepare.outputs.tag }}
+
+  publish:
+    name: Approve Open VSX publication
+    needs: release
+    environment: open-vsx
+    concurrency:
+      group: publish-openvsx
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out validation tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.21.0'
+          cache: npm
+      - name: Install validation and publishing tools
         run: |
-          if [ "$DRY_RUN" = true ]; then
-            echo "Preview for $TAG passed. No version, commit, tag or release was published." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Released [$TAG](https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG) with the verified VSIX and SHA256SUMS." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          npm ci --include=dev --no-audit --no-fund
+          npm install --global ovsx@1.3.0 --ignore-scripts --no-audit --no-fund
+      - name: Download this chain's GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: gh release download "$TAG" --pattern '*.vsix' --pattern SHA256SUMS --dir "$RUNNER_TEMP/released"
+      - name: Publish the released bytes and verify the registry download
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: node scripts/publish-openvsx.cjs "$RUNNER_TEMP/released" "$TAG"

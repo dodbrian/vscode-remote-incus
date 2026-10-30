@@ -309,7 +309,7 @@
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "package": "npm run check && node scripts/package.cjs",
-    "test": "npm run check && node --test tests/release.test.cjs tests/release-automation.test.cjs && node tests/build.cjs",
+    "test": "npm run check && node --test tests/release.test.cjs tests/release-automation.test.cjs tests/publish-openvsx.test.cjs && node tests/build.cjs",
     "test:relay": "node scripts/verify-relay.cjs",
     "prepare": "sh scripts/setup-hooks.sh",
     "audit:privacy": "node scripts/audit-privacy.cjs",
