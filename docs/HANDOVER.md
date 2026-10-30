@@ -24,7 +24,9 @@ with a Docker container".
 
 Routine CI and deliberate releases are now separate. The final trigger split is
 on `main` in `b41f2e1` and `e0bd756`. Use the [release guide](RELEASING.md) for the
-operator steps and automatic versioning rules.
+operator steps and automatic versioning rules. The tip of `main` is `70c5ee7`
+(README build/test badge), preceded by this handover's own record `01a59c1`;
+both documentation pushes passed hosted Build and test and CodeQL (rows below).
 
 - **Normal push:** [Build and test](https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml) runs the
   complete local-fixture verification and packages a VSIX, then finishes. It has
@@ -45,15 +47,16 @@ operator steps and automatic versioning rules.
 
 Fresh distribution and verification evidence:
 
-| Item                   | Verified stopping point                                                                                                                                                                                    |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GitHub                 | [v0.2.0](https://github.com/dodbrian/vscode-remote-incus/releases/tag/v0.2.0) is public, tagged at version commit `f84f4a9`, with VSIX and checksum assets                                                 |
-| Release asset          | `remote-incus-0.2.0.vsix` matches `SHA256SUMS`; SHA-256 `523b7eb82225704203592618dc19e501b0311aa5e79ceef01fe4d7a84ae0a51a`; archive validation passed with 35 files and 93 local documentation links       |
-| Open VSX               | Fresh public API reports latest version `0.1.0`; namespace `dodbrian` now reports `verified: true`                                                                                                         |
-| Original release run   | [41118975496](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41118975496) created GitHub v0.2.0; its Open VSX job was cancelled. It used the superseded two-approval/push-triggered workflow |
-| Final ordinary push CI | [41122467146](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41122467146) passed on `e0bd756`, with only the build/test job and no waiting deployment                                        |
-| Release dry run        | [41123119347](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41123119347) passed on `e0bd756`; build succeeded and both release/publish jobs were skipped                                    |
-| CodeQL                 | [41122466578](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41122466578) passed on `e0bd756`                                                                                                |
+| Item                   | Verified stopping point                                                                                                                                                                                                                                               |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub                 | [v0.2.0](https://github.com/dodbrian/vscode-remote-incus/releases/tag/v0.2.0) is public, tagged at version commit `f84f4a9`, with VSIX and checksum assets                                                                                                            |
+| Release asset          | `remote-incus-0.2.0.vsix` matches `SHA256SUMS`; SHA-256 `523b7eb82225704203592618dc19e501b0311aa5e79ceef01fe4d7a84ae0a51a`; archive validation passed with 35 files and 93 local documentation links                                                                  |
+| Open VSX               | Fresh public API reports latest version `0.1.0`; namespace `dodbrian` now reports `verified: true`                                                                                                                                                                    |
+| Original release run   | [41118975496](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41118975496) created GitHub v0.2.0; its Open VSX job was cancelled. It used the superseded two-approval/push-triggered workflow                                                            |
+| Final ordinary push CI | [41122467146](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41122467146) passed on `e0bd756`, with only the build/test job and no waiting deployment                                                                                                   |
+| Release dry run        | [41123119347](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41123119347) passed on `e0bd756`; build succeeded and both release/publish jobs were skipped                                                                                               |
+| Documentation push CI  | Build and test passed for `01a59c1` and `70c5ee7` ([41125072543](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41125072543) / [41127126244](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41127126244)); CodeQL passed for both as well |
+| CodeQL                 | [41122466578](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41122466578) passed on `e0bd756`                                                                                                                                                           |
 
 The final manual-only trigger arrangement has hosted build and dry-run evidence;
 a real release/publication has not yet completed through that final arrangement.
@@ -62,10 +65,11 @@ successful dry run as publication, silently restart the cancelled publishing job
 or create a replacement release merely to retry registry distribution. Publishing
 an existing release needs the user's explicit decision and the publishing gate.
 
-The current source version is `0.2.0`; later workflow/documentation commits are
-unreleased. Rebuilding the checkout can produce different bytes at that same
-manifest version. Existing release assets stay frozen; publication uses their
-stored bytes, not a newly rebuilt local `remote-incus.vsix`.
+The current source version is `0.2.0`; the later documentation commits
+`01a59c1` and `70c5ee7` are unreleased. Rebuilding the checkout can produce
+different bytes at that same manifest version. Existing release assets stay
+frozen; publication uses their stored bytes, not a newly rebuilt local
+`remote-incus.vsix`.
 
 No runtime deployment, editor restart or live target operation was performed for
 this workflow work. The last recorded live uninstall acceptance is preserved
@@ -1397,17 +1401,25 @@ docs/
   README.md                documentation index
   DESIGN.md                canonical architecture + findings + plan
   HANDOVER.md              current stopping point and historical context
+  RELEASING.md             operator guide for the manual release workflow
+  RELEASE-READINESS.md     hosted-evidence release tooling review
   TASK-*-RESULTS.md        implementation and verification evidence
   TASK-05-MEASUREMENTS.json connection optimization measurements
   tests/                   testing guide and coverage map
   spike/                   Phase-0 verification guide
+.github/workflows/         offline-ci.yml (push gate) + release.yml (manual release)
 package.json               extension manifest (proposals, views, commands, settings)
 tsconfig.json / esbuild.js build config (bundle → dist/extension.js)
+eslint.config.mjs          mandatory lint rules (strict typed linting; scoped carve-outs)
 src/
   extension.ts             activate: resolver + tree + commands wiring
   authority.ts             `incus+<remote>:<instance>` parse/format
   incusCli.ts              typed incus CLI wrapper (exec, push+meter, list, lifecycle)
   bootstrap.ts             install/start/token/port (spike flow, inlined; reuse hardening)
+  serverDownload.ts        verified container download for auto/container strategies
+  serverShutdown.ts        scoped /proc-aware server shutdown for uninstall
+  forwarding.ts            IPv4 loopback workaround via core forwarding + Ports row
+  workspace.ts             duplicate-as-workspace folder open in a new window
   bridge.ts                exec-stdio → ManagedMessagePassing
   resolver.ts              RemoteAuthorityResolver + pre-flight
   tree.ts                  Remote Explorer tree (remotes → instances)
@@ -1417,7 +1429,7 @@ src/
   logging.ts               output channel (+ REMOTE_INCUS_DEBUG_LOG mirror)
   types/                   proposal d.ts pinned to vscode 1.143.1
 assets/relay.js            bundled relay (staged in-instance per install)
-tests/                     regression/script suite and fixtures
+tests/                     regression suite (17 suites) and fixtures
 scripts/                   development helpers and opt-in verification
   redeploy.sh              build + package + install + restart normal VS Code
 ```
