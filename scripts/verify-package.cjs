@@ -26,6 +26,9 @@ const required = [
 ];
 const documentation = [
   'ALTERNATIVES.md',
+  'CONTRIBUTING.md',
+  'images/incus-connected-workspace.png',
+  'images/incus-remote-explorer.png',
   'DESIGN.md',
   'HANDOVER.md',
   'README.md',
@@ -47,6 +50,10 @@ const documentation = [
 ].map((name) => `docs/${name}`);
 const allowed = new Set([...required, ...documentation].map((name) => `extension/${name}`));
 const metadata = new Set(['[Content_Types].xml', 'extension.vsixmanifest']);
+const screenshots = new Set([
+  'extension/docs/images/incus-connected-workspace.png',
+  'extension/docs/images/incus-remote-explorer.png',
+]);
 
 const { inspectMarkdown, resolveLocalLink } = require('./package-markdown.cjs');
 
@@ -180,6 +187,12 @@ function inspectRecords(records) {
       data.toString('utf8').includes('sourceMappingURL=')
     ) {
       errors.push('Production bundle contains a source map reference');
+    }
+    if (screenshots.has(name)) {
+      if (!data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+        errors.push(`Invalid PNG screenshot: ${name}`);
+      }
+      continue;
     }
     if (data.includes(0)) errors.push(`Unexpected binary content: ${name}`);
     for (const { kind, line } of findings(data.toString('utf8'))) {

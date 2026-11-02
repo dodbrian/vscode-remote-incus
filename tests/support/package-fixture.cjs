@@ -5,6 +5,15 @@ function fixture({ publisher = 'fixture-publisher', version = '0.1.0' } = {}) {
   const records = new Map(
     [...required, ...documentation].map((name) => [`extension/${name}`, Buffer.from('fixture')]),
   );
+  for (const name of documentation.filter((name) => name.endsWith('.png'))) {
+    records.set(
+      `extension/${name}`,
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    );
+  }
   records.set(
     'extension/package.json',
     Buffer.from(
@@ -19,7 +28,7 @@ function fixture({ publisher = 'fixture-publisher', version = '0.1.0' } = {}) {
   records.set(
     '[Content_Types].xml',
     Buffer.from(
-      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">${['js', 'json', 'md', 'svg', 'txt', 'vsixmanifest'].map((extension) => `<Default Extension="${extension}" ContentType="text/plain"/>`).join('')}</Types>`,
+      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">${['js', 'json', 'md', 'svg', 'png', 'txt', 'vsixmanifest'].map((extension) => `<Default Extension="${extension}" ContentType="text/plain"/>`).join('')}</Types>`,
     ),
   );
   records.set(

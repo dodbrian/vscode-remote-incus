@@ -14,6 +14,10 @@ unless stated otherwise.
 - [Third-party notices](ThirdPartyNotices.md): bundled asset attribution and licensing.
 - [Release policy and process](RELEASING.md): manual release runs with an approval gate for publishing.
 
+## Contributing
+
+- [Contributor guide](CONTRIBUTING.md): development setup, quality gates and manual deployment.
+
 ## Testing and verification
 
 - [Testing guide](tests/README.md): offline, relay, and live verification commands.

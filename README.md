@@ -2,293 +2,172 @@
 
 [![Build and test](https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml/badge.svg)](https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml)
 
-Connect to [Incus](https://github.com/lxc/incus) containers (system containers;
-Incus = community fork of LXD) as a first-class remote connection type — the
-same slot Dev Containers / Remote-SSH occupy in the Remote Explorer.
+Connect VS Code to [Incus](https://github.com/lxc/incus) system containers through
+Remote Explorer, using your existing Incus client configuration. No SSH server
+is required inside the container.
 
-**Status: Phase 1 work in progress** — architecture is frozen and spike-verified
-(see [design](docs/DESIGN.md)); version 0.1.0 is available on
-[Open VSX](https://open-vsx.org/extension/dodbrian/remote-incus).
+**Beta:** This extension is under active development. Expect bugs and rough edges.
 
 This is an independent project, not affiliated with or endorsed by the Incus
 project or Linux Containers.
 
-## How it works (no sshd required)
+![Connected Incus workspace with a remote file open and an integrated terminal](docs/images/incus-connected-workspace.png)
 
-- Instances are addressed via the existing `incus` client configuration
-  (`incus remote list`) — the auth boundary is the Incus daemon identity (TLS
-  client certs / trust tokens / OIDC). No SSH or externally exposed instance
-  ports are required; the VS Code server listens only on instance loopback.
-- The transport is `incus exec … -- node relay.js`: the child's stdio is the
-  byte transport, wrapped as a VS Code managed remote connection.
-- By default, server setup tries verified container download, then visibly
-  falls back once to client download and `incus file push` if needed. The
-  server starts detached as the instance's primary unprivileged user.
+## How it works
 
-## Similar projects
+Remote - Incus uses your existing Incus client configuration to discover and
+connect to containers on local or remote servers. It runs VS Code Server inside the container,
+then connects through `incus exec`. No SSH server or externally exposed container
+ports are required.
 
-Canonical Workshop provides LXD development environments through Remote-SSH;
-ssh2incus provides an Incus SSH gateway without per-instance SSH servers.
-Remote - Incus connects through the existing Incus client using exec-stdio,
-without SSH setup or a separate gateway. See the [alternatives comparison](docs/ALTERNATIVES.md)
-for dated findings, sources, and distribution research.
+## Requirements
 
-## Install (VS Code stable)
+- **Editor:** VS Code or a compatible editor, such as VSCodium, with support for
+  the required proposed APIs and compatibility with VS Code 1.140.0 or later.
+- **Incus:** the [Incus CLI](https://linuxcontainers.org/incus/docs/main/installing/)
+  available in the editor's PATH, with access to a local or remote Incus server.
+- **Client platform:** Linux and macOS have been verified. An official Incus CLI
+  is available for Windows, but the extension has not yet been verified there.
+- **Container:** a Linux system container with the tools and runtime libraries
+  needed by VS Code Server. Ubuntu, Debian and CentOS may require additional
+  packages, especially on minimal images.
 
-Download the VSIX from [Open VSX](https://open-vsx.org/extension/dodbrian/remote-incus)
-or build it locally (see [Development](#development)), and opt in once via VS Code's
-**Preferences: Configure Runtime Arguments**
-command (`argv.json`; preserve any existing entries):
+Inside the container, setup requires `/bin/sh`, `tar`, `gzip` and standard core
+utilities, including `sha256sum` and `nohup`, available in the selected user's
+PATH. Bash is not required. Setup reports missing prerequisites; it does not
+install system packages automatically. Minimal Alpine x64 images additionally
+need `libstdc++` and `libgcc`. The rescue terminal requires util-linux `script`.
 
-```json
-{
-  "enable-proposed-api": ["dodbrian.remote-incus"]
-}
-```
+## Installation
 
-Then install the downloaded VSIX:
+1. Download the extension's VSIX from
+   [Open VSX](https://open-vsx.org/extension/dodbrian/remote-incus).
+2. Run **Preferences: Configure Runtime Arguments** from the Command Palette.
+   Add the following entry to `argv.json`, preserving any existing settings:
 
-```sh
-code --install-extension dodbrian.remote-incus-0.1.0.vsix
-```
+   ```json
+   {
+     "enable-proposed-api": ["dodbrian.remote-incus"]
+   }
+   ```
 
-For a local build, the filename is `remote-incus.vsix`.
-Restart VS Code after changing the runtime arguments. The extension ID is
-`dodbrian.remote-incus`. Open VSX hosting does not change VS Code's default
-extension marketplace. Ownership of the Open VSX namespace `dodbrian` is verified.
+3. Open the Extensions view, select **… → Install from VSIX…**, and choose the
+   downloaded file.
+4. Restart the editor.
 
-Open the Command Palette and run **Remote - Incus: Show Incus** to reveal the
-Incus view, including when Remote Explorer is hidden or another target is
-selected. You can also open **Remote Explorer** in the Activity Bar and select
-**Incus** from its target dropdown. The Remote Explorer container is built into
-VS Code; Microsoft's separate `ms-vscode.remote-explorer` extension is not
-required. If the Incus view is unavailable, check that Remote - Incus is enabled
-and that the proposed-API runtime argument above is configured, then restart
-VS Code.
-
-Current verified configuration: Linux x64 client, Stable VS Code 1.143.1 and
-Incus 7.5.1, with scoped Ubuntu/Rocky Linux 9.8 glibc x64 and Alpine musl x64
-instance checks.
-The manifest declares VS Code `^1.140.0`, and bootstrap implements glibc arm64
-selection, but these are not evidence that every matching version or architecture
-works. ARM64, Insiders, macOS and Windows remain unverified. Incus 6.0.5 has
-historical evidence with packaging-specific signal restrictions; see the
-[design support matrix](docs/DESIGN.md#10-support-matrix-mvp).
-
-Bootstrap requires `/bin/sh`; Bash is optional. Before a missing or incomplete
-installation is downloaded or extracted, setup checks `tar`, `gzip` and its
-required file/checksum utilities in the selected user's PATH. A missing tool
-produces a direct prerequisite error; install it or make it available in that
-user's PATH before reconnecting. The checks require executable utility files;
-flavor detection reports an unavailable `uname` directly. The extension does not repair PATH or install
-packages automatically. The rescue terminal additionally
-requires util-linux `script`. Minimal Alpine x64 images need `libstdc++` and
-`libgcc` for the musl server runtime; installing Bash does not supply those
-libraries. Install prerequisites explicitly; the extension does not install
-system packages. Before launching a new server, bootstrap probes the bundled
-runtime and reports loader or permission failures immediately; it also checks
-for `nohup` and an executable launcher. The rescue terminal names a missing
-`script` utility directly.
+To build the VSIX locally, see [Development](#development).
 
 ## Incus setup
 
-Follow the [official Incus installation guide](https://linuxcontainers.org/incus/docs/main/installing/)
-to install the Incus CLI on the computer running VS Code. Configure either a local
-Incus server or a remote server; a local daemon is optional when using remotes.
+Configure the Incus CLI to access your server:
 
-- For a local server, ensure the Incus service is running. On a new installation,
-  run `incus admin init` in a terminal and follow its prompts. Ensure your user
-  has permission to access the Incus socket; group changes may require signing
-  out and back in.
-- For a remote server, configure its address and authentication with
-  `incus remote add`, following your server administrator’s instructions.
-- Check `incus remote list` and `incus list <remote>:` in a terminal. Replace
-  `<remote>` with the configured remote name, such as `local`.
+- **Local server:** ensure Incus is running and your user has permission to
+  access it. For a new server, run `incus admin init`. See the official
+  [server initialization guide](https://linuxcontainers.org/incus/docs/main/howto/initialize/)
+  for configuration details.
+- **Remote server:** add it with `incus remote add`, following your server
+  administrator's instructions. See the official
+  [remote server guide](https://linuxcontainers.org/incus/docs/main/remotes/)
+  for connection and authentication details.
 
-If a server is unavailable, expand its node for setup guidance, **Try again**,
-and **Show connection details**. Once the server is ready, select **Try again**
-or the view’s **Refresh** button; an editor restart is unnecessary. Listing
-failures do not prevent browsing other configured servers.
+Check access in a terminal:
 
-## IPv4 forwarding on IPv6-only containers
+```sh
+incus remote list
+incus list <remote>:
+```
 
-If an IPv4-only service fails through ordinary forwarding on an IPv6-only
-container, right-click its existing row in the Ports view and choose
-**Forward over IPv4**. The action uses that row's port automatically; it does
-not ask for a port number. VS Code manages the resulting forward as usual.
+Replace `<remote>` with your configured remote name, such as `local`.
+For a complete introduction, see [First steps with Incus](https://linuxcontainers.org/incus/docs/main/tutorial/first_steps/).
 
-The helper uses an existing forwarded or environment-detected row; it does not
-make all listening services appear in Ports. VS Code's discovery settings still
-apply. With `hybrid` discovery, run the service in the integrated terminal so
-its startup URL can trigger automatic forwarding. An externally started service
-may have no row until its URL appears in terminal output or it is forwarded.
+## Connect to a container
 
-The action supports IPv4 loopback rows in an Incus remote window. If the port
-already has an ordinary forward, the helper creates a separate entry; stop the
-original when it is no longer needed. Existing forwarding and automatic port
-detection continue to use VS Code's core behavior.
+1. Open the Command Palette and run **Remote - Incus: Show Incus**. Alternatively,
+   open **Remote Explorer** and select **Incus** from the target dropdown.
+2. Expand your server to see its containers.
+3. Right-click a container and choose **Connect in Current Window…** or
+   **Connect in New Window…**.
 
-## Server download strategy
+Once connected, open a folder and work with files, terminals and extensions in
+the remote environment.
 
-`remote-incus.downloadStrategy` defaults to `auto`. No selection is required
-before installation: setup tries container download first and visibly switches
-to client download/transfer once if that route fails. A matching installation
-skips downloading altogether.
+![Remote Explorer with Incus selected and the current-window and new-window connection actions visible](docs/images/incus-remote-explorer.png)
 
-| Setting          | Behavior                                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------------ |
-| `auto` (default) | Container first, one visible client fallback; custom mirrors use client transfer directly. |
-| `client`         | Always download on the client and transfer through Incus.                                  |
-| `container`      | Container download only; failure is reported without fallback.                             |
+## Server installation
 
-To force a route, explicitly set `remote-incus.downloadStrategy` to `client` or
-`container`. Container downloading requires existing curl and outbound HTTPS to
-Microsoft's update/CDN endpoints. No package is installed automatically, and
-attempts have bounded timeouts. Managed curl ignores `.curlrc` options so they cannot introduce implicit retries or override those limits. Client transfer supports containers without
-internet access; explicit client mode also avoids waiting for a failed container
-attempt in environments known to be offline.
+On the first connection, the extension downloads and installs VS Code Server
+inside the container. Existing matching installations are reused.
 
-Container archives use client-obtained commit/SHA metadata, private partials and
-hash verification before publication. If that route fails after obtaining a
-trusted digest, the client fallback must match it before publishing or reusing its cache too. When metadata is
-unavailable, fallback retains the existing client-side hash and transfer checks.
-If partial cleanup cannot be confirmed, setup stops instead of starting another
-transfer against uncertain state. Both-route failure is reported without looping.
-Custom `downloadUrlTemplate` mirrors work with `auto` or `client`; explicit
-container mode rejects unsupported mirrors.
+By default, it tries downloading inside the container, then falls back to
+downloading on your computer and transferring through Incus.
 
-The extension does not enable or change Incus keepalive configuration.
+| `remote-incus.downloadStrategy` | Behavior                                                                                             |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `auto` (default)                | Try the container first, then fall back to client transfer.                                          |
+| `client`                        | Download on your computer and transfer through Incus. Useful for containers without internet access. |
+| `container`                     | Download inside the container, with no fallback. Requires `curl` and outbound HTTPS.                 |
 
-## Verification status
-
-The reviewed build was deployed on 2026-10-25 and verified byte-identical to its
-production bundle. Normal Ubuntu/Rocky connections, signed authentication,
-invalid-token rejection and healthy reuse passed. Rocky's missing-`tar` error
-was verified in VS Code before an explicitly approved `tar` installation;
-setup then completed. Other Rocky terminal/UI and error cases remain unverified.
-
-Task 4 verification is complete; its results have been discussed and the user
-has resolved the discussion gate. Real shell/relay
-checks and explicitly authorized local/TLS integration passed, along with
-user-assisted files, terminals, Restricted Mode, distinct-folder concurrent
-windows and reload/folder reconnect. See [the evidence report](docs/TASK-04-RESULTS.md)
-for versions, cleanup and exact limits.
-
-The Ports view is now enabled; actual forwarding passed with an IPv4-only
-service on the TLS/cluster fixture and an IPv6-loopback service locally.
-After redeploy, the user manually verified Ports and reported it working
-on 2026-10-25. A local fixture with IPv6-only external networking exposed a
-separate IPv4-loopback address-resolution edge
-case. The **Forward over IPv4** helper above passed isolated HTTP checks and
-manual acceptance in the normal installed profile on 2026-10-25; ordinary
-forwarding still has that address-resolution limitation. See
-[the handover](docs/HANDOVER.md) for the evidence.
-
-“Connect in New Window” opens a separate workspace containing the chosen or
-last-used remote folder. Each request has its own workspace identity, so an
-already-open folder gets a second window. “Connect in Current Window” continues
-to open the folder directly. Instances without folder history open an empty
-remote window. The small workspace files live in the extension's local storage
-(`window-workspaces`), remain available for reload/reopening, and do not modify
-the remote project. Successful files are retained rather than automatically
-pruned; failed open requests remove their generated workspace. Isolated
-three-window and reopening checks passed; the user also manually confirmed the
-normal-profile identical-folder new-window workflow on 2026-10-25.
+For custom mirrors, set `remote-incus.downloadUrlTemplate` and use `auto` or
+`client`; custom mirrors use client transfer directly.
 
 ## Development
 
-See the [release policy and process](docs/RELEASING.md) and [changelog](CHANGELOG.md)
-for versioning and publication.
-
-The offline Node suite uses the existing local dependencies. After `npm ci`:
+Install dependencies, run the checks and build the extension:
 
 ```sh
+npm ci
 npm test
-npm run test:relay
-npm run typecheck
-npm run compile
-npm run test:package
-npm run test:redeploy
 npm run package
 ```
 
-`npm test` needs no VS Code installation, Incus binary/daemon, credentials,
-internet access or server download. `npm run test:relay` additionally needs
-local loopback TCP sockets and runs the bundled relay as real child processes.
-These portable checks are configured in the tracked offline CI workflow (`.github/workflows/offline-ci.yml`)
-without private infrastructure. CI installs locked dependencies, runs the checks,
-and retains a verified VSIX as a build artifact, then finishes. The separately
-started [Release workflow](docs/RELEASING.md) builds a numbered candidate, creates
-a GitHub release, then waits for manual approval to publish it to Open VSX.
+The packaged extension is written to `remote-incus.vsix`.
 
-`npm run package` uses the lockfile-installed VSCE. Its `vscode:prepublish` hook
-builds minified production output and removes stale source maps. The package
-validator inspects the actual ZIP contents against an explicit file policy,
-checks nonempty runtime/licenses, JavaScript syntax, matching VSIX metadata,
-ZIP checksums and documentation links, and scans privacy patterns. Packaging adjusts root README/license references to VSCE's emitted
-filenames so the archive's relative links remain valid. A new build replaces `remote-incus.vsix` only after finalization and validation
-succeed; failures preserve the previous artifact and remove the rejected
-candidate. `npm run test:package` covers archive policy, Markdown handling and
-build-failure preservation with local fixtures.
-Local validation does not establish that the workflow has run on GitHub.
+See the [contributor guide](docs/CONTRIBUTING.md) for development setup and quality
+rules, the [testing guide](docs/tests/README.md) for additional checks, the
+[release guide](docs/RELEASING.md) for publication and the
+[changelog](CHANGELOG.md) for release history.
 
-### Mandatory quality gates
+## Troubleshooting
 
-Linting (strict, type-checked rules), code formatting and the strict
-TypeScript compiler settings are enforced as one gate — `npm run check` — and
-every diagnostic is a failure, including anything set to "warn" (`--max-warnings 0`).
-`npm test` and `npm run package` run this gate first; a `pre-commit` hook
-(installed automatically by `npm install`) blocks non-conforming commits.
+### The Incus view is missing
 
-```sh
-npm run check          # typecheck + lint + formatting verification
-npm run lint           # ESLint only (warnings fail)
-npm run lint:fix       # auto-fix lint findings
-npm run format         # Prettier --write
-npm run format:check   # Prettier --check (fails on unformatted files)
-```
+Run **Remote - Incus: Show Incus** from the Command Palette. If the view is still
+unavailable, confirm that the extension is enabled and the proposed API is
+configured as described in [Installation](#installation), then restart the editor.
 
-Formatting is Prettier's (single quotes, print width 100, defaults otherwise);
-`.vscode/settings.json` applies the same on save. Rules that only make sense
-for shipped code (the unsafe-`any` family, strict nullish/condition checks) run
-at full strength under `src/`, with a documented carve-out for the test
-fixture's opaque stub boundary in `eslint.config.mjs`.
+### A server is unavailable
 
-The manual `scripts/verify-live.ts` verifier is separate: it refuses CI and
-requires an explicit runtime target, destructive opt-in and the installed
-client's signing-module path. Establish that the fixture is test-owned and idle
-before use. No instance is created/deleted automatically, and target values or
-raw private logs belong outside tracked artifacts. See
-[testing guide](docs/tests/README.md) for commands and boundaries. The older
-smoke/fresh-install scripts are not CI entry points. Smoke runs only pure checks
-without a target argument; live smoke requires an explicit `remote:instance`.
-Fresh-install checks also require `INCUS_TEST_ALLOW_DESTRUCTIVE=yes`. Run these
-manual harnesses from the repository root against a test-owned idle fixture.
+Check access in a terminal with `incus list <remote>:`, replacing `<remote>` with
+your configured remote name. After fixing access, select **Try again** on the
+server node or use the view's **Refresh** button.
 
-For a manual deployment, replace the quoted placeholders with your test-owned
-fixture and absolute remote folder. This installs the build, restarts normal
-VS Code and reopens that folder. Quote paths containing spaces. The helper
-resolves the checkout root itself, so it can also be invoked by absolute path
-from another working directory.
+### An IPv4 service is unreachable through port forwarding
 
-```sh
-npm install
-npm run typecheck
-./scripts/redeploy.sh '<remote:instance>' '<absolute-folder>'
-```
+If an IPv4-only service is unreachable through ordinary forwarding in an
+IPv6-only container, right-click its row in the **Ports** view and select
+**Forward over IPv4**.
 
-## Publication privacy
+The action requires an existing port row. If it creates a second forward, stop
+the original when it is no longer needed.
 
-Run `npm run audit:privacy` on the checkout and
-`node scripts/audit-privacy.cjs --history` on reachable Git history. For an
-extracted VSIX or source export, use
-`node scripts/audit-privacy.cjs --root <directory>`. Findings report file, line
-and category without printing the matched value. This bounded pattern check
-supplements manual review; it cannot recognize arbitrary private hostnames or
-every secret format. Keep fixture identities in runtime inputs and keep raw
-logs, token files and credentials out of tracked files and published archives.
+## Feedback and bug reports
 
-## Icon licensing
+Report bugs and suggest improvements through
+[GitHub Issues](https://github.com/dodbrian/vscode-remote-incus/issues).
+For bug reports, include your editor name and version, client operating system,
+Incus version, container distribution and steps to reproduce the problem.
+Remove credentials and private infrastructure details from any logs you share.
+
+## Related projects
+
+- [Canonical Workshop](https://ubuntu.com/workshop/docs/how-to/develop-with-workshops/connect-vscode/)
+  provides LXD development environments with VS Code access through Remote-SSH.
+- [ssh2incus](https://github.com/mobydeck/ssh2incus) provides an SSH gateway to
+  Incus instances without requiring an SSH server inside each instance.
+
+## License
+
+Remote - Incus is licensed under the [MIT License](LICENSE).
 
 Bundled tree SVGs are by Microsoft and contributors, licensed under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
@@ -297,7 +176,5 @@ for source and license details.
 
 ## Documentation
 
-See the [documentation index](docs/README.md) for architecture, testing, task plans,
-verification results, and project history. The
-[release-readiness review](docs/RELEASE-READINESS.md) records hosted CI,
-publication evidence and remaining verification work.
+See the [documentation index](docs/README.md) for architecture, contributor guides,
+testing and project history.
