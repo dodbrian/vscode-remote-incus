@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 const load = createRequire(__filename);
 
-const { findings } = load(path.resolve('scripts/audit-privacy.cjs')) as {
+const { findings, isReviewedImage } = load(path.resolve('scripts/audit-privacy.cjs')) as {
+  isReviewedImage: (data: Buffer) => boolean;
   findings: (text: string) => { kind: string; line: number }[];
 };
 
@@ -39,4 +41,15 @@ test('publication audit accepts loopback, documentation addresses and synthetic 
   ]) {
     assert.deepEqual(findings(value), []);
   }
+});
+
+test('publication audit accepts only the exact reviewed screenshot bytes', () => {
+  for (const name of ['incus-connected-workspace.png', 'incus-remote-explorer.png']) {
+    const data = fs.readFileSync(path.resolve('docs/images', name));
+    assert.equal(isReviewedImage(data), true);
+    const changed = Buffer.from(data);
+    changed.writeUInt8(changed.readUInt8(changed.length - 1) ^ 1, changed.length - 1);
+    assert.equal(isReviewedImage(changed), false);
+  }
+  assert.equal(isReviewedImage(Buffer.from([0, 1, 2])), false);
 });

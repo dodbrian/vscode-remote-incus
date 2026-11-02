@@ -51,3 +51,7 @@ and category without printing the matched value. This bounded pattern check
 supplements manual review; it cannot recognize arbitrary private hostnames or
 every secret format. Keep fixture identities in runtime inputs and keep raw
 logs, token files and credentials out of tracked files and published archives.
+
+Binary images require visual privacy review. The audit recognizes the exact
+reviewed README screenshots by SHA-256 in `scripts/audit-privacy.cjs`; new or
+modified images require another review before updating those checksums.

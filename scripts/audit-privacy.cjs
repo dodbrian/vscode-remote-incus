@@ -6,6 +6,17 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const cp = require('node:child_process');
+const { createHash } = require('node:crypto');
+
+// Visually reviewed README screenshots. Any byte change requires another review.
+const reviewedImages = new Set([
+  '5fcfd8c9597a4f896fd9122e1ba991696d345d7a63af5eade52bc13fa1cd051e', // connected workspace
+  '0be0112266a9e992ab521345ffb78a2f89a4945cdfa00fb676f6bd20e8e166ff', // Remote Explorer
+]);
+
+function isReviewedImage(data) {
+  return reviewedImages.has(createHash('sha256').update(data).digest('hex'));
+}
 
 const rules = [
   ['private key', /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----/g],
@@ -99,7 +110,10 @@ function main() {
   }
   let count = 0;
   for (const { file, data } of records) {
-    if (data.includes(0)) throw new Error('Binary file requires separate review: ' + file);
+    if (data.includes(0)) {
+      if (isReviewedImage(data)) continue;
+      throw new Error('Binary file requires separate review: ' + file);
+    }
     for (const { kind, line } of findings(data.toString('utf8'))) {
       console.error(`${file}:${line}: ${kind} (value redacted)`);
       count++;
@@ -110,4 +124,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { findings };
+module.exports = { findings, isReviewedImage };
