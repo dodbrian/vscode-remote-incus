@@ -4,10 +4,22 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-02
+
 ### Changed
 
 - Keep push CI limited to build and test. A manually started release workflow
   creates the numbered GitHub release, then requires approval for Open VSX publication.
+
+### Commits
+
+- fix(ci): recognize reviewed screenshot bytes (28b5f6d)
+- docs(readme): guide beta users through setup (7c86b23)
+- docs(handover): pin the resume point to main's tip (5f45497)
+- docs(readme): show build and test status (70c5ee7)
+- docs(release): record the verified workflow handover (01a59c1)
+- fix(ci): enable builds for branch pushes (e0bd756)
+- fix(ci): separate routine builds from releases (b41f2e1)
 
 ## [0.2.0] - 2026-10-30
 
