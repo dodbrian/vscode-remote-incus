@@ -1,7 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { copyFileSync, mkdirSync, existsSync, readFileSync, symlinkSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  existsSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { withFixture } from './support/fixture';
 import { identity } from './support/scenario';
 import { uninstallServer } from '../src/bootstrap';
@@ -21,6 +28,8 @@ for (const mode of ['normal', 'deleted', 'symlink', 'denied', 'stuck'] as const)
       if (mode === 'symlink') symlinkSync(home, selectedHome);
       mkdirSync(root, { recursive: true });
       mkdirSync(other, { recursive: true });
+      const marker = `${root}/installation-marker`;
+      writeFileSync(marker, 'preserve installation contents');
       const processes: import('node:child_process').ChildProcess[] = [];
       let childPid: number | undefined;
       t.after(() => {
@@ -74,18 +83,29 @@ for (const mode of ['normal', 'deleted', 'symlink', 'denied', 'stuck'] as const)
         unlinkSync(`${root}/copilot-runtime`);
       }
       f.expect('child_process.execFile', (_cmd, args, _opts, cb) => {
-        const script = String(args.at(-1)).replaceAll(
-          '/tmp/vscode-server-',
-          `${f.directory}/archive-`,
-        );
+        // Keep real /proc identities and signals, but scan only fixture-owned
+        // processes so retry duration does not depend on the host process count.
+        // Visit the child before its parent to require another discovery pass.
+        const procEntries = [childPid, ...processes.map((p) => p.pid)].map((pid) => {
+          assert.ok(typeof pid === 'number' && Number.isSafeInteger(pid) && pid > 0);
+          return `/proc/${pid}`;
+        });
+        const original = String(args.at(-1));
+        assert.ok(original.includes('for proc in /proc/[0-9]*; do'));
+        const script = original
+          .replace('for proc in /proc/[0-9]*; do', `for proc in ${procEntries.join(' ')}; do`)
+          .replaceAll('/tmp/vscode-server-', `${f.directory}/archive-`);
         const prefix =
           mode === 'denied'
             ? 'kill() { return 1; };'
             : mode === 'stuck'
               ? 'kill() { return 0; }; sleep() { :; };'
               : '';
-        cp.execFile('/bin/sh', ['-c', prefix + script], (err, stdout, stderr) =>
-          cb(err, stdout, stderr),
+        cp.execFile(
+          '/bin/sh',
+          ['-c', prefix + script],
+          { timeout: 10_000 },
+          (err, stdout, stderr) => cb(err, stdout, stderr),
         );
       });
       const uninstall = (): Promise<void> =>
@@ -93,12 +113,6 @@ for (const mode of ['normal', 'deleted', 'symlink', 'denied', 'stuck'] as const)
           { remote: 'fixture', instance: 'selected' },
           { ...identity, home: selectedHome },
         );
-      if (mode === 'denied' || mode === 'stuck') {
-        await assert.rejects(uninstall(), /installation preserved/);
-        assert.equal(existsSync(root), true, 'failed shutdown must preserve files');
-        return;
-      }
-      await uninstall();
       const running = (pid: number | undefined): boolean => {
         try {
           assert.ok(pid);
@@ -108,6 +122,21 @@ for (const mode of ['normal', 'deleted', 'symlink', 'denied', 'stuck'] as const)
           return false;
         }
       };
+      if (mode === 'denied' || mode === 'stuck') {
+        await assert.rejects(
+          uninstall(),
+          mode === 'denied'
+            ? /Cannot stop server process .*installation preserved/
+            : /Server processes did not exit; installation preserved/,
+        );
+        assert.equal(readFileSync(marker, 'utf8'), 'preserve installation contents');
+        assert.equal(running(server.pid), true, 'failed shutdown must preserve server process');
+        assert.equal(running(childPid), true, 'failed shutdown must preserve child process');
+        assert.equal(running(copilot.pid), true, 'failed shutdown must preserve Copilot process');
+        assert.equal(running(unrelated.pid), true, 'other installation must survive failure');
+        return;
+      }
+      await uninstall();
       assert.equal(running(server.pid), false, 'server must exit before uninstall completes');
       assert.equal(running(childPid), false, 'external child executable must exit');
       assert.equal(running(copilot.pid), false, 'TERM-resistant Copilot must exit');

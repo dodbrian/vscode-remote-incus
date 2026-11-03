@@ -20,7 +20,39 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: README registry compatibility (2026-11-03)
+## Current stopping point: dependency security and uninstall fixtures (2026-11-03)
+
+[Dependabot alert #7](https://github.com/dodbrian/vscode-remote-incus/security/dependabot/7)
+reported vulnerable development dependency `minimatch` 10.2.6. An npm override
+now selects patched `minimatch` 11.0.2 across the development tools. A fresh npm
+audit also identified a `glob` advisory; a VSCE-scoped override selects patched
+`glob` 14.0.3. The lockfile and
+[dependency follow-up](RELEASE-READINESS.md#dependency-security-follow-up)
+record both updates. The final npm audit reports zero vulnerabilities.
+
+The full regression run exposed a host-dependent timeout in the uninstall
+fixture's stuck-process case: repeated scans of 529 host processes exceeded
+the 30-second test limit. The fixture now scans only its own real processes,
+with the child first to exercise repeated descendant discovery. It retains real
+`/proc` identities and signals, checks exact failure reasons, verifies installation
+contents and unrelated processes survive failure, and bounds its shell subprocess
+to ten seconds. Production uninstall code is unchanged; the fixture no longer
+tests enumeration of the entire host process table.
+
+Validation: `npm test` passed all 214 offline regressions plus the release and
+publishing tests, including types, lint and formatting. All five uninstall cases
+passed; the stuck case took about 0.38 seconds. Relay, package-policy and
+deployment-guard checks passed, as did production VSIX construction and package
+verification. The final privacy audit reported zero findings and
+`git diff --check` passed.
+
+Resume after pushing by checking hosted Build and test / CodeQL results and
+whether Dependabot closes alert #7. Those hosted results and closure have not
+yet been verified for these changes. Source version remains `0.2.1`; the locally
+rebuilt VSIX is validation output only and must not replace published assets.
+No release, publication or runtime deployment was performed.
+
+## Previous checkpoint: README registry compatibility (2026-11-03)
 
 The README now highlights the beta notice with 🚨 and uses explicit HTTPS
 URLs for screenshots, documentation and section links. Packaging deliberately
