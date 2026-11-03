@@ -20,7 +20,28 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: dependency security and uninstall fixtures (2026-11-03)
+## Current stopping point: published changelog clarity (2026-11-03)
+
+VSIX finalization now removes the entire `Unreleased` section from the packaged
+`extension/changelog.md`, so readers see the latest dated release first. The
+repository changelog retains that section for pending work. GitHub release notes
+already omit it and required no change.
+
+Regression coverage checks both empty and populated pending sections, preserves
+released history, and confirms that finalization leaves the source records
+unchanged. The new test failed before the fix. `npm run test:package`,
+`npm run check`, and `npm run package` passed. The rebuilt VSIX was inspected:
+its first release heading is `0.2.2`, with no `Unreleased` heading.
+`git diff --check` also passed.
+
+Source version remains `0.2.2`. The local VSIX is validation output only;
+existing published assets must stay frozen. No release, publication or runtime
+deployment was performed. Resume by checking hosted CI for this push, then
+verify the registry/editor changelog after a separately requested future release.
+Earlier checkpoints below retain historical evidence and were not refreshed
+for this change.
+
+## Previous checkpoint: dependency security and uninstall fixtures (2026-11-03)
 
 [Dependabot alert #7](https://github.com/dodbrian/vscode-remote-incus/security/dependabot/7)
 reported vulnerable development dependency `minimatch` 10.2.6. An npm override

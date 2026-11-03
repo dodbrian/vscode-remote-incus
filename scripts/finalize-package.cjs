@@ -16,7 +16,11 @@ function finalizeRecords(records) {
   const result = new Map(records);
   for (const [name, bytes] of records) {
     if (!name.endsWith('.md')) continue;
-    const rewritten = rewriteMarkdownLinks(bytes.toString('utf8'), (href) => {
+    let text = bytes.toString('utf8');
+    // The repository tracks pending work; the published changelog shows releases only.
+    if (name === 'extension/changelog.md')
+      text = text.replace(/^## \[Unreleased\][^\S\r\n]*\r?\n[\s\S]*?(?=^## |$(?![\s\S]))/m, '');
+    const rewritten = rewriteMarkdownLinks(text, (href) => {
       const local = resolveLocalLink(name, href);
       if (!local) return null;
       const canonical = {

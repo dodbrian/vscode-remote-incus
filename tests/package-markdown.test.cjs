@@ -106,6 +106,17 @@ test('HTML anchors use actual attributes without parsing comments or script exam
   assert.deepEqual([...inspectMarkdown(source).anchors], ['some>anchor', 'legacy']);
 });
 
+test('packaged changelog contains released history without the Unreleased section', () => {
+  const history = '## [0.2.2] - 2026-11-03\n\n- Released fix.\n';
+  for (const pending of ['', '### Fixed\n\n- Pending fix.\n\n']) {
+    const source = `# Changelog\n\n## [Unreleased]\n\n${pending}${history}`;
+    const records = new Map([['extension/changelog.md', Buffer.from(source)]]);
+    const output = finalizeRecords(records).get('extension/changelog.md').toString('utf8');
+    assert.equal(output, `# Changelog\n\n${history}`);
+    assert.equal(records.get('extension/changelog.md').toString('utf8'), source);
+  }
+});
+
 test('finalization rewrites changelog links to the VSCE archive filename', () => {
   assert.equal(
     finalize('[changes](../CHANGELOG.md#unreleased)'),
