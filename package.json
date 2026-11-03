@@ -319,7 +319,9 @@
     "test:redeploy": "node --test tests/redeploy.test.cjs"
   },
   "overrides": {
+    "minimatch": "11.0.2",
     "@vscode/vsce": {
+      "glob": "14.0.3",
       "@azure/identity": {
         "@azure/msal-node": "7.1.1"
       }

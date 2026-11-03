@@ -57,6 +57,13 @@ hosted CI execution describe earlier checkpoints, not the current backlog.
 
 ## Dependency security follow-up
 
+For [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249),
+an npm override pins `minimatch` to `11.0.2` across the development tools.
+VSCE's `glob` dependency is also pinned to `14.0.3` for
+[GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4).
+Both patched versions support the CI Node version. Remove these overrides once
+the upstream tools request patched versions directly and the audit remains clean.
+
 The `fast-uri` alerts were resolved by its lockfile update to `3.1.9`.
 For [GHSA-xcx6-jx8p-x3h5](https://github.com/advisories/GHSA-xcx6-jx8p-x3h5),
 VSCE's Azure Identity `4.14.0` still requests MSAL Node `^6.0.0`, while the
