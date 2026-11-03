@@ -20,7 +20,134 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: release workflow ready (2026-10-30)
+## Current stopping point: README registry compatibility (2026-11-03)
+
+The README now highlights the beta notice with 🚨 and uses explicit HTTPS
+URLs for screenshots, documentation and section links. Packaging deliberately
+uses `--no-rewrite-relative-links`, so relative README destinations previously
+survived into the registry description without a usable repository base.
+
+- Both screenshot URLs use raw GitHub content pinned to commit
+  `7c86b2320823a4fdbb7ec91a1dc66cf93b7bcdfc`. Their bytes match the reviewed
+  local images; future changes on `main` cannot alter these screenshots.
+- Documentation links use GitHub `main` so readers reach current guidance.
+  Development and Installation links open the corresponding GitHub README
+  sections, including from the registry or editor extension view.
+- Third-party-notice wording now distinguishes the linked repository document
+  from the copy also included in the extension package.
+- `npm run package` passed release metadata, type, lint, format and archive
+  policy checks. The packaged README matched the source, with all 23
+  destinations using HTTPS. Nine repository file targets and two heading
+  anchors were checked locally, and both pinned images matched Git bytes.
+- The privacy audit passed with zero findings after the image-pinning
+  refinement. Formatting and `git diff --check` passed. No new regression
+  tests were added for this documentation-only change.
+
+These changes are for the next release. The local VSIX was rebuilt for
+validation at source version `0.2.1`; it must not replace the frozen published
+`0.2.1` assets. No release, publication or runtime deployment was started.
+Actual Open VSX rendering and click behavior remain unverified until a future
+explicitly requested release is published. Resume by checking that listing's
+screenshots, documentation links and section links after publication.
+
+The earlier release-verification checkpoint and its outstanding end-to-end
+validation remain below. Its external service evidence is retained from the
+prior session and was not refreshed for this README change.
+
+## Previous checkpoint: bounded Open VSX verification pushed (2026-11-03)
+
+<!-- Preserve existing links to the formerly current checkpoint. -->
+
+<a id="current-stopping-point-release-workflow-ready-2026-10-30"></a>
+
+The release verification fix is committed and pushed to `main` as
+[`597ccaf`](https://github.com/dodbrian/vscode-remote-incus/commit/597ccaf479ddd2983b10ea44d797262823e782ef)
+(`fix(release): verify Open VSX acceptance asynchronously`). Remote `main` was
+verified equal to local HEAD and the checkout was clean after that push. The
+source manifest version remains `0.2.1`; no new release, publication or live
+runtime deployment was started for this fix. The README compatibility changes
+above are a subsequent documentation checkpoint.
+
+### Incident and current distribution
+
+The [v0.2.1 release run](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41543607404)
+built and tested its candidate, created the GitHub release, and successfully
+uploaded to Open VSX. Its final job failed because the old verifier waited only
+about one minute for public visibility while Open VSX was still processing the
+package. The failed run does not mean that the upload was rejected.
+
+- [GitHub v0.2.1](https://github.com/dodbrian/vscode-remote-incus/releases/tag/v0.2.1)
+  contains `remote-incus-0.2.1.vsix` and `SHA256SUMS`.
+- The refreshed [Open VSX latest API](https://open-vsx.org/api/dodbrian/remote-incus/latest)
+  reports `0.2.1`, published at `2026-11-02T23:18:31.795178Z`, with `verified: true`.
+- During this session, the GitHub release VSIX, recorded checksum and downloaded
+  Open VSX VSIX matched SHA-256
+  `911bf250eacfbb7d7b80d4132c541e7b87f16e11579c344f61b3a8524bf6335c`.
+  The refreshed GitHub asset metadata still reports that digest. Existing release
+  bytes stay frozen; never rebuild version `0.2.1` to replace or republish them.
+
+### Implemented behavior
+
+Normal pushes remain build/test only. A manually started Release still builds a
+candidate, creates the GitHub release and waits for `open-vsx` approval before
+uploading that exact artifact. See [Releasing](RELEASING.md) for operator steps.
+
+- The publishing job succeeds when Open VSX accepts the upload. It automatically
+  dispatches `.github/workflows/verify-openvsx.yml` for that release only.
+- Each verification job waits through `open-vsx-verification-delay`, then checks
+  once. A pending release dispatches its next check after another 30-minute
+  delay. There is no permanent schedule, manual verification step or sleeping
+  runner. Completed or untracked releases do not start a chain.
+- Stop on matching bytes, an integrity failure, the original 24-hour deadline,
+  or the 48-attempt cap. A check finishing after the deadline cannot report
+  success. The first check after expiry reports failure without downloading.
+- The pending commit status pins the accepted package SHA-256, original
+  acceptance timestamp and next attempt. Retries preserve all three. Changed
+  release assets, duplicate attempts and out-of-order attempts cannot silently
+  pass verification or fork the chain.
+- Publishing and verification share a per-release concurrency group with
+  `queue: max` and cancellation disabled. This serializes status updates and
+  prevents duplicates from replacing a valid pending successor.
+- The live delay environment was created and rechecked: 30-minute wait timer,
+  admin bypass disabled, no required reviewers. It is separate from the existing
+  publishing approval. Verification uses `deployment: false`, has no publishing
+  token and never uploads a package.
+
+### Validation and remaining work
+
+- All **63 release tests** passed, including the real CLI against mocked GitHub
+  JSON responses with network access blocked, plus duplicate-run, pinned-byte,
+  deadline and dispatch-recovery cases.
+- `npm run check`, the mandatory commit hook, `git diff --check` and the privacy
+  audit passed. The audit reported zero findings.
+- actionlint **1.7.12** passed with only its unsupported `queue: max` diagnostic
+  excluded. This field was confirmed in current GitHub documentation and
+  Context7; YAML and shared concurrency settings were also checked.
+- Hosted [Build and test](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41706924677)
+  **passed** on `597ccaf`. This supersedes an earlier local full-suite attempt
+  whose unchanged uninstall "stuck process" test timed out. The focused release
+  tests passed separately. Hosted
+  [CodeQL](https://github.com/dodbrian/vscode-remote-incus/actions/runs/41706924370)
+  **passed** on the same commit.
+- The new delayed dispatch chain has **not run on GitHub**. Hosted ordinary CI
+  success is not evidence of environment timing, automatic successor dispatch
+  or terminal status behavior. The already-published `0.2.1` release predates
+  receipt tracking and is not automatically enrolled.
+
+Resume on the next explicitly requested release by verifying the delayed chain
+end to end. Do not create or
+republish a release just to exercise this change. Runner/setup cancellation,
+GitHub status API failure or dispatch failure can interrupt the chain; recovery
+and the cross-service acceptance/receipt failure window are documented in
+[automatic verification](RELEASING.md#automatic-open-vsx-verification). Retrying
+publication can resume a saved receipt at its persisted attempt without another
+upload or a reset deadline. A failed first receipt write needs investigation
+before retrying because Open VSX acceptance and GitHub recording are not atomic.
+
+## Previous checkpoint: release workflow ready (2026-10-30)
+
+This is a historical snapshot. Its version, registry and branch-tip claims are
+superseded by the current stopping point above.
 
 Routine CI and deliberate releases are now separate. The final trigger split is
 on `main` in `b41f2e1` and `e0bd756`. Use the [release guide](RELEASING.md) for the

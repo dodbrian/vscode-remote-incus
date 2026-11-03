@@ -6,12 +6,12 @@ Connect VS Code to [Incus](https://github.com/lxc/incus) system containers throu
 Remote Explorer, using your existing Incus client configuration. No SSH server
 is required inside the container.
 
-**Beta:** This extension is under active development. Expect bugs and rough edges.
+🚨 **Beta:** This extension is under active development. Expect bugs and rough edges.
 
 This is an independent project, not affiliated with or endorsed by the Incus
 project or Linux Containers.
 
-![Connected Incus workspace with a remote file open and an integrated terminal](docs/images/incus-connected-workspace.png)
+![Connected Incus workspace with a remote file open and an integrated terminal](https://raw.githubusercontent.com/dodbrian/vscode-remote-incus/7c86b2320823a4fdbb7ec91a1dc66cf93b7bcdfc/docs/images/incus-connected-workspace.png)
 
 ## How it works
 
@@ -55,7 +55,7 @@ need `libstdc++` and `libgcc`. The rescue terminal requires util-linux `script`.
    downloaded file.
 4. Restart the editor.
 
-To build the VSIX locally, see [Development](#development).
+To build the VSIX locally, see [Development](https://github.com/dodbrian/vscode-remote-incus/blob/main/README.md#development).
 
 ## Incus setup
 
@@ -91,7 +91,7 @@ For a complete introduction, see [First steps with Incus](https://linuxcontainer
 Once connected, open a folder and work with files, terminals and extensions in
 the remote environment.
 
-![Remote Explorer with Incus selected and the current-window and new-window connection actions visible](docs/images/incus-remote-explorer.png)
+![Remote Explorer with Incus selected and the current-window and new-window connection actions visible](https://raw.githubusercontent.com/dodbrian/vscode-remote-incus/7c86b2320823a4fdbb7ec91a1dc66cf93b7bcdfc/docs/images/incus-remote-explorer.png)
 
 ## Server installation
 
@@ -122,10 +122,10 @@ npm run package
 
 The packaged extension is written to `remote-incus.vsix`.
 
-See the [contributor guide](docs/CONTRIBUTING.md) for development setup and quality
-rules, the [testing guide](docs/tests/README.md) for additional checks, the
-[release guide](docs/RELEASING.md) for publication and the
-[changelog](CHANGELOG.md) for release history.
+See the [contributor guide](https://github.com/dodbrian/vscode-remote-incus/blob/main/docs/CONTRIBUTING.md) for development setup and quality
+rules, the [testing guide](https://github.com/dodbrian/vscode-remote-incus/blob/main/docs/tests/README.md) for additional checks, the
+[release guide](https://github.com/dodbrian/vscode-remote-incus/blob/main/docs/RELEASING.md) for publication and the
+[changelog](https://github.com/dodbrian/vscode-remote-incus/blob/main/CHANGELOG.md) for release history.
 
 ## Troubleshooting
 
@@ -133,7 +133,7 @@ rules, the [testing guide](docs/tests/README.md) for additional checks, the
 
 Run **Remote - Incus: Show Incus** from the Command Palette. If the view is still
 unavailable, confirm that the extension is enabled and the proposed API is
-configured as described in [Installation](#installation), then restart the editor.
+configured as described in [Installation](https://github.com/dodbrian/vscode-remote-incus/blob/main/README.md#installation), then restart the editor.
 
 ### A server is unavailable
 
@@ -167,14 +167,14 @@ Remove credentials and private infrastructure details from any logs you share.
 
 ## License
 
-Remote - Incus is licensed under the [MIT License](LICENSE).
+Remote - Incus is licensed under the [MIT License](https://github.com/dodbrian/vscode-remote-incus/blob/main/LICENSE).
 
 Bundled tree SVGs are by Microsoft and contributors, licensed under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-See the [third-party notices](docs/ThirdPartyNotices.md) in the extension package
-for source and license details.
+See the [third-party notices](https://github.com/dodbrian/vscode-remote-incus/blob/main/docs/ThirdPartyNotices.md)
+for source and license details. These notices are also included in the extension package.
 
 ## Documentation
 
-See the [documentation index](docs/README.md) for architecture, contributor guides,
+See the [documentation index](https://github.com/dodbrian/vscode-remote-incus/blob/main/docs/README.md) for architecture, contributor guides,
 testing and project history.
