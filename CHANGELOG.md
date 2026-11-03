@@ -4,6 +4,17 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-03
+
+### Commits
+
+- chore(workspace): remove extension recommendation prompts (88331f2)
+- docs(readme): explain CLI installation from VSIX (7a9a64c)
+- test(uninstall): isolate process shutdown fixtures (afc53d8)
+- fix(deps): resolve development tooling advisories (9617021)
+- docs(readme): make registry links self-contained (1e2bf57)
+- fix(release): verify Open VSX acceptance asynchronously (597ccaf)
+
 ## [0.2.1] - 2026-11-02
 
 ### Changed
