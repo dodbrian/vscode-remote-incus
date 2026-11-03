@@ -1,0 +1,52 @@
+name: Verify Open VSX availability
+run-name: Open VSX ${{ inputs.tag }} (attempt ${{ inputs.attempt }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release accepted by Open VSX (supplied automatically)'
+        type: string
+        required: true
+      attempt:
+        description: 'Bounded verification attempt (supplied automatically)'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  statuses: write
+  actions: write
+
+concurrency:
+  group: openvsx-${{ inputs.tag }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  verify:
+    name: Verify ${{ inputs.tag }} (attempt ${{ inputs.attempt }})
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment:
+      name: open-vsx-verification-delay
+      deployment: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out validation tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.21.0'
+          cache: npm
+      - name: Install validation tools
+        run: npm ci --include=dev --ignore-scripts --no-audit --no-fund
+      - name: Check this release once and continue only if pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          ATTEMPT: ${{ inputs.attempt }}
+        run: node scripts/verify-openvsx.cjs verify "$TAG" "$ATTEMPT"

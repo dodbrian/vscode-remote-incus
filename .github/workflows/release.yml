@@ -122,10 +122,15 @@ jobs:
   publish:
     name: Approve Open VSX publication
     needs: release
+    permissions:
+      contents: read
+      statuses: write
+      actions: write
     environment: open-vsx
     concurrency:
-      group: publish-openvsx
+      group: openvsx-${{ needs.release.outputs.tag }}
       cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -147,8 +152,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.release.outputs.tag }}
         run: gh release download "$TAG" --pattern '*.vsix' --pattern SHA256SUMS --dir "$RUNNER_TEMP/released"
-      - name: Publish the released bytes and verify the registry download
+      - name: Submit the released bytes to Open VSX
         env:
+          GH_TOKEN: ${{ github.token }}
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
           TAG: ${{ needs.release.outputs.tag }}
-        run: node scripts/publish-openvsx.cjs "$RUNNER_TEMP/released" "$TAG"
+        run: node scripts/verify-openvsx.cjs submit "$RUNNER_TEMP/released" "$TAG"

@@ -37,7 +37,10 @@ both documentation pushes passed hosted Build and test and CodeQL (rows below).
   creation after its checks pass; there is no separate release approval gate.
 - **Publishing:** the final job waits for the `open-vsx` environment approval.
   It downloads this run's GitHub release assets, checks identity/version and
-  `SHA256SUMS`, publishes that exact VSIX, and compares the registry download.
+  `SHA256SUMS`, and submits that exact VSIX. After acceptance, a separate
+  release-triggered chain verifies its registry download after each 30-minute
+  delay, stopping on success or the 24-hour deadline; see
+  [automatic verification](RELEASING.md#automatic-open-vsx-verification).
   It does not rebuild or select a different release. The environment currently
   requires `dodbrian`'s review and permits only `main`.
 - Versions are inferred from conventional commits. Optional bump/exact-version

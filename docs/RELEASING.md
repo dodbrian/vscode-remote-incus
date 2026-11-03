@@ -18,7 +18,8 @@ checks pass. It shows three connected stages in one Actions graph:
    environment. In the run, choose **Review deployments**, select **open-vsx**,
    then **Approve and deploy**. It downloads the VSIX from this chain's GitHub
    release, verifies its identity and checksum, and publishes those exact bytes.
-   It never rebuilds or chooses a different release.
+   It never rebuilds or chooses a different release. The job succeeds when Open VSX
+   accepts the upload; Open VSX checks can continue afterwards.
 
 Version numbers and artifacts flow automatically through all three stages. You
 can inspect or install the GitHub release before approving publication. The README
@@ -71,10 +72,59 @@ build a new candidate.
 
 Use **Re-run failed jobs** to recover the same chain. A failed GitHub upload
 recognizes the tag created by its own run and completes the release without
-bumping again. Retrying publication accepts an already published version only
-when its downloaded bytes match the GitHub release. Different bytes fail;
-published versions and tags are never overwritten. Registry propagation is
-checked before reporting an upload failure.
+bumping again. A recorded pending upload is not submitted again. Retrying
+publication accepts an already visible version only when its downloaded bytes
+match the GitHub release. Different bytes fail; published versions and tags are
+never overwritten. An unsuccessful upload is reported as a failure unless the
+registry download already proves it succeeded.
+
+## Automatic Open VSX verification
+
+After upload acceptance, the release commit has a pending **Open VSX availability
+(vX.Y.Z)** status. The release automatically dispatches **Verify Open VSX
+availability** for that tag. It waits 30 minutes through the
+`open-vsx-verification-delay` environment, then checks the release once. If still
+pending, it dispatches the next delayed check. There is no cron schedule or user
+step; no workflow runs when no release needs verification. The dispatch trigger
+is used by automation, even though GitHub also exposes it in the Actions UI.
+
+The delay environment must have a **30-minute wait timer**, no required reviewers,
+admin bypass disabled, no other protection gates, and no secrets. Its settings
+are checked before upload and before each dispatch. GitHub holds the job before assigning a runner, so the delay does not occupy a
+runner. `deployment: false` keeps these checks out of deployment history. The
+original `open-vsx` publishing approval remains separate.
+
+While Open VSX checks the extension, an unavailable version remains pending.
+The accepted upload receipt pins the package SHA-256, original acceptance time,
+and next attempt in the commit status. Once visible, the verifier downloads the
+GitHub release assets, checks their checksum, identity and package policy, and compares the registry download
+byte for byte, including a comparison against that pinned SHA-256. Replacing both
+a release package and its checksum cannot make a different upload pass. Matching
+bytes mark the commit status successful and stop the chain. Mismatched bytes fail the status and verification workflow, with no further
+checks. Temporary API/network errors queue another delayed check within the same
+deadline. No verification job receives the publishing secret or uploads a package.
+
+Verification stops at success, an integrity failure, or 24 hours after upload
+acceptance, whichever comes first. A hard limit of 48 checks also bounds the chain.
+Queue delays and execution time can make checks later than 30-minute intervals;
+the first check after the deadline reports failure without downloading anything.
+The original acceptance time and attempt budget survive retries. Duplicate or
+out-of-order runs stop without checking or dispatching another run. Publication
+and verification share a per-release concurrency queue so status updates cannot
+race, and duplicate dispatches cannot replace a pending valid successor.
+
+Inspect the release commit status and verification workflow summaries for results;
+the original upload job remains successful. A dispatch/configuration failure fails
+that workflow and stops the chain rather than silently claiming verification.
+Setup failures, runner cancellation, and GitHub status API failures also stop
+automatic progress; they cannot be recovered by code that never gets to run.
+Retrying the release publication job can resume an accepted upload without
+uploading again, while keeping its original deadline and next attempt. If Open
+VSX accepts an upload but saving the first receipt fails, inspect Open VSX and
+the failed job before retrying: there is no atomic transaction across the two
+services, and no acceptance record exists for automation to rely on. Releases
+uploaded before this tracking was introduced are not automatically enrolled. Both workflow files
+must be on `main` before using the new release flow.
 
 GitHub provides source ZIP and tar archives automatically. The release also
 contains the versioned VSIX, `SHA256SUMS` and changelog-based notes. `main` rules

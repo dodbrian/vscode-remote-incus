@@ -29,45 +29,51 @@ async function verifyCandidate(directory, tag) {
   return { filename, bytes, version };
 }
 
+async function registryMatches(candidate, request = fetch) {
+  const endpoint = `https://open-vsx.org/api/dodbrian/remote-incus/${candidate.version}`;
+  const metadata = await request(endpoint, { signal: AbortSignal.timeout(30000) });
+  if (metadata.status === 404) return false;
+  if (!metadata.ok) throw new Error(`Registry lookup failed: HTTP ${metadata.status}`);
+  const result = await metadata.json();
+  const url = new URL(result.files.download);
+  if (url.protocol !== 'https:') throw new Error('Registry download must use HTTPS.');
+  const download = await request(url.href, { signal: AbortSignal.timeout(60000) });
+  if (!download.ok) throw new Error(`Registry download failed: HTTP ${download.status}`);
+  if (!Buffer.from(await download.arrayBuffer()).equals(candidate.bytes)) {
+    const error = new Error(
+      'Registry version exists with different bytes; refusing to overwrite it.',
+    );
+    error.code = 'OPENVSX_INTEGRITY';
+    throw error;
+  }
+  return true;
+}
+
 async function publishReleased(
   candidate,
   {
     request = fetch,
     upload = (filename) => execFileSync('ovsx', ['publish', filename], { stdio: 'inherit' }),
-    pause = () => new Promise((resolve) => setTimeout(resolve, 5000)),
   } = {},
 ) {
-  const endpoint = `https://open-vsx.org/api/dodbrian/remote-incus/${candidate.version}`;
-  async function present() {
-    const metadata = await request(endpoint);
-    if (metadata.status === 404) return false;
-    if (!metadata.ok) throw new Error(`Registry lookup failed: HTTP ${metadata.status}`);
-    const result = await metadata.json();
-    const url = new URL(result.files.download);
-    if (url.protocol !== 'https:') throw new Error('Registry download must use HTTPS.');
-    const download = await request(url.href);
-    if (!download.ok) throw new Error(`Registry download failed: HTTP ${download.status}`);
-    if (!Buffer.from(await download.arrayBuffer()).equals(candidate.bytes))
-      throw new Error('Registry version exists with different bytes; refusing to overwrite it.');
-    return true;
-  }
-  if (await present()) return 'Already published; released bytes verified.';
-  let failure;
+  if (await registryMatches(candidate, request))
+    return { state: 'verified', message: 'Already published; released bytes verified.' };
   try {
-    upload(candidate.filename);
+    await upload(candidate.filename);
   } catch (error) {
-    failure = error;
+    // Reconcile an ambiguous response once, without claiming acceptance on failure.
+    if (await registryMatches(candidate, request))
+      return {
+        state: 'verified',
+        message: 'Published; registry download matches the GitHub release.',
+      };
+    throw error;
   }
-  // An upload error can still mean the registry accepted the package. Poll for
-  // propagation before allowing a retry, and never submit it twice in this run.
-  for (let attempt = 0; attempt < 12; attempt++) {
-    if (await present()) return 'Published; registry download matches the GitHub release.';
-    console.log('Waiting for registry propagation...');
-    await pause();
-  }
-  throw (
-    failure || new Error('Registry version is not visible yet. Retry the publish job to verify it.')
-  );
+  return {
+    state: 'accepted',
+    message:
+      'Upload accepted; awaiting Open VSX checks. Availability will be verified automatically.',
+  };
 }
 
 if (require.main === module) {
@@ -76,11 +82,11 @@ if (require.main === module) {
     const candidate = await verifyCandidate(directory, tag);
     if (process.env.RELEASE_VERIFY_ONLY === 'true')
       console.log('Released VSIX identity, version, checksum and contents verified.');
-    else console.log(await publishReleased(candidate));
+    else console.log((await publishReleased(candidate)).message);
   })().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;
   });
 }
 
-module.exports = { verifyCandidate, publishReleased };
+module.exports = { verifyCandidate, publishReleased, registryMatches };
