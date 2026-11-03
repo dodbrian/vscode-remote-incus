@@ -52,7 +52,15 @@ need `libstdc++` and `libgcc`. The rescue terminal requires util-linux `script`.
    ```
 
 3. Open the Extensions view, select **… → Install from VSIX…**, and choose the
-   downloaded file.
+   downloaded file. Alternatively, install it from the command line:
+
+   ```sh
+   code --install-extension /path/to/downloaded-extension.vsix
+   ```
+
+   Replace the path with your downloaded VSIX file. For VSCodium, use `codium`
+   instead of `code`.
+
 4. Restart the editor.
 
 To build the VSIX locally, see [Development](https://github.com/dodbrian/vscode-remote-incus/blob/main/README.md#development).
