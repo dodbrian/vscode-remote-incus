@@ -326,3 +326,91 @@ test('auto does not disguise unexpected progress errors as a download failure', 
     assert.ok(!ops.some((a) => a[0] === 'file' || /tar -xzf|nohup/.test(defined(a.at(-1)))));
     assert.equal(fs.existsSync(`${f.directory}/server-cache`), false);
   }));
+
+for (const strategy of ['auto', 'client', 'container'])
+  test(`issue 7: VSCodium ${strategy} never requests Microsoft metadata`, (t) =>
+    withFixture(t, async (f) => {
+      f.state.set('appName', 'VSCodium');
+      fs.writeFileSync(`${f.directory}/package.json`, JSON.stringify({ version: '1.143.17183' }));
+      f.configuration.set('remote-incus.downloadStrategy', strategy);
+      const ops = installedServer(f, {
+        installed: false,
+        running: '',
+        pushedSha: createHash('sha256').update('archive').digest('hex'),
+        hook: (_args, script) => (script.includes('curl --disable --fail') ? '' : undefined),
+      });
+      f.expect('fetch', (url) => {
+        assert.ok(url.startsWith('https://github.com/VSCodium/vscodium/releases/download/'));
+        if (strategy !== 'client') {
+          assert.ok(url.endsWith('.tar.gz.sha256'));
+          return new Response(
+            `${createHash('sha256').update('archive').digest('hex')}  vscodium-reh-linux-x64-1.143.17183.tar.gz\n`,
+          );
+        }
+        return new Response('archive');
+      });
+      await ensureServerReady(context(f), { remote: `codium-${strategy}`, instance: 'owned' });
+      assert.ok(ops.some((a) => defined(a.at(-1)).includes('ln -s codium-server')));
+      assert.equal(
+        ops.some((a) => defined(a.at(-1)).includes('curl --disable')),
+        strategy !== 'client',
+      );
+      assert.equal(
+        ops.some((a) => a[0] === 'file' && defined(a[2]).endsWith('.tar.gz')),
+        strategy === 'client',
+      );
+    }));
+
+for (const checksum of [
+  'invalid',
+  `${'a'.repeat(64)}  wrong.tar.gz`,
+  `${'a'.repeat(64)}  vscodium-reh-linux-x64-1.143.17183.tar.gz\nextra`,
+])
+  test('VSCodium rejects malformed or mismatched release checksum before container execution', (t) =>
+    withFixture(t, async (f) => {
+      f.state.set('appName', 'VSCodium');
+      fs.writeFileSync(`${f.directory}/package.json`, JSON.stringify({ version: '1.143.17183' }));
+      f.expect('fetch', () => new Response(checksum));
+      await assert.rejects(
+        downloadInContainer(ref, identity, COMMIT, 'linux-x64'),
+        /verified server metadata/,
+      );
+      assert.ok(!f.calls.some((c) => c.name.startsWith('child_process')));
+    }));
+
+for (const corrupt of [false, true])
+  test(`VSCodium automatic fallback retains publisher checksum; corrupt=${String(corrupt)}`, (t) =>
+    withFixture(t, async (f) => {
+      f.state.set('appName', 'VSCodium');
+      fs.writeFileSync(`${f.directory}/package.json`, JSON.stringify({ version: '1.143.17183' }));
+      f.configuration.set('remote-incus.downloadStrategy', 'auto');
+      const digest = createHash('sha256').update('archive').digest('hex');
+      const ops = installedServer(f, {
+        installed: false,
+        running: '',
+        pushedSha: digest,
+        hook: (_args, script) => {
+          if (script.includes('curl --disable --fail')) throw new Error('container offline');
+          if (script.startsWith('rm -f -- ')) return '';
+          return undefined;
+        },
+      });
+      f.expect('fetch', (url) => {
+        assert.ok(url.endsWith('.sha256'));
+        return new Response(`${digest}  vscodium-reh-linux-x64-1.143.17183.tar.gz\n`);
+      });
+      f.expect('fetch', (url) => {
+        assert.ok(url.endsWith('.tar.gz'));
+        return new Response(corrupt ? 'corrupt' : 'archive');
+      });
+      const ready = ensureServerReady(context(f), {
+        remote: `codium-fallback-${String(corrupt)}`,
+        instance: 'owned',
+      });
+      if (corrupt) await assert.rejects(ready, /trusted server metadata SHA-256/);
+      else await ready;
+      assert.equal(
+        ops.some((a) => a[0] === 'file' && defined(a[2]).endsWith('.tar.gz')),
+        !corrupt,
+      );
+    }));

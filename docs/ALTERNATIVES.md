@@ -142,8 +142,12 @@ proposed-API opt-in. This is precedent, not guaranteed acceptance of our package
 Microsoft VS Code users would still install the VSIX and enable our APIs;
 Open VSX hosting does not change the client's default marketplace.
 
-VSCodium uses Open VSX by default, but our Microsoft VS Code Server bootstrap
-needs separate compatibility and licensing review before claiming support.
+At the time of this research, the bootstrap selected Microsoft server builds
+for every editor. The 2026-11-04 issue #7 fix now selects VSCodium's own
+remote-host releases and has manual acceptance on the tested AppImage; see
+[the current bootstrap design](DESIGN.md#selectable-archive-acquisition).
+VSCodium uses Open VSX by default. The following publication prerequisites
+record the historical research state.
 Publishing also requires a final publisher ID, registry account/agreement,
 and replacement of the placeholder repository metadata. No publication has
 been attempted or authorized by this research.

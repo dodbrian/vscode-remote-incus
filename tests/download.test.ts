@@ -85,3 +85,41 @@ test('publisher-matching archive is published with its verified sidecar', (t) =>
     assert.equal(readFileSync(result.file, 'utf8'), 'archive');
     assert.equal(readFileSync(result.file + '.sha256', 'utf8').trim(), digest);
   }));
+
+for (const [appName, repository, suffix] of [
+  ['VSCodium', 'vscodium', ''],
+  ['VSCodium - Insiders', 'vscodium-insiders', '-insider'],
+] as const)
+  test(`issue 7: ${appName} downloads its exact REH release`, (t) =>
+    withFixture(t, async (f) => {
+      f.state.set('appName', appName);
+      writeFileSync(`${f.directory}/package.json`, JSON.stringify({ version: '1.143.17183' }));
+      f.expect('fetch', (url) => {
+        assert.equal(
+          url,
+          `https://github.com/VSCodium/${repository}/releases/download/1.143.17183${suffix}/vscodium-reh-linux-x64-1.143.17183${suffix}.tar.gz`,
+        );
+        return new Response('archive');
+      });
+      await downloadTarball(context(f), COMMIT, 'linux-x64');
+    }));
+
+test('issue 7: missing VSCodium release metadata fails before contacting Microsoft', (t) =>
+  withFixture(t, async (f) => {
+    f.state.set('appName', 'VSCodium');
+    await assert.rejects(downloadTarball(context(f), COMMIT, 'linux-x64'), /VSCodium.*release/);
+  }));
+
+test('issue 7: a VSCodium custom mirror does not require release metadata', (t) =>
+  withFixture(t, async (f) => {
+    f.state.set('appName', 'VSCodium');
+    f.configuration.set(
+      'remote-incus.downloadUrlTemplate',
+      'https://mirror.invalid/{commit}/{flavor}',
+    );
+    f.expect('fetch', (url) => {
+      assert.equal(url, `https://mirror.invalid/${COMMIT}/linux-arm64`);
+      return new Response('archive');
+    });
+    await downloadTarball(context(f), COMMIT, 'linux-arm64');
+  }));

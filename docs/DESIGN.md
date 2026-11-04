@@ -80,10 +80,11 @@ addressed below as first-class requirements.
 The client route supports **air-gapped containers**. Default auto mode first
 tries container HTTPS download and falls back to this route if needed:
 
-1. Extension resolves the server commit **from the local client** (`code --version`,
-   line 2) — server and client must match by commit.
+1. Extension resolves the server commit **from the local client**
+   (`vscode.env.appCommit`, with CLI fallback) — server and client must match by commit.
 2. Download `https://update.code.visualstudio.com/commit:<sha>/server-linux-x64/stable`
-   **client-side** (≈222 MB; cache under extension globalStorage; sha256 recorded).
+   **client-side** for Microsoft VS Code (cache under extension globalStorage;
+   sha256 recorded). VSCodium selects its own release archive as described below.
 3. `incus file push <tarball> <instance>/tmp/…` (**path mode**) — then extract inside as
    the target user into `~/.vscode-server/bin/<commit>` (`--strip-components=1`).
 4. Token file: `~/.vscode-server/data/Machine/.incus-conn-token`, mode `0600`,
@@ -155,8 +156,31 @@ attempt, then one visible client fallback after an expected route failure.
 all archive work for all three modes. Auto with a custom URL template goes
 straight to the client route without requesting Microsoft metadata.
 
-Container metadata has a 15-second deadline, rejects redirects and requires the
-exact commit, valid SHA and supported HTTPS CDN. Existing curl ignores automatic curlrc loading (`--disable` first), and follows HTTPS-only
+Microsoft metadata has a 15-second deadline, rejects redirects and requires the
+exact commit, valid SHA and supported HTTPS CDN. VSCodium reads the installed
+editor's full version from `vscode.env.appRoot/package.json` and selects
+`vscodium-reh-<platform>-<version>.tar.gz` from the corresponding VSCodium GitHub
+release. Insiders selects the `vscodium-insiders` repository and `-insider` tag
+and archive suffix; this naming is covered offline but has not been tested live.
+VSCodium obtains the release's `.sha256` sidecar on the client with a 15-second
+deadline and follows GitHub asset redirects. It requires a valid SHA-256 and the
+exact archive filename before container execution. The archive itself is
+then downloaded inside the container. Missing or unsupported local release
+metadata fails with guidance to configure a custom URL; it never substitutes a
+Microsoft build or a different VSCodium release.
+
+VSCodium client archives have a separate cache subdirectory. Extraction provides
+a `bin/code-server` symlink when the archive names its launcher `codium-server`
+or `codium-server-insiders`. Server commit matching remains unchanged.
+
+Both editors share `~/.vscode-server`, token, log and relay state for each container
+user. Switching editors with different commits stops the old server, starts the
+matching build and prunes other install directories. Parallel editor or
+client-commit installations are intentionally unsupported; connecting another
+editor can interrupt existing connections. No provider isolation is planned.
+
+For either publisher, container curl ignores automatic curlrc loading
+(`--disable` first) and follows HTTPS-only
 redirects with 10-second connect/180-second total limits inside a 210-second exec.
 Only file creation explicitly supplies the selected GID; normal bootstrap and
 bridge GID behavior is unchanged. Exclusive 0600 UUID partials have EXIT/INT/TERM
@@ -588,18 +612,18 @@ received normal-profile manual acceptance; see the handover for their scope.
 This separates implemented selection and declared ranges from verified runtime
 coverage. Earlier evidence does not establish every intermediate version.
 
-| Dimension                    | Current evidence                                                                                               | Remaining limits                                                                                                       |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Client OS/architecture       | Linux x64                                                                                                      | macOS, Windows and ARM64 clients unverified                                                                            |
-| Client version               | Scoped Stable 1.143.1 checks; historical Stable 1.142.0 evidence                                               | Manifest range `^1.140.0` is a declaration, not full range verification; Insiders unverified; proposed APIs can change |
-| Proposed APIs                | `resolvers`, `contribViewsRemote`, `tunnels`; typings pinned to 1.143.1                                        | Stable requires explicit opt-in; registry eligibility must be checked before publication                               |
-| Daemon transport             | Local Unix socket and remote TLS/cluster fixtures                                                              | Restricted remotes/projects unverified                                                                                 |
-| Incus CLI/server             | Scoped 7.5.1 checks; historical 6.0.5 evidence                                                                 | Packaging can block signals (§14); no exhaustive version/package matrix                                                |
-| Instance architecture/libc   | Ubuntu and Rocky Linux 9.8 glibc x64; Alpine 3.24 musl x64 checks                                              | glibc ARM64 selection implemented but unverified; musl ARM64 rejected                                                  |
-| Shell/runtime                | `/bin/sh`, including BusyBox without Bash; Alpine prerequisites and normal-profile terminal workflows verified | Required runtime libraries/utilities must already be installed; rescue terminal needs util-linux `script`              |
-| Ports                        | Core forwarding plus selected-row IPv4 helper; normal-profile manual acceptance on 2026-10-25                  | Ordinary IPv4-loopback forwarding can fail with IPv6-only external networking; helper needs an existing Ports row      |
-| Identical-folder new windows | Isolated concurrent/reopening checks plus normal-profile manual acceptance on 2026-10-25                       | Uses retained local workspace files; no automatic pruning                                                              |
-| Diagnostics                  | Resolver classification and startup prerequisite regressions; scoped live startup checks                       | Missing-tar dialog verified; other error dialogs unverified; runtime probe does not cover every later startup failure  |
+| Dimension                    | Current evidence                                                                                                                                                   | Remaining limits                                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Client OS/architecture       | Linux x64                                                                                                                                                          | macOS, Windows and ARM64 clients unverified                                                                            |
+| Client version               | Manual VS Code 1.145.0 and VSCodium AppImage 1.143.17232 acceptance (2026-11-04), including client transfer and container download; earlier Stable checks retained | Manifest range `^1.140.0` is a declaration, not full range verification; Insiders unverified; proposed APIs can change |
+| Proposed APIs                | `resolvers`, `contribViewsRemote`, `tunnels`; typings pinned to 1.143.1                                                                                            | Stable requires explicit opt-in; registry eligibility must be checked before publication                               |
+| Daemon transport             | Local Unix socket and remote TLS/cluster fixtures                                                                                                                  | Restricted remotes/projects unverified                                                                                 |
+| Incus CLI/server             | Scoped 7.5.1 checks; historical 6.0.5 evidence                                                                                                                     | Packaging can block signals (§14); no exhaustive version/package matrix                                                |
+| Instance architecture/libc   | Ubuntu and Rocky Linux 9.8 glibc x64; Alpine 3.24 musl x64 checks                                                                                                  | glibc ARM64 selection implemented but unverified; musl ARM64 rejected                                                  |
+| Shell/runtime                | `/bin/sh`, including BusyBox without Bash; Alpine prerequisites and normal-profile terminal workflows verified                                                     | Required runtime libraries/utilities must already be installed; rescue terminal needs util-linux `script`              |
+| Ports                        | Core forwarding plus selected-row IPv4 helper; normal-profile manual acceptance on 2026-10-25                                                                      | Ordinary IPv4-loopback forwarding can fail with IPv6-only external networking; helper needs an existing Ports row      |
+| Identical-folder new windows | Isolated concurrent/reopening checks plus normal-profile manual acceptance on 2026-10-25                                                                           | Uses retained local workspace files; no automatic pruning                                                              |
+| Diagnostics                  | Resolver classification and startup prerequisite regressions; scoped live startup checks                                                                           | Missing-tar dialog verified; other error dialogs unverified; runtime probe does not cover every later startup failure  |
 
 ## 11. Open questions (recorded, with leaning)
 

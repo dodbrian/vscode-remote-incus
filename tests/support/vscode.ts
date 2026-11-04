@@ -111,6 +111,12 @@ export class MarkdownString {
   constructor(readonly value: string) {}
 }
 export const env = {
+  get appName(): string {
+    return fixture().state.get('appName') ?? 'Visual Studio Code';
+  },
+  get appRoot(): string {
+    return fixture().state.get('appRoot') ?? fixture().directory;
+  },
   get appCommit(): string | undefined {
     return fixture().state.get('commit');
   },

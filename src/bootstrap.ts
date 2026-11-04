@@ -51,6 +51,7 @@ import {
 } from './serverDownload';
 import { Report } from './progress';
 import { shutdownScript } from './serverShutdown';
+import { isVSCodium, vscodiumArchiveUrl } from './serverProvider';
 
 export const VS_SERVER_DIR = '.vscode-server';
 
@@ -268,8 +269,15 @@ export async function downloadTarball(
   const template =
     vscode.workspace.getConfiguration('remote-incus').get<string>('downloadUrlTemplate') ??
     DEFAULT_URL_TEMPLATE;
-  const url = template.replace('{commit}', commit).replace('{flavor}', flavor);
-  const cacheDir = path.join(context.globalStorageUri.fsPath, 'server-cache');
+  const codium = template === DEFAULT_URL_TEMPLATE && isVSCodium();
+  const url = codium
+    ? await vscodiumArchiveUrl(flavor)
+    : template.replace('{commit}', commit).replace('{flavor}', flavor);
+  const cacheDir = path.join(
+    context.globalStorageUri.fsPath,
+    'server-cache',
+    ...(codium ? ['vscodium'] : []),
+  );
   await fs.promises.mkdir(cacheDir, { recursive: true });
   const file = path.join(cacheDir, `vscode-server-${flavor}-${commit}.tar.gz`);
   const shaFile = `${file}.sha256`;
@@ -427,8 +435,8 @@ async function obtainServerArchive(
       report?.('container download failed — switching to client download and transfer…');
     }
   } else if (strategy === 'auto' && customMirror) {
-    log('custom mirror configured — using client download and transfer');
-    report?.('custom mirror configured — using client download and transfer…');
+    log('editor server provider or custom mirror selected — using client download and transfer');
+    report?.('using client download and transfer for the selected server provider…');
   }
   try {
     const tar = await downloadTarball(
@@ -553,6 +561,17 @@ async function ensureExtracted(
       `mkdir -p ${sq(dir)}`,
       `touch ${sq(`${dir}/.incus-installing`)}`,
       `tar -xzf ${sq(tmp)} -C ${sq(dir)} --strip-components=1`,
+      ...(isVSCodium()
+        ? [
+            `if [ ! -e ${sq(`${dir}/bin/code-server`)} ]; then`,
+            `  if [ -x ${sq(`${dir}/bin/codium-server`)} ]; then`,
+            `    ln -s codium-server ${sq(`${dir}/bin/code-server`)}`,
+            `  elif [ -x ${sq(`${dir}/bin/codium-server-insiders`)} ]; then`,
+            `    ln -s codium-server-insiders ${sq(`${dir}/bin/code-server`)}`,
+            `  else echo 'VSCodium archive has no server launcher' >&2; exit 1; fi`,
+            `fi`,
+          ]
+        : []),
       `touch ${sq(marker)}`,
       `rm -f ${sq(`${dir}/.incus-installing`)}`,
       `rm -f ${sq(tmp)}`,
@@ -882,7 +901,9 @@ async function doEnsureServerReady(
     await sweepOrphanRelays(ref);
     // Hygiene belongs to fresh startup. Pruning failures cannot invalidate
     // a ready session; healthy reuse preserves active bridges and skips it.
-    await pruneServerCache(path.join(context.globalStorageUri.fsPath, 'server-cache'), commit);
+    const cacheDir = path.join(context.globalStorageUri.fsPath, 'server-cache');
+    await pruneServerCache(cacheDir, commit);
+    if (isVSCodium()) await pruneServerCache(path.join(cacheDir, 'vscodium'), commit);
     try {
       await pruneOldInstalls(ref, identity, commit);
     } catch (err: unknown) {

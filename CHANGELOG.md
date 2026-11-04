@@ -4,6 +4,12 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- Download the matching VSCodium remote-host release instead of requesting its
+  commit from Microsoft. VSCodium supports verified container downloads with
+  automatic client transfer fallback.
+
 ## [0.2.2] - 2026-11-03
 
 ### Commits

@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { execInInstance, InstanceRef, sq } from './incusCli';
 import type { Identity, ServerFlavor } from './bootstrap';
 import type { Report } from './progress';
+import { isVSCodium, vscodiumArchiveUrl } from './serverProvider';
 
 export const DEFAULT_URL_TEMPLATE =
   'https://update.code.visualstudio.com/commit:{commit}/server-{flavor}/stable';
@@ -40,34 +41,51 @@ export async function downloadInContainer(
   let url: URL;
   let sha256: string | undefined;
   try {
-    const response = await fetch(
-      `https://update.code.visualstudio.com/api/versions/commit:${commit}/server-${flavor}/stable`,
-      {
+    if (isVSCodium()) {
+      url = new URL(await vscodiumArchiveUrl(flavor));
+      const response = await fetch(`${url.href}.sha256`, {
         signal: AbortSignal.timeout(15_000),
-        redirect: 'error',
-      },
-    );
-    if (!response.ok) throw new Error(`metadata HTTP ${response.status}`);
-    const metadata: unknown = await response.json();
-    if (!metadata || typeof metadata !== 'object') throw new Error('missing metadata');
-    const m = metadata as Record<string, unknown>;
-    if (
-      m.version !== commit ||
-      typeof m.sha256hash !== 'string' ||
-      !/^[a-f0-9]{64}$/i.test(m.sha256hash)
-    ) {
-      throw new Error('metadata commit, SHA-256 or URL is invalid');
-    }
-    sha256 = m.sha256hash.toLowerCase();
-    if (typeof m.url !== 'string') throw new Error('metadata URL is missing');
-    url = new URL(m.url);
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      !['vscode.download.prss.microsoft.com', 'update.code.visualstudio.com'].includes(url.hostname)
-    ) {
-      throw new Error('metadata URL is not an allowed Microsoft HTTPS endpoint');
+        redirect: 'follow',
+      });
+      if (!response.ok) throw new Error(`checksum HTTP ${response.status}`);
+      const checksum = (await response.text()).trim();
+      const match = /^([a-f0-9]{64})[ \t]+\*?([^\r\n]+)$/i.exec(checksum);
+      if (!match || match[2] !== url.pathname.split('/').at(-1)) {
+        throw new Error('VSCodium checksum digest or archive filename is invalid');
+      }
+      sha256 = match[1]?.toLowerCase();
+    } else {
+      const response = await fetch(
+        `https://update.code.visualstudio.com/api/versions/commit:${commit}/server-${flavor}/stable`,
+        {
+          signal: AbortSignal.timeout(15_000),
+          redirect: 'error',
+        },
+      );
+      if (!response.ok) throw new Error(`metadata HTTP ${response.status}`);
+      const metadata: unknown = await response.json();
+      if (!metadata || typeof metadata !== 'object') throw new Error('missing metadata');
+      const m = metadata as Record<string, unknown>;
+      if (
+        m.version !== commit ||
+        typeof m.sha256hash !== 'string' ||
+        !/^[a-f0-9]{64}$/i.test(m.sha256hash)
+      ) {
+        throw new Error('metadata commit, SHA-256 or URL is invalid');
+      }
+      sha256 = m.sha256hash.toLowerCase();
+      if (typeof m.url !== 'string') throw new Error('metadata URL is missing');
+      url = new URL(m.url);
+      if (
+        url.protocol !== 'https:' ||
+        url.username ||
+        url.password ||
+        !['vscode.download.prss.microsoft.com', 'update.code.visualstudio.com'].includes(
+          url.hostname,
+        )
+      ) {
+        throw new Error('metadata URL is not an allowed Microsoft HTTPS endpoint');
+      }
     }
   } catch (cause) {
     throw new ContainerDownloadError(
