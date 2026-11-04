@@ -4,11 +4,20 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-04
+
 ### Fixed
 
 - Download the matching VSCodium remote-host release instead of requesting its
   commit from Microsoft. VSCodium supports verified container downloads with
   automatic client transfer fallback.
+
+### Commits
+
+- docs(contributing): require pull requests for issue fixes (aa6b9d1)
+- fix(server): select matching VSCodium host releases (c8b4f19)
+- fix(package): show only released changelog entries (9063634)
+- docs(license): clarify copyright attribution (7e4cdb2)
 
 ## [0.2.2] - 2026-11-03
 
