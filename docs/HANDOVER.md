@@ -54,8 +54,10 @@ links), privacy audit with zero findings, and `git diff --check`.
 
 Source version remains `0.2.2`. This is a fix for a future release; do not replace
 existing published assets. No release or registry publication is authorized by
-this task. After push, check hosted Build and test / CodeQL results; issue closure
-has not been requested. Earlier checkpoints below retain historical evidence.
+this task. Issue work must use a dedicated branch and a pull request against
+`main`; never push directly to `main`. This fix is prepared on
+`fix/vscodium-server-downloads`. After opening the PR, check hosted Build and
+test / CodeQL results; issue closure has not been requested. Earlier checkpoints below retain historical evidence.
 
 ## Previous checkpoint: published changelog clarity (2026-11-03)
 
