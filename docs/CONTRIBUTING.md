@@ -5,6 +5,13 @@ repository root. See the [testing guide](tests/README.md) for the complete
 portable checks, packaging validation and manual integration procedures, and
 the [release guide](RELEASING.md) for publication.
 
+## Issue workflow
+
+Create a dedicated branch for each issue, commit the reviewed changes there,
+and open a pull request against `main`. Never push issue changes directly to
+`main`. Include the issue reference, validation results and any remaining
+verification limits in the PR description.
+
 ## Quality gates
 
 Linting (strict, type-checked rules), code formatting and the strict
