@@ -104,7 +104,8 @@ the remote environment.
 ## Server installation
 
 On the first connection, the extension downloads and installs VS Code Server
-inside the container. Existing matching installations are reused.
+inside the container. VS Code uses Microsoft server builds; VSCodium uses its
+matching remote-host release. Existing matching installations are reused.
 
 By default, it tries downloading inside the container, then falls back to
 downloading on your computer and transferring through Incus.
@@ -115,8 +116,20 @@ downloading on your computer and transferring through Incus.
 | `client`                        | Download on your computer and transfer through Incus. Useful for containers without internet access. |
 | `container`                     | Download inside the container, with no fallback. Requires `curl` and outbound HTTPS.                 |
 
+VSCodium uses the matching VSCodium remote-host archive from GitHub Releases,
+selected from the installed editor's full package version. The `auto` and
+`container` strategies verify the archive against VSCodium's published SHA-256
+checksum before accepting a download inside the container. As with VS Code,
+`auto` falls back to client transfer if the container download fails.
+Custom or repackaged VSCodium builds can set an explicit archive URL below.
+
 For custom mirrors, set `remote-incus.downloadUrlTemplate` and use `auto` or
 `client`; custom mirrors use client transfer directly.
+
+Each container user has one managed server installation under
+`~/.vscode-server`. Switching between VS Code and VSCodium replaces the running
+server and removes the previous build. Simultaneous connections from different
+editors or different client commits are unsupported and can interrupt each other.
 
 ## Development
 

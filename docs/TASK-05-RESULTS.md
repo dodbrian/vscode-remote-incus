@@ -5,6 +5,11 @@ reported “much better” and authorized task closure. The running session is l
 intact. Source changes after checkpoints `e03dcf8` and `2a99945` remain uncommitted;
 nothing was pushed or published. No next task starts automatically.
 
+The archive-provider selection was extended for VSCodium on 2026-11-04.
+That follow-up and its manual acceptance are recorded in the
+[current bootstrap design](DESIGN.md#selectable-archive-acquisition) and
+[handover](HANDOVER.md); the measurements below retain the original VS Code scope.
+
 ## Final design
 
 After identity and the fresh client commit are resolved, two read-only execs run

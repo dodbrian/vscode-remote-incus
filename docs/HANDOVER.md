@@ -20,7 +20,44 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: published changelog clarity (2026-11-03)
+## Current stopping point: VSCodium server compatibility (2026-11-04)
+
+[Issue #7](https://github.com/dodbrian/vscode-remote-incus/issues/7) is implemented
+and manually accepted by the user. VSCodium AppImage 1.143.17232 previously
+requested its commit from Microsoft's update service and received HTTP 404.
+The bootstrap now chooses the installed VSCodium version's own remote-host
+archive from GitHub Releases; official VS Code retains Microsoft downloads.
+
+Both editors support `auto` (verified container download, then visible client
+fallback), `client` (download and Incus push), and `container` (no fallback).
+VSCodium container downloads use the release's SHA-256 sidecar, validated for
+the exact archive filename. Any verified publisher digest is retained during
+fallback. Custom mirrors continue to use client transfer with `auto`/`client`.
+VSCodium caches are separate on the client; server launcher names are normalized
+during extraction. Stable and Insiders URL naming has offline coverage; only
+stable editors were manually tested.
+
+The user confirmed both Microsoft VS Code 1.145.0 and VSCodium AppImage
+1.143.17232 work, including pushing and downloading inside the container.
+The final test VSIX was installed into the AppImage for that acceptance.
+The user explicitly chose to retain one managed installation per container user:
+editors share `~/.vscode-server`, and switching commits replaces the running
+server and prunes older installs. Concurrent editors can interrupt each other;
+provider isolation and parallel installations are outside the agreed scope.
+
+Validation: the full `npm test` run passed 226 offline regressions plus the
+release/publishing tests; production packaging and archive policy passed.
+README, DESIGN, compatibility notes and coverage now describe this behavior.
+Final documentation checks also passed: relay fixtures, 28 package regressions,
+three deployment guards, production VSIX construction (94 local documentation
+links), privacy audit with zero findings, and `git diff --check`.
+
+Source version remains `0.2.2`. This is a fix for a future release; do not replace
+existing published assets. No release or registry publication is authorized by
+this task. After push, check hosted Build and test / CodeQL results; issue closure
+has not been requested. Earlier checkpoints below retain historical evidence.
+
+## Previous checkpoint: published changelog clarity (2026-11-03)
 
 VSIX finalization now removes the entire `Unreleased` section from the packaged
 `extension/changelog.md`, so readers see the latest dated release first. The
@@ -1600,6 +1637,7 @@ src/
   incusCli.ts              typed incus CLI wrapper (exec, push+meter, list, lifecycle)
   bootstrap.ts             install/start/token/port (spike flow, inlined; reuse hardening)
   serverDownload.ts        verified container download for auto/container strategies
+  serverProvider.ts        editor-specific VSCodium release archive selection
   serverShutdown.ts        scoped /proc-aware server shutdown for uninstall
   forwarding.ts            IPv4 loopback workaround via core forwarding + Ports row
   workspace.ts             duplicate-as-workspace folder open in a new window

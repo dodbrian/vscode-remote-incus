@@ -1,3 +1,22 @@
+# VSCodium server selection follow-up (2026-11-04)
+
+The user manually accepted official VS Code 1.145.0 and VSCodium AppImage
+1.143.17232 connections, including client download/push and verified downloads
+inside the container. This is user-reported runtime acceptance; it does not
+extend to Insiders, ARM64 or additional package formats.
+
+`download.test.ts` covers exact stable/Insiders release URLs, missing local
+release metadata and custom mirror overrides. `container-download.test.ts`
+covers VSCodium auto/client/container routing without Microsoft metadata,
+launcher normalization, rejection of malformed or mismatched checksum sidecars,
+and fallback that retains the publisher digest and rejects corrupt client bytes.
+The existing Microsoft and shell download regressions remain in place.
+The full run passed 226 offline regressions plus release/publishing tests.
+
+The single shared server installation per container user is retained by choice.
+Parallel editor connections are unsupported; see
+[server bootstrap](../DESIGN.md#selectable-archive-acquisition).
+
 # Current verification scope (2026-10-25)
 
 The reviewed build is now deployed and bundle-hash verified. Normal-profile
