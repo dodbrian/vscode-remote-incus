@@ -2,12 +2,14 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { enableProposedApi } from './runtimeArguments';
 import { isVSCodium } from './serverProvider';
+import { firstLine, log } from './logging';
 
 export async function registerOnboarding(
   context: vscode.ExtensionContext,
   ready: boolean,
 ): Promise<void> {
-  const walkthrough = `${context.extension.id}#${isVSCodium() ? 'setup-vscodium' : 'setup'}`;
+  const codium = isVSCodium();
+  const walkthrough = `${context.extension.id}#${codium ? 'setup-vscodium' : 'setup'}`;
   const resume = context.globalState.get<boolean>('setup.resumeAfterRestart', false);
   let configured = ready || resume;
   await Promise.all([
@@ -17,7 +19,7 @@ export async function registerOnboarding(
     vscode.commands.executeCommand(
       'setContext',
       'remote-incus.editor',
-      isVSCodium() ? 'vscodium' : 'vscode',
+      codium ? 'vscodium' : 'vscode',
     ),
   ]);
   const openSetup = (): Thenable<unknown> =>
@@ -26,6 +28,17 @@ export async function registerOnboarding(
       { category: walkthrough, step: ready ? 'connect' : configured ? 'restart' : 'enable' },
       false,
     );
+  // Optional Welcome UI must never prevent command or resolver activation.
+  // A failed automatic opening is retried on a later startup.
+  const tryOpenSetup = async (): Promise<boolean> => {
+    try {
+      await openSetup();
+      return true;
+    } catch (error) {
+      log(`Could not open setup walkthrough: ${firstLine(error)}`);
+      return false;
+    }
+  };
   const autoOpen = vscode.workspace
     .getConfiguration('workbench.welcomePage.walkthroughs')
     .get<boolean>('openOnInstall', true);
@@ -61,7 +74,7 @@ export async function registerOnboarding(
             {
               modal: true,
               detail:
-                'This adds the extension ID to enable-proposed-api in the open argv.json and saves the file. Other settings and extension IDs are preserved. An existing empty array, which grants access to all extensions, becomes a list containing this extension. A full editor restart is required.',
+                'This adds the extension ID to enable-proposed-api in the open argv.json and saves the file. Other settings and extension IDs are preserved. A full editor restart is required.',
             },
             'Enable Support',
           );
@@ -86,7 +99,7 @@ export async function registerOnboarding(
         configured = true;
         await context.globalState.update('setup.resumeAfterRestart', true);
         await vscode.commands.executeCommand('setContext', 'remote-incus.supportConfigured', true);
-        await openSetup();
+        await tryOpenSetup();
         await vscode.window.showInformationMessage(
           `Support is configured. Quit all ${vscode.env.appName} windows and start the editor again to enable Remote-Incus.`,
         );
@@ -106,20 +119,24 @@ export async function registerOnboarding(
         getChildren: () => [],
       }),
     );
-    // Existing installs can also need setup. Respect the editor's walkthrough
-    // preference and show automatically at most once; the setup view persists.
-    if (!context.globalState.get<boolean>('setup.offered')) {
-      await context.globalState.update('setup.offered', true);
-      if (autoOpen) await openSetup();
-    }
     context.subscriptions.push(
       vscode.commands.registerCommand('remote-incus.showInstances', openSetup),
     );
+    // Existing installs can also need setup. Respect the editor's walkthrough
+    // preference and show automatically at most once; the setup view persists.
+    if (
+      !context.globalState.get<boolean>('setup.offered') &&
+      (!autoOpen || (await tryOpenSetup()))
+    ) {
+      await context.globalState.update('setup.offered', true);
+    }
   }
+
   if (ready && resume) {
     // A restored Welcome editor retains its previously selected step. Explicitly
     // select Connect once after our saved configuration takes effect.
-    if (autoOpen && !vscode.env.remoteAuthority?.startsWith('incus+')) await openSetup();
-    await context.globalState.update('setup.resumeAfterRestart', false);
+    const resumed =
+      !autoOpen || vscode.env.remoteAuthority?.startsWith('incus+') || (await tryOpenSetup());
+    if (resumed) await context.globalState.update('setup.resumeAfterRestart', false);
   }
 }

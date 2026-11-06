@@ -22,6 +22,24 @@ with a Docker container".
 
 ## Current stopping point: editor setup walkthrough (2026-11-06)
 
+Review follow-up for PR #9: automatic walkthrough failures no longer abort
+activation or misreport a successful configuration save. Commands
+are registered before opening optional UI, and a failed initial opening or
+post-restart resume remains retryable. The resolver catch now handles only the
+actual missing-resolvers permission error; unrelated failures remain visible.
+The runtime edit uses one append operation for missing, empty and populated
+arrays, preserving comments inside empty arrays. The earlier statement that an
+empty `argv.json` array grants access to all extensions was incorrect and has
+been removed from the confirmation and documentation.
+
+The follow-up passed `npm test` with all 266 offline regressions plus the
+release/publishing tests, `npm run test:package`, production packaging (42 files,
+95 local documentation links), privacy audit (zero findings), and whitespace
+checks. New coverage models the actual edited/saved document, edit rejection,
+changes or closure during confirmation, double clicks, and failed walkthrough
+opening before and after configuration. The manual acceptance below applies to
+the previously pushed build; this review build has not been manually retested.
+
 The user accepted the complete onboarding flow in both VS Code 1.145.2 and
 VSCodium AppImage 1.143.17232 on 2026-11-06. Each editor was tested with the same
 rebuilt VSIX in a fresh isolated portable profile, with no proposed APIs enabled
@@ -44,7 +62,7 @@ privacy settings.
 The feature is tracked by [PR #9](https://github.com/dodbrian/vscode-remote-incus/pull/9)
 against `main`, using `feat/setup-walkthrough`. Every separate branch push must
 have a pull request. This task authorizes committing and pushing the accepted
-refinements; merging or releasing has not been requested.
+refinements and review fixes; merging or releasing has not been requested.
 
 First-time setup is implemented on `feat/setup-walkthrough`. The extension now
 activates at startup even when proposed API access has not been granted. It
@@ -65,10 +83,11 @@ registration succeeds after restarting.
 Arguments** command to locate its own `argv.json`; no VS Code or VSCodium path is
 hardcoded. It validates the opened document and JSONC, asks for confirmation,
 then saves the configuration with the extension ID appended. Existing settings,
-comments and other extension IDs are preserved. An existing empty array, which
-enables proposals for all extensions, becomes a list containing this extension;
-the confirmation explains this. Duplicate keys, malformed arrays, unsaved edits
-and changes during confirmation are rejected. Cancellation does not write.
+comments and other extension IDs are preserved, including comments inside an
+empty array. Empty arrays in `argv.json` enable no proposals; they differ from
+the bare `--enable-proposed-api` command-line flag. Duplicate keys, malformed
+arrays, unsaved edits and changes during confirmation are rejected. Cancellation
+does not write.
 VS Code and VSCodium must be configured separately. A full application restart
 is required; **Reload Window** does not apply runtime arguments.
 

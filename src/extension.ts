@@ -32,16 +32,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       ),
     );
   } catch (error) {
-    if (
-      !(error instanceof Error) ||
-      !/CANNOT use API proposal|proposed API|proposed api/i.test(error.message)
-    )
+    if (!(error instanceof Error) || !error.message.includes('CANNOT use API proposal: resolvers'))
       throw error;
     await registerOnboarding(context, false);
     log('Editor support unavailable; setup commands and Explorer view registered');
     return;
   }
-  await registerOnboarding(context, true);
   // Record the current window's folder on every ext-host start of a window
   // already sitting on an incus authority — covers reloads, ext-host
   // restarts and opens that bypass our commands. At a FIRST connect the
@@ -59,6 +55,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.registerTreeDataProvider('remote-incus.instances', tree),
   );
   registerCommands(context, tree, history);
+  await registerOnboarding(context, true);
   log(`registered: resolver prefix "${AUTHORITY_PREFIX}", Remote Explorer tree, commands`);
 }
 

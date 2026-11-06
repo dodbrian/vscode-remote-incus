@@ -21,7 +21,7 @@ test('runtime edit preserves comments, settings and other IDs; repeat is a no-op
   assert.equal(enableProposedApi(updated, id), updated);
   assert.equal(enableProposedApi(updated, id.toUpperCase()), updated);
 });
-test('runtime edit handles missing and empty arrays without enabling all extensions', () => {
+test('runtime edit handles missing and empty arrays', () => {
   for (const original of ['{}', '{ /* keep */ }', '{"enable-proposed-api": []}']) {
     assert.deepEqual(parse(enableProposedApi(original, id))['enable-proposed-api'], [id]);
   }
@@ -65,18 +65,28 @@ for (const product of ['Visual Studio Code', 'VSCodium']) {
     'cancel',
     'dirty',
     'changed',
+    'dirty-during-confirmation',
+    'closed-during-confirmation',
     'wrong-file',
+    'apply-fails',
     'save-fails',
     'already-configured',
+    'double-click',
+    'walkthrough-fails',
   ]) {
     test(`${product}: setup ${outcome}`, (t) =>
       withFixture(t, async (f) => {
         const ctx = context(f);
         f.state.set('appName', product);
-        let content =
-          outcome === 'already-configured' ? '{"enable-proposed-api":["offline"]}' : '{}';
+        const original =
+          outcome === 'already-configured'
+            ? '{"other":true,"enable-proposed-api":["other.extension","offline"]}'
+            : '{"other":true,/* keep */"enable-proposed-api":["other.extension"]}';
+        let content = original;
+        let saved: string | undefined;
         let saves = 0;
         let edits = 0;
+        let confirmations = 0;
         const document = {
           uri: vscode.Uri.file(
             `/editor/${product}/${outcome === 'wrong-file' ? 'settings.json' : 'argv.json'}`,
@@ -87,47 +97,97 @@ for (const product of ['Visual Studio Code', 'VSCodium']) {
           positionAt: (offset: number) => ({ line: 0, character: offset }),
           save: () => {
             saves++;
-            return outcome !== 'save-fails';
+            if (outcome === 'save-fails') return false;
+            saved = content;
+            document.isDirty = false;
+            return true;
           },
         };
         f.state.set('activeEditor', { document });
-        f.routes.set('vscode.execute', () => undefined);
+        f.routes.set('vscode.execute', (command) => {
+          if (outcome === 'walkthrough-fails' && command === 'workbench.action.openWalkthrough') {
+            return Promise.reject(new Error('Walkthrough unavailable'));
+          }
+          return Promise.resolve();
+        });
         f.routes.set('vscode.registerTree', () => ({ dispose() {} }));
-        f.routes.set('vscode.warning', () => {
+        f.routes.set('vscode.warning', (message, options) => {
+          confirmations++;
+          assert.ok(message.includes(product));
+          assert.equal(options.modal, true);
           if (outcome === 'changed') content = '{"new":true}';
+          if (outcome === 'dirty-during-confirmation') document.isDirty = true;
+          if (outcome === 'closed-during-confirmation') document.isClosed = true;
           return outcome === 'cancel' ? undefined : 'Enable Support';
         });
-        f.routes.set('vscode.applyEdit', () => {
+        f.routes.set('vscode.applyEdit', (edit) => {
           edits++;
+          assert.equal(edit.edits.length, 1);
+          const [uri, range, replacement] = edit.edits[0];
+          assert.equal(uri.toString(), document.uri.toString());
+          assert.equal(range.start.character, 0);
+          assert.equal(range.end.character, original.length);
+          if (outcome === 'apply-fails') return false;
+          content = replacement;
+          document.isDirty = true;
           return true;
         });
         f.routes.set('vscode.info', () => undefined);
         f.routes.set('vscode.error', () => undefined);
         await registerOnboarding(ctx, false);
-        await f.state.get('commands').get('remote-incus.enableSupport')();
-        const shouldEdit = outcome === 'confirm' || outcome === 'save-fails';
+        const enable = f.state.get('commands').get('remote-incus.enableSupport');
+        if (outcome === 'double-click') await Promise.all([enable(), enable()]);
+        else await enable();
+        const shouldEdit = [
+          'confirm',
+          'double-click',
+          'walkthrough-fails',
+          'apply-fails',
+          'save-fails',
+        ].includes(outcome);
+        const successful = [
+          'confirm',
+          'double-click',
+          'walkthrough-fails',
+          'already-configured',
+        ].includes(outcome);
         assert.equal(edits, shouldEdit ? 1 : 0);
-        assert.equal(saves, shouldEdit ? 1 : 0);
+        assert.equal(saves, shouldEdit && outcome !== 'apply-fails' ? 1 : 0);
+        if (saved) {
+          assert.deepEqual(parse(saved), {
+            other: true,
+            'enable-proposed-api': ['other.extension', 'offline'],
+          });
+          assert.ok(saved.includes('/* keep */'));
+        }
+        if (outcome === 'cancel' || outcome === 'apply-fails') assert.equal(content, original);
+        if (outcome === 'save-fails') assert.equal(document.isDirty, true);
         assert.equal(
           f.calls.some((c) => c.name === 'vscode.error'),
-          ['dirty', 'changed', 'wrong-file', 'save-fails'].includes(outcome),
+          [
+            'dirty',
+            'changed',
+            'dirty-during-confirmation',
+            'closed-during-confirmation',
+            'wrong-file',
+            'apply-fails',
+            'save-fails',
+          ].includes(outcome),
         );
         assert.equal(
-          f.calls.some(
-            (c) =>
-              c.args[0] === 'setContext' &&
-              c.args[1] === 'remote-incus.supportConfigured' &&
-              c.args[2] === true,
-          ),
-          outcome === 'confirm' || outcome === 'already-configured',
+          f.calls.some((c) => c.name === 'vscode.info'),
+          successful,
         );
-        assert.ok(f.calls.some((c) => c.args[0] === 'workbench.action.configureRuntimeArguments'));
-        const successful = outcome === 'confirm' || outcome === 'already-configured';
         assert.equal(ctx.globalState.get('setup.resumeAfterRestart') === true, successful);
         const focused = f.calls
           .filter((c) => c.args[0] === 'workbench.action.openWalkthrough')
           .at(-1);
         assert.equal(focused?.args[1].step, successful ? 'restart' : 'enable');
+        assert.equal(
+          f.calls.filter((c) => c.args[0] === 'workbench.action.configureRuntimeArguments').length,
+          1,
+        );
+        if (outcome === 'double-click') assert.equal(confirmations, 1);
       }));
   }
 }
@@ -244,4 +304,60 @@ test('restart resume respects disabled walkthrough opening', (t) =>
     f.routes.set('vscode.execute', () => undefined);
     await registerOnboarding(ctx, true);
     assert.ok(!f.calls.some((c) => c.args[0] === 'workbench.action.openWalkthrough'));
+  }));
+
+test('runtime edit preserves comments inside an empty proposed API array', () => {
+  const original = '{"enable-proposed-api": [ /* leave this explanation */ ]}';
+  const updated = enableProposedApi(original, id);
+  assert.deepEqual(parse(updated)['enable-proposed-api'], [id]);
+  assert.ok(updated.includes('/* leave this explanation */'));
+});
+
+for (const ready of [false, true]) {
+  test(`walkthrough failure does not block activation (support ready: ${String(ready)})`, (t) =>
+    withFixture(t, async (f) => {
+      const ctx = context(f);
+      if (ready) await ctx.globalState.update('setup.resumeAfterRestart', true);
+      f.routes.set('vscode.output', () => ({ appendLine() {}, dispose() {} }));
+      f.routes.set('vscode.registerResolver', () => {
+        if (!ready) throw new Error('CANNOT use API proposal: resolvers');
+        return { dispose() {} };
+      });
+      f.routes.set('vscode.registerTree', () => ({ dispose() {} }));
+      let fail = true;
+      f.routes.set('vscode.execute', (command) => {
+        if (fail && command === 'workbench.action.openWalkthrough')
+          return Promise.reject(new Error('Walkthrough UI unavailable'));
+        return Promise.resolve();
+      });
+      await activate(ctx);
+      assert.ok(f.state.get('commands').has('remote-incus.openSetup'));
+      assert.ok(f.state.get('commands').has('remote-incus.showInstances'));
+      if (ready) {
+        assert.ok(
+          f.calls.some(
+            (c) => c.name === 'vscode.registerTree' && c.args[0] === 'remote-incus.instances',
+          ),
+        );
+        assert.equal(ctx.globalState.get('setup.resumeAfterRestart'), true);
+      } else assert.notEqual(ctx.globalState.get('setup.offered'), true);
+      // A later startup can retry the one-time resume instead of losing it.
+      fail = false;
+      f.state.get('commands').clear();
+      await registerOnboarding(ctx, ready);
+      assert.equal(
+        ctx.globalState.get(ready ? 'setup.resumeAfterRestart' : 'setup.offered'),
+        !ready,
+      );
+    }));
+}
+
+test('unrelated resolver errors are not misreported as missing API permission', (t) =>
+  withFixture(t, async (f) => {
+    f.routes.set('vscode.output', () => ({ appendLine() {}, dispose() {} }));
+    const failure = new Error('Internal proposed API registration failure');
+    f.routes.set('vscode.registerResolver', () => {
+      throw failure;
+    });
+    await assert.rejects(activate(context(f)), (error) => error === failure);
   }));
