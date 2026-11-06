@@ -127,7 +127,14 @@ function prepare(
   writeNotes(root, directory, tag);
   const plan = { version, tag, source, runId, resumed };
   fs.writeFileSync(path.join(directory, 'plan.json'), JSON.stringify(plan) + '\n');
+  saveMetadata(root, directory);
   return plan;
+}
+
+function saveMetadata(root, directory) {
+  fs.mkdirSync(path.join(directory, 'metadata'), { recursive: true });
+  for (const name of ['package.json', 'package-lock.json', 'CHANGELOG.md'])
+    fs.copyFileSync(path.join(root, name), path.join(directory, 'metadata', name));
 }
 
 function collect(root, directory) {
@@ -142,9 +149,7 @@ function collect(root, directory) {
     path.join(directory, 'SHA256SUMS'),
     `${createHash('sha256').update(bytes).digest('hex')}  ${name}\n`,
   );
-  fs.mkdirSync(path.join(directory, 'metadata'), { recursive: true });
-  for (const name of ['package.json', 'package-lock.json', 'CHANGELOG.md'])
-    fs.copyFileSync(path.join(root, name), path.join(directory, 'metadata', name));
+  saveMetadata(root, directory);
 }
 
 function restore(root, directory) {

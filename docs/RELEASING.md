@@ -5,23 +5,31 @@ builds a VSIX, and finishes. It does not calculate a new version, create a relea
 or wait for an approval.
 
 When ready to release, open **Actions → Release → Run workflow** and select
-`main`. Starting this workflow authorizes GitHub release creation after its
-checks pass. It shows three connected stages in one Actions graph:
+`main`. The workflow calculates the version first and waits for confirmation
+before starting the build. It shows five connected stages in one Actions graph:
 
-1. **Build and test candidate** calculates the next version, prepares the
-   changelog, runs all checks, and retains the verified VSIX, checksum, release
-   notes and exact version metadata as one artifact.
-2. **Create GitHub release** runs automatically after the build succeeds. It
+1. **Preview release version and notes** calculates the next version and prepares
+   the changelog without installing dependencies or building a package. Its run
+   summary shows the proposed version, source commit and release notes.
+2. **Confirm release vX.Y.Z** waits for your approval of `release-confirmation`.
+   Review the preview, choose **Review deployments**, select
+   **release-confirmation**, then **Approve and deploy**. This authorizes the
+   build and GitHub release. Reject to stop; to change the version, start a new
+   run with a different bump or exact version override.
+3. **Build and test vX.Y.Z** restores the saved preview metadata without choosing
+   another version, runs all checks, and retains the verified VSIX, checksum,
+   release notes and exact version metadata as one artifact.
+4. **Create GitHub release** runs automatically after the build succeeds. It
    uses that run's candidate to commit the version and changelog, push an
-   annotated tag, and create the GitHub release. There is no release approval gate.
-3. **Approve Open VSX publication** waits for your approval of the `open-vsx`
+   annotated tag, and create the GitHub release.
+5. **Approve Open VSX publication** waits for your approval of the `open-vsx`
    environment. In the run, choose **Review deployments**, select **open-vsx**,
    then **Approve and deploy**. It downloads the VSIX from this chain's GitHub
    release, verifies its identity and checksum, and publishes those exact bytes.
    It never rebuilds or chooses a different release. The job succeeds when Open VSX
    accepts the upload; Open VSX checks can continue afterwards.
 
-Version numbers and artifacts flow automatically through all three stages. You
+Version numbers and artifacts flow automatically through all stages. You
 can inspect or install the GitHub release before approving publication. The README
 is inside the VSIX and source archives; release notes also link to its tagged copy.
 
@@ -52,10 +60,13 @@ for 1.0 from a breaking change during the pre-1.0 period.
 
 GitHub's **Run workflow** dialog cannot calculate or preview the automatic
 version. Its inputs are defined in the workflow file; the version is calculated
-after the run starts. The candidate summary shows the calculated version.
+after the run starts. The preview summary and pending confirmation job name show
+the calculated version before the build. GitHub controls the approval dialog;
+its checkbox is named `release-confirmation`, not the version number.
 
-To exercise the release build without creating a release or requesting publishing
-approval, select **dry_run**. The build prepares a candidate locally but consumes no version. You can also run
+To exercise the release build without creating a release or requesting either
+approval, select **dry_run**. The preview runs and the build proceeds without
+confirmation, but consumes no version. You can also run
 a dry run on a development branch. Real releases require `main`.
 
 ## Identity, failures and retries
@@ -64,6 +75,13 @@ The build artifact is associated with its source commit and workflow run. The
 release and publishing stages receive their tag and artifacts automatically
 through job outputs. No registry secret is passed to the build or GitHub release
 steps.
+
+The `release-confirmation` environment requires the repository owner's review,
+self-review allowed, admin bypass disabled, and only the `main` branch allowed.
+The preview checks for the required reviewer gate before proposing a real release;
+missing or weakened reviewer settings stop the run. Configure it in
+**Settings → Environments** before using this flow. Naming an environment in YAML
+alone does not establish an approval requirement.
 
 The `open-vsx` environment requires the repository owner's review and allows only
 `main`. Keep it configured in **Settings → Environments**. This is what makes

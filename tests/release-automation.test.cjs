@@ -187,6 +187,28 @@ for (const [name, authored, expected] of [
   });
 }
 
+test('approved preparation restores the exact version and notes before any build', (t) => {
+  const f = fixture(t);
+  const original = git(f.root, 'rev-parse', 'HEAD');
+  const plan = prepare(f.root, f.options);
+  const changelog = fs.readFileSync(path.join(f.root, 'CHANGELOG.md'), 'utf8');
+  const notes = fs.readFileSync(path.join(f.options.directory, 'release-notes.md'), 'utf8');
+  git(f.root, 'reset', '--hard', original);
+  environment(t, { GITHUB_RUN_ID: f.options.runId, GITHUB_SHA: original });
+  restore(f.root, f.options.directory);
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(f.root, 'package.json'))).version,
+    plan.version,
+  );
+  assert.equal(fs.readFileSync(path.join(f.root, 'CHANGELOG.md'), 'utf8'), changelog);
+  assert.equal(fs.readFileSync(path.join(f.options.directory, 'release-notes.md'), 'utf8'), notes);
+  assert.equal(git(f.root, 'rev-parse', 'HEAD'), original);
+  assert.equal(git(f.root, 'tag', '--list', plan.tag), '');
+  assert.ok(!fs.existsSync(path.join(f.root, 'remote-incus.vsix')));
+  environment(t, { GITHUB_RUN_ID: '99999' });
+  assert.throws(() => restore(f.root, f.options.directory), /does not belong/);
+});
+
 test('preparation builds notes and checksum without consuming a remote version', (t) => {
   const f = fixture(t);
   const plan = prepare(f.root, f.options);

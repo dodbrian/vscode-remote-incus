@@ -21,13 +21,14 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build and test candidate
+  plan:
+    name: Preview release version and notes
+    if: ${{ github.ref == 'refs/heads/main' || inputs.dry_run }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 5
     outputs:
       tag: ${{ steps.prepare.outputs.tag }}
-      artifact: candidate-${{ github.run_id }}-${{ github.run_attempt }}
+      artifact: release-plan-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out source and history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,13 +39,87 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24.21.0'
-          cache: npm
+      - name: Require a configured release approval gate
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REQUIRED=$(gh api "repos/$GITHUB_REPOSITORY/environments/release-confirmation" --jq '
+            .can_admins_bypass == false and any(.protection_rules[];
+              .type == "required_reviewers" and .prevent_self_review == false and (.reviewers | length) > 0)')
+          if [ "$REQUIRED" != true ]; then
+            echo 'Configure release-confirmation with required reviewers, self-review allowed and admin bypass disabled.' >&2
+            exit 1
+          fi
       - name: Prepare candidate version and changelog
         id: prepare
         env:
           RELEASE_BUMP: ${{ inputs.bump || 'auto' }}
           RELEASE_VERSION: ${{ inputs.version }}
         run: node scripts/release.cjs prepare "$RUNNER_TEMP/release"
+      - name: Retain the version and metadata for approval
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+          retention-days: 30
+      - name: Show version before starting the build
+        env:
+          TAG: ${{ steps.prepare.outputs.tag }}
+        run: |
+          echo "## Proposed release $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "Source commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Review these notes, then approve release-confirmation to start the build. A dry run continues without approval.' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/release/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
+
+  confirm:
+    name: Confirm release ${{ needs.plan.outputs.tag }}
+    needs: plan
+    if: ${{ !inputs.dry_run }}
+    environment:
+      name: release-confirmation
+      url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#summary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Record version approval
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: echo "Approved $TAG for build and release." >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build and test ${{ needs.plan.outputs.tag }}
+    needs: [plan, confirm]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (inputs.dry_run || needs.confirm.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tag: ${{ needs.plan.outputs.tag }}
+      artifact: candidate-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out approved source and history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.21.0'
+          cache: npm
+      - name: Download this run's approved release plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: ${{ needs.plan.outputs.artifact }}
+        run: gh run download "$GITHUB_RUN_ID" --name "$ARTIFACT" --dir "$RUNNER_TEMP/release"
+      - name: Restore approved metadata without recalculating the version
+        run: node scripts/release.cjs restore "$RUNNER_TEMP/release"
       - name: Install locked dependencies
         run: npm ci --include=dev --no-audit --no-fund
       - name: Format generated metadata
@@ -68,7 +143,7 @@ jobs:
           retention-days: 30
       - name: Show candidate for review
         env:
-          TAG: ${{ steps.prepare.outputs.tag }}
+          TAG: ${{ needs.plan.outputs.tag }}
         run: |
           echo "## Verified candidate $TAG" >> "$GITHUB_STEP_SUMMARY"
           cat "$RUNNER_TEMP/release/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
