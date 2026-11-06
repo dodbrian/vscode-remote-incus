@@ -29,7 +29,6 @@
   ],
   "activationEvents": [
     "onResolveRemoteAuthority:incus",
-    "onView:remote-incus.instances",
     "onStartupFinished"
   ],
   "contributes": {
@@ -46,6 +45,7 @@
         {
           "id": "remote-incus.setup",
           "name": "Incus Setup",
+          "icon": "$(tools)",
           "when": "remote-incus.setupRequired"
         }
       ]
