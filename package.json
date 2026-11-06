@@ -29,7 +29,8 @@
   ],
   "activationEvents": [
     "onResolveRemoteAuthority:incus",
-    "onView:remote-incus.instances"
+    "onView:remote-incus.instances",
+    "onStartupFinished"
   ],
   "contributes": {
     "views": {
@@ -39,6 +40,13 @@
           "name": "Incus",
           "group": "targets@1",
           "remoteName": "incus"
+        }
+      ],
+      "explorer": [
+        {
+          "id": "remote-incus.setup",
+          "name": "Incus Setup",
+          "when": "remote-incus.setupRequired"
         }
       ]
     },
@@ -136,6 +144,16 @@
       {
         "command": "remote-incus.forwardPortIPv4",
         "title": "Forward over IPv4",
+        "category": "Remote - Incus"
+      },
+      {
+        "command": "remote-incus.openSetup",
+        "title": "Open Setup",
+        "category": "Remote - Incus"
+      },
+      {
+        "command": "remote-incus.enableSupport",
+        "title": "Enable Editor Support\u2026",
         "category": "Remote - Incus"
       }
     ],
@@ -296,7 +314,57 @@
           "description": "How to obtain a missing VS Code server archive. Complete installations skip download work for either strategy."
         }
       }
-    }
+    },
+    "viewsWelcome": [
+      {
+        "view": "remote-incus.setup",
+        "contents": "Finish setting up Remote-Incus. Remote connections require additional editor APIs.\n[Open Setup](command:remote-incus.openSetup)",
+        "when": "remote-incus.setupRequired"
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "setup",
+        "title": "Get Started with Remote-Incus",
+        "description": "Connect VS Code or VSCodium to your Incus containers.",
+        "steps": [
+          {
+            "id": "enable",
+            "title": "Enable editor support",
+            "description": "Remote-Incus needs proposed APIs for remote connections and Remote Explorer. Enable them for this extension only. You will be asked before the runtime configuration is saved.\n[Enable Support\u2026](command:remote-incus.enableSupport)",
+            "media": {
+              "markdown": "docs/walkthrough/enable.md"
+            },
+            "completionEvents": [
+              "onContext:remote-incus.supportConfigured",
+              "onContext:remote-incus.supportReady"
+            ]
+          },
+          {
+            "id": "restart",
+            "title": "Restart your editor",
+            "description": "After enabling support, quit all editor windows and start the editor again. Reload Window does not apply runtime arguments. This step completes when the remote APIs are available.",
+            "media": {
+              "markdown": "docs/walkthrough/restart.md"
+            },
+            "completionEvents": [
+              "onContext:remote-incus.supportReady"
+            ]
+          },
+          {
+            "id": "connect",
+            "title": "Connect to an Incus container",
+            "description": "Configure the Incus CLI on your computer, then open the Incus view in Remote Explorer.\n[Show Incus](command:remote-incus.showInstances)",
+            "media": {
+              "markdown": "docs/walkthrough/connect.md"
+            },
+            "completionEvents": [
+              "onView:remote-incus.instances"
+            ]
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "verify:release": "node scripts/verify-release.cjs",
@@ -344,6 +412,7 @@
     "xml2js": "0.5.0",
     "markdown-it": "14.3.3",
     "sax": "1.6.1",
-    "parse5": "7.3.0"
+    "parse5": "7.3.0",
+    "jsonc-parser": "3.3.1"
   }
 }

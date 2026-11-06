@@ -10,6 +10,7 @@ import { IncusAuthorityResolver } from './resolver';
 import { InstancesTree } from './tree';
 import { registerCommands } from './commands';
 import { initLogging, log } from './logging';
+import { registerOnboarding } from './onboarding';
 
 export function activate(context: vscode.ExtensionContext): void {
   initLogging(context);
@@ -18,6 +19,29 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   const history = new FolderHistory(context);
+  const tree = new InstancesTree(history, context.asAbsolutePath('assets'));
+  try {
+    // Exports may exist even without permission. Registration performs the
+    // editor's actual proposed-API access check without making a connection.
+    context.subscriptions.push(
+      vscode.workspace.registerRemoteAuthorityResolver(
+        AUTHORITY_PREFIX,
+        new IncusAuthorityResolver(context, () => {
+          tree.refresh();
+        }),
+      ),
+    );
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !/CANNOT use API proposal|proposed API|proposed api/i.test(error.message)
+    )
+      throw error;
+    registerOnboarding(context, false);
+    log('Editor support unavailable; setup commands and Explorer view registered');
+    return;
+  }
+  registerOnboarding(context, true);
   // Record the current window's folder on every ext-host start of a window
   // already sitting on an incus authority — covers reloads, ext-host
   // restarts and opens that bypass our commands. At a FIRST connect the
@@ -31,14 +55,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
-  const tree = new InstancesTree(history, context.asAbsolutePath('assets'));
   context.subscriptions.push(
-    vscode.workspace.registerRemoteAuthorityResolver(
-      AUTHORITY_PREFIX,
-      new IncusAuthorityResolver(context, () => {
-        tree.refresh();
-      }),
-    ),
     vscode.window.registerTreeDataProvider('remote-incus.instances', tree),
   );
   registerCommands(context, tree, history);

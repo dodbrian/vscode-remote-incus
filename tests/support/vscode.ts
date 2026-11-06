@@ -47,6 +47,7 @@ export class EventEmitter<T> {
 }
 
 export const workspace = {
+  applyEdit: (...args: any[]) => fixture().call('vscode.applyEdit', args),
   get tunnels(): Promise<any[]> {
     return fixture().call('vscode.tunnels', []);
   },
@@ -127,6 +128,10 @@ export const env = {
 export const version = 'offline';
 export const ProgressLocation = { Notification: 15 };
 export const window = {
+  get activeTextEditor(): any {
+    return fixture().state.get('activeEditor');
+  },
+  showInformationMessage: (...args: any[]) => fixture().call('vscode.info', args),
   withProgress: (...args: any[]) => fixture().call('vscode.withProgress', args),
   showErrorMessage: (...args: any[]) => fixture().call('vscode.error', args),
   showWarningMessage: (...args: any[]) => fixture().call('vscode.warning', args),
@@ -166,5 +171,18 @@ export class RemoteAuthorityResolverError extends Error {
   }
   static NotAvailable(message: string): Error {
     return new RemoteAuthorityResolverError(message, 'NotAvailable');
+  }
+}
+
+export class Range {
+  constructor(
+    readonly start: unknown,
+    readonly end: unknown,
+  ) {}
+}
+export class WorkspaceEdit {
+  readonly edits: unknown[] = [];
+  replace(...args: unknown[]): void {
+    this.edits.push(args);
   }
 }

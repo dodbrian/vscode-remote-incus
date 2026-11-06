@@ -4,6 +4,12 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [Unreleased]
 
+### Added
+
+- Guide first-time setup with a walkthrough and persistent Explorer setup view.
+  Enable proposed APIs with confirmation using the running VS Code or VSCodium
+  runtime configuration, preserving existing settings and comments.
+
 ## [0.2.3] - 2026-11-04
 
 ### Fixed

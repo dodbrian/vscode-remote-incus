@@ -18,6 +18,8 @@ async function main() {
     external: ['vscode'],
     format: 'cjs',
     platform: 'node',
+    // JSONC parser ships UMD and ESM; bundle ESM to resolve its internal imports.
+    mainFields: ['module', 'main'],
     target: 'node22',
     sourcemap: !production,
     minify: production,

@@ -14,3 +14,9 @@ These icons are licensed under [Creative Commons Attribution 4.0 International
 The full license is included in [licenses/vscode-icons-CC-BY-4.0.txt](../licenses/vscode-icons-CC-BY-4.0.txt).
 The extension's MIT license does not replace the icons' CC BY 4.0 license.
 No Microsoft endorsement is implied; trademark rights are not granted.
+
+## Microsoft JSONC parser
+
+The extension bundles `jsonc-parser` 3.3.1 by Microsoft to preserve comments
+when editing runtime arguments. It is licensed under the MIT license.
+The full notice is included in [licenses/jsonc-parser-MIT.txt](../licenses/jsonc-parser-MIT.txt).

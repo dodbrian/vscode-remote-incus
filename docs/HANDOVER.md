@@ -20,7 +20,68 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: VSCodium server compatibility (2026-11-04)
+## Current stopping point: editor setup walkthrough (2026-11-06)
+
+First-time setup is implemented on `feat/setup-walkthrough`. The extension now
+activates at startup even when proposed API access has not been granted. It
+attempts the actual resolver registration permission check, since proposed API
+exports can exist without permission. If access is denied, stable API commands
+and an empty **Incus Setup** view in the ordinary Explorer sidebar remain
+available. Remote Explorer itself cannot host the setup view before the
+`contribViewsRemote` proposal is enabled.
+
+The built-in **Get Started with Remote-Incus** walkthrough explains the required
+APIs, configuration, full application restart and first connection. Users can
+reopen it through the setup view or **Remote - Incus: Open Setup**. Automatic
+opening respects the editor's walkthrough preference and is offered at most
+once by the activation handler. The temporary view disappears when resolver
+registration succeeds after restarting.
+
+**Enable Support…** invokes the running editor's **Preferences: Configure Runtime
+Arguments** command to locate its own `argv.json`; no VS Code or VSCodium path is
+hardcoded. It validates the opened document and JSONC, asks for confirmation,
+then saves the configuration with the extension ID appended. Existing settings,
+comments and other extension IDs are preserved. An existing empty array, which
+enables proposals for all extensions, becomes a list containing this extension;
+the confirmation explains this. Duplicate keys, malformed arrays, unsaved edits
+and changes during confirmation are rejected. Cancellation does not write.
+VS Code and VSCodium must be configured separately. A full application restart
+is required; **Reload Window** does not apply runtime arguments.
+
+The bundled Microsoft `jsonc-parser` 3.3.1 is a direct development dependency;
+esbuild includes its ESM implementation in the extension bundle. Selecting the
+ESM entry is necessary because bundling its UMD entry leaves unresolved internal
+requires. The MIT notice and walkthrough Markdown are required VSIX contents.
+README installation instructions and the Unreleased changelog describe setup.
+
+Validation completed for this implementation:
+
+- `npm test`: type, lint, format and release checks, release/publishing tests,
+  and all 247 offline regressions passed. New coverage includes both editor
+  identities, denied permission with exports present, JSONC preservation,
+  cancellation, dirty/changed files, save failures and walkthrough visibility.
+- `npm run test:package` passed all three package test files.
+- `npm run package` produced a verified VSIX with 42 files and 95 local
+  documentation links; archive policy reported no findings.
+- The production bundle loaded successfully with the editor module stubbed.
+- `npm run audit:privacy` reported zero findings across 127 files/objects,
+  including the final staged feature and handover changes.
+- `git diff --check` passed. Some child-process fixtures required execution
+  outside the sandbox after `EPERM`; the successful full run used that access.
+
+Source version remains `0.2.3`. The local `remote-incus.vsix` is validation
+output. No live installation, editor configuration update, release or registry
+publication was performed. Manual acceptance remains outstanding in BOTH
+standard VS Code and VSCodium: install without proposed APIs, dismiss and reopen
+setup, cancel/confirm the file update, quit all windows, restart, and verify the
+setup view disappears and Incus appears in Remote Explorer. Portable and
+Insiders installations use the editor-selected file but have not been manually
+validated. Hosted CI results for this feature push are not yet verified.
+
+Resume with manual acceptance and hosted CI review. Earlier checkpoints below
+retain historical evidence and were not refreshed for this feature.
+
+## Previous checkpoint: VSCodium server compatibility (2026-11-04)
 
 [Issue #7](https://github.com/dodbrian/vscode-remote-incus/issues/7) is implemented
 and manually accepted by the user. VSCodium AppImage 1.143.17232 previously
