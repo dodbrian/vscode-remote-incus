@@ -201,13 +201,52 @@ test('approved preparation restores the exact version and notes before any build
     plan.version,
   );
   assert.equal(fs.readFileSync(path.join(f.root, 'CHANGELOG.md'), 'utf8'), changelog);
-  assert.equal(fs.readFileSync(path.join(f.options.directory, 'release-notes.md'), 'utf8'), notes);
   assert.equal(git(f.root, 'rev-parse', 'HEAD'), original);
   assert.equal(git(f.root, 'tag', '--list', plan.tag), '');
   assert.ok(!fs.existsSync(path.join(f.root, 'remote-incus.vsix')));
+  fs.writeFileSync(path.join(f.root, 'remote-incus.vsix'), 'verified fixture archive');
+  collect(f.root, f.options.directory);
+  assert.equal(fs.readFileSync(path.join(f.options.directory, 'release-notes.md'), 'utf8'), notes);
   environment(t, { GITHUB_RUN_ID: '99999' });
   assert.throws(() => restore(f.root, f.options.directory), /does not belong/);
 });
+
+for (const [mismatch, error] of [
+  ['approved tag', /approved release tag/],
+  ['metadata', /lockfile versions must match/],
+  ['source', /does not belong/],
+  ['checkout', /Checkout does not match/],
+  ['plan version', /metadata does not match/],
+]) {
+  test(`restore rejects mismatched ${mismatch} before changing the checkout`, (t) => {
+    const f = fixture(t);
+    const names = ['package.json', 'package-lock.json', 'CHANGELOG.md'];
+    const original = names.map((name) => fs.readFileSync(path.join(f.root, name), 'utf8'));
+    prepare(f.root, f.options);
+    git(f.root, 'reset', '--hard', f.options.source);
+    environment(t, { GITHUB_RUN_ID: f.options.runId, GITHUB_SHA: f.options.source });
+    let tag = 'v0.1.1';
+    if (mismatch === 'approved tag') tag = 'v9.0.0';
+    if (mismatch === 'metadata')
+      fs.writeFileSync(
+        path.join(f.options.directory, 'metadata', 'package.json'),
+        JSON.stringify({ version: '9.0.0' }),
+      );
+    if (mismatch === 'source') process.env.GITHUB_SHA = 'a'.repeat(40);
+    if (mismatch === 'checkout') git(f.root, 'checkout', '--detach', 'v0.1.0');
+    if (mismatch === 'plan version') {
+      const filename = path.join(f.options.directory, 'plan.json');
+      const plan = JSON.parse(fs.readFileSync(filename));
+      plan.version = '9.0.0';
+      fs.writeFileSync(filename, JSON.stringify(plan));
+    }
+    assert.throws(() => restore(f.root, f.options.directory, tag), error);
+    assert.deepEqual(
+      names.map((name) => fs.readFileSync(path.join(f.root, name), 'utf8')),
+      original,
+    );
+  });
+}
 
 test('preparation builds notes and checksum without consuming a remote version', (t) => {
   const f = fixture(t);

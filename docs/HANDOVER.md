@@ -34,8 +34,9 @@ job is named `Confirm release vX.Y.Z` and waits on `release-confirmation`.
 The approval dialog's checkbox uses the fixed environment name; GitHub controls
 that dialog. Approving authorizes the build and subsequent GitHub release.
 
-The build restores the approved metadata, validating workflow run ID and source
-SHA, rather than recalculating the version after approval. Collection refreshes
+The build restores the approved metadata, validating workflow run ID, source
+SHA, the expected approved tag and metadata consistency before copying anything
+into the checkout, rather than recalculating the version after approval. Collection refreshes
 the metadata after formatting for the existing release-job handoff. Dry runs
 skip confirmation and continue to the build, but cannot release or publish.
 Real runs require main. The separate Open VSX approval remains in place.
@@ -43,15 +44,19 @@ Real runs require main. The separate Open VSX approval remains in place.
 The `release-confirmation` environment has been configured and read back live:
 required reviewer is the repository owner, self-review is allowed, admin bypass
 is disabled, and its only deployment branch policy is branch `main`. The preview
-checks the reviewer configuration and fails if absent or weakened. No release
-run was started or approved as part of this implementation.
+checks the reviewer configuration and fails if absent or weakened. No real release
+was started or approved as part of this implementation.
 
-Local validation: all 70 release/publishing tests pass, including a new regression
-for restoring approved metadata before any build without consuming a version,
-and rejecting metadata from another run. `npm run check` and whitespace checks
+Local validation: all 75 release/publishing tests pass. Review added checks that
+wrong tags, sources, checkouts, plan versions and inconsistent metadata leave the
+checkout unchanged, and that rebuilding notes from restored metadata preserves
+the preview text. `npm run check` and whitespace checks
 pass. actionlint 1.7.12 passes with only its known unsupported `queue: max` key
-excluded. The actual confirmation UI and job scheduling remain unverified until
-the workflow is merged and exercised. See `RELEASING.md` for the updated user flow.
+excluded. Hosted dry run [42293139753](https://github.com/dodbrian/vscode-remote-incus/actions/runs/42293139753)
+passed on the initial PR implementation: preview and build succeeded with v0.3.1;
+confirmation, GitHub release and Open VSX publication were skipped. The actual
+confirmation UI and rejection path remain unverified until a real main-branch
+run is exercised. See `RELEASING.md` for the updated user flow.
 
 Use a PR for this branch. Merging, confirming a release and publishing require
 the user's own decisions; implementation does not authorize those actions.
