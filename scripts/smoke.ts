@@ -1,6 +1,6 @@
 /**
  * Offline smoke for the pure logic + read-only incus wrappers (no vscode).
- * Run: node esbuild.js is NOT involved — bundled ad hoc:
+ * Run: node esbuild.cjs is NOT involved — bundled ad hoc:
  *   npx esbuild scripts/smoke.ts --bundle --platform=node --alias:vscode=./scripts/vscode-stub.js --outfile=/tmp/remote-incus-dev/smoke.js && node /tmp/remote-incus-dev/smoke.js
  */
 import { parseAuthority, formatAuthority } from '../src/authority';
