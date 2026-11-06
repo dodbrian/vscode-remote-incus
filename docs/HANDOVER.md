@@ -1701,7 +1701,7 @@ inventory, addresses, instance names or cached process state is authoritative.
   `REMOTE_INCUS_DEBUG_LOG`, which scripts/redeploy.sh sets) plus the
   "Remote - Incus" output channel.
 - Offline smoke: `npx esbuild scripts/smoke.ts --bundle --platform=node
---alias:vscode=./scripts/vscode-stub.js --outfile=/tmp/remote-incus-dev/smoke.js &&
+--alias:vscode=./scripts/vscode-stub.cjs --outfile=/tmp/remote-incus-dev/smoke.js &&
 node /tmp/remote-incus-dev/smoke.js` (authority round-trips + read-only daemon probes).
 - Chain deploy steps with `&&`, not `;` — a `;` chain once relaunched a
   window with STALE code after a failed typecheck (cost: confusing session).

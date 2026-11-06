@@ -186,7 +186,7 @@ root using installed dependencies:
 task4_bundle=$(mktemp /tmp/remote-incus-live-XXXXXX.cjs)
 trap 'rm -f "$task4_bundle"' EXIT
 ./node_modules/.bin/esbuild scripts/verify-live.ts --bundle --platform=node \
-  --alias:vscode=./scripts/vscode-stub.js --outfile="$task4_bundle" &&
+  --alias:vscode=./scripts/vscode-stub.cjs --outfile="$task4_bundle" &&
   node "$task4_bundle"
 ```
 
@@ -257,7 +257,7 @@ runtime values and keep raw logs outside Git. Never run them against the active
 manual session left open for the user.
 
 Bundle each TypeScript entry with esbuild, `--platform=node` and
-`--alias:vscode=./scripts/vscode-stub.js` as shown above. The test-only stub maps
+`--alias:vscode=./scripts/vscode-stub.cjs` as shown above. The test-only stub maps
 `INCUS_TEST_DOWNLOAD_STRATEGY`; production reads normal VS Code configuration.
 
 | Verifier                                        | Coverage and additional requirements                                                                                                                                                                                                                                                                    |
