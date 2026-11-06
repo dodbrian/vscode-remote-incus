@@ -20,7 +20,42 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: editor setup walkthrough (2026-11-06)
+## Current stopping point: release summary and changelog ordering (2026-11-06)
+
+PR #9 was merged on 2026-11-06. The current work starts from the v0.3.0 release
+commit `ce23a61` on branch `fix/isolate-release-test-summary`.
+
+Release run [42277562892](https://github.com/dodbrian/vscode-remote-incus/actions/runs/42277562892)
+prepared v0.3.0 correctly. Its candidate summary also contained v0.1.0 messages
+because in-process Open VSX tests inherited `GITHUB_STEP_SUMMARY`. Those messages
+were fixture output, not the candidate version or real publishing operations.
+
+The publishing test suite now redirects summaries to a temporary file and restores
+the inherited environment afterwards. A subprocess regression checks that the
+inherited Actions summary remains untouched, while the existing CLI test verifies
+that real publishing commands still write their summary.
+
+Release preparation now places Added before Fixed in authored Unreleased notes,
+preserving section content and spacing. That order flows into the new dated
+changelog entry and release notes; historical entries are not reordered by the
+generator. The existing v0.3.0 source entry was also reordered at the user's
+request. This source edit does not change already published release artifacts.
+The ordering rule is documented in `RELEASING.md`.
+
+Local validation passed all 69 release/publishing tests, `npm run check` (release
+metadata, type checks, lint and formatting), and `git diff --check`. Review added
+coverage for reversed/already ordered sections, either category alone, other
+sections and introductory prose, preserved formatting, and unchanged history.
+Hosted Actions behavior for these changes remains unverified.
+
+The user authorized updating this handover, committing and pushing these changes.
+Push this branch with a PR against `main`; merging and releasing are not authorized.
+GitHub's Run workflow dialog cannot calculate a live automatic version preview.
+This limitation is documented; a separate lightweight preview workflow was
+discussed but has not been implemented. Existing `dry_run` still runs the full
+candidate build without creating a release.
+
+## Previous stopping point: editor setup walkthrough (2026-11-06)
 
 Latest acceptance finding: on a fresh VS Code run of the review build, the user
 reported that Restart remained unchecked after a successful application restart.

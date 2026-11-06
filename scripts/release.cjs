@@ -48,6 +48,16 @@ function releaseNotes(changelog) {
   return changelog.split(/^## /m)[2].split('\n').slice(1).join('\n').trim();
 }
 
+function orderChangelogSections(notes) {
+  notes = notes.trim();
+  // Give the last section the same boundary as the others before moving it.
+  const sections = `${notes}\n\n`.split(/(?=^### )/m);
+  const added = sections.findIndex((section) => /^### Added\s*\n/.test(section));
+  const fixed = sections.findIndex((section) => /^### Fixed\s*\n/.test(section));
+  if (fixed !== -1 && added > fixed) sections.splice(fixed, 0, sections.splice(added, 1)[0]);
+  return sections.join('').trim();
+}
+
 function writeNotes(root, directory, tag) {
   let notes = releaseNotes(fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8'));
   if (process.env.GITHUB_REPOSITORY)
@@ -96,7 +106,7 @@ function prepare(
     const filename = path.join(root, 'CHANGELOG.md');
     const changelog = fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n');
     const sections = changelog.split(/^## /m);
-    const authored = sections[1].slice('[Unreleased]'.length).trim();
+    const authored = orderChangelogSections(sections[1].slice('[Unreleased]'.length));
     const commits = git('log', '--format=- %s (%h)', range);
     if (!commits) throw new Error('There are no changes since the previous release.');
     const notes = [authored, '### Commits\n\n' + commits].filter(Boolean).join('\n\n');

@@ -39,6 +39,8 @@ current version's tag:
 The largest applicable bump wins. When there is no existing version tag, the
 first automated release includes the existing commit history. Authored
 `Unreleased` changelog notes are preserved and supplemented with the commit list.
+Place `### Added` before `### Fixed` whenever both sections are present. Release
+preparation enforces this order in the new changelog entry and release notes.
 Breaking changes should include migration instructions in those notes.
 
 Normally, leave version selection automatic. For an intentional override, use
@@ -47,6 +49,10 @@ Normally, leave version selection automatic. For an intentional override, use
 explicitly choose `1.0.0` once the core connection workflow is dependable and you
 commit to configuration and behavior compatibility. CI does not infer readiness
 for 1.0 from a breaking change during the pre-1.0 period.
+
+GitHub's **Run workflow** dialog cannot calculate or preview the automatic
+version. Its inputs are defined in the workflow file; the version is calculated
+after the run starts. The candidate summary shows the calculated version.
 
 To exercise the release build without creating a release or requesting publishing
 approval, select **dry_run**. The build prepares a candidate locally but consumes no version. You can also run
