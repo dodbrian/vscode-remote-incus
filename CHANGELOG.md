@@ -6,6 +6,9 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ### Fixed
 
+- Persist completed setup checkboxes after restart even when the native
+  walkthrough misses the startup readiness event.
+
 - Preserve comments inside empty runtime argument arrays. Keep extension commands
   available if the setup walkthrough cannot open, and retry automatic opening
   on a later startup.

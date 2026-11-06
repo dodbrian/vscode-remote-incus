@@ -22,6 +22,26 @@ with a Docker container".
 
 ## Current stopping point: editor setup walkthrough (2026-11-06)
 
+Latest acceptance finding: on a fresh VS Code run of the review build, the user
+reported that Restart remained unchecked after a successful application restart.
+Live logs confirmed resolver/tree registration, while native walkthrough storage
+contained only the completed Enable step. The context-only completion event can
+be missed during native walkthrough initialization.
+
+The accepted fix explicitly persists native Enable/Restart completion when resolver
+access is confirmed, and Enable completion after configuration is saved. Optional
+completion-command failures are logged without blocking activation. Tests cover
+both editor identities when context completion events are missed. `npm test`
+passed all 269 offline regressions plus release/publishing checks; production
+packaging passed with 42 files and 95 local documentation links. The rebuilt VSIX
+was installed into the existing isolated VS Code acceptance profile and its
+bundle matched the build byte-for-byte. After reopening that profile, the user
+confirmed the Restart checkbox was checked and Connect was selected. The same
+build was then tested in a fresh isolated VSCodium profile through configuration
+and restart; the user confirmed that flow works too. Manual acceptance of the
+checkbox fix is complete in both editor builds listed below. The user requested
+committing and pushing this fix to the existing PR branch.
+
 Review follow-up for PR #9: automatic walkthrough failures no longer abort
 activation or misreport a successful configuration save. Commands
 are registered before opening optional UI, and a failed initial opening or
@@ -37,8 +57,8 @@ release/publishing tests, `npm run test:package`, production packaging (42 files
 95 local documentation links), privacy audit (zero findings), and whitespace
 checks. New coverage models the actual edited/saved document, edit rejection,
 changes or closure during confirmation, double clicks, and failed walkthrough
-opening before and after configuration. The manual acceptance below applies to
-the previously pushed build; this review build has not been manually retested.
+opening before and after configuration. The subsequent checkbox fix and final
+manual acceptance in both editors are recorded above.
 
 The user accepted the complete onboarding flow in both VS Code 1.145.2 and
 VSCodium AppImage 1.143.17232 on 2026-11-06. Each editor was tested with the same

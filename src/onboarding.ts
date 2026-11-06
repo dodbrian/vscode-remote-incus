@@ -39,6 +39,17 @@ export async function registerOnboarding(
       return false;
     }
   };
+  const completeSteps = async (...steps: string[]): Promise<void> => {
+    for (const step of steps) {
+      try {
+        // A startup context event can precede the native walkthrough listeners.
+        // Persist completion explicitly rather than relying on that event alone.
+        await vscode.commands.executeCommand('welcome.markStepComplete', `${walkthrough}#${step}`);
+      } catch (error) {
+        log(`Could not complete setup step ${step}: ${firstLine(error)}`);
+      }
+    }
+  };
   const autoOpen = vscode.workspace
     .getConfiguration('workbench.welcomePage.walkthroughs')
     .get<boolean>('openOnInstall', true);
@@ -99,6 +110,7 @@ export async function registerOnboarding(
         configured = true;
         await context.globalState.update('setup.resumeAfterRestart', true);
         await vscode.commands.executeCommand('setContext', 'remote-incus.supportConfigured', true);
+        await completeSteps('enable');
         await tryOpenSetup();
         await vscode.window.showInformationMessage(
           `Support is configured. Quit all ${vscode.env.appName} windows and start the editor again to enable Remote-Incus.`,
@@ -132,6 +144,7 @@ export async function registerOnboarding(
     }
   }
 
+  if (ready) await completeSteps('enable', 'restart');
   if (ready && resume) {
     // A restored Welcome editor retains its previously selected step. Explicitly
     // select Connect once after our saved configuration takes effect.
