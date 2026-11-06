@@ -30,7 +30,7 @@ function identity(root) {
   git(root, 'config', 'user.email', 'fixture@example.invalid');
 }
 
-function fixture(t) {
+function fixture(t, notes = '### Fixed\n\n- Friendly summary.') {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'incus-release-flow-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const root = path.join(directory, 'checkout');
@@ -47,7 +47,7 @@ function fixture(t) {
   );
   fs.writeFileSync(
     path.join(root, 'CHANGELOG.md'),
-    '# Changelog\n\n## [Unreleased]\n\n### Fixed\n\n- Friendly summary.\n\n## [0.1.0] - 2026-10-25\n\n- Initial release.\n',
+    `# Changelog\n\n## [Unreleased]\n\n${notes}\n\n## [0.1.0] - 2026-10-25\n\n- Initial release.\n`,
   );
   git(root, 'add', '.');
   git(
@@ -146,6 +146,45 @@ for (const [version, bump, expected] of [
 ]) {
   test(`${bump} changes ${version} to ${expected}`, () =>
     assert.equal(nextVersion(version, bump), expected));
+}
+
+for (const [name, authored, expected] of [
+  [
+    'reversed',
+    '### Fixed\n\n- Repair.\n\n### Added\n\n- Feature.',
+    '### Added\n\n- Feature.\n\n### Fixed\n\n- Repair.',
+  ],
+  [
+    'already ordered',
+    '### Added\n\n- Feature.\n\n\n### Fixed\n\n- Repair.',
+    '### Added\n\n- Feature.\n\n\n### Fixed\n\n- Repair.',
+  ],
+  ['only fixes', '### Fixed\n\n- Repair.', '### Fixed\n\n- Repair.'],
+  ['only additions', '### Added\n\n- Feature.', '### Added\n\n- Feature.'],
+  [
+    'other sections',
+    'Release overview.\n\n### Fixed\n\n- Repair.\n\n### Security\n\n- Protect.\n\n### Added\n\n- Feature.',
+    'Release overview.\n\n### Added\n\n- Feature.\n\n### Fixed\n\n- Repair.\n\n### Security\n\n- Protect.',
+  ],
+]) {
+  test(`preparation preserves release note content with ${name} sections`, (t) => {
+    const f = fixture(t, authored);
+    const historical = fs
+      .readFileSync(path.join(f.root, 'CHANGELOG.md'), 'utf8')
+      .split('## [0.1.0]')[1];
+    prepare(f.root, f.options);
+    for (const filename of [
+      path.join(f.root, 'CHANGELOG.md'),
+      path.join(f.options.directory, 'release-notes.md'),
+    ]) {
+      const text = fs.readFileSync(filename, 'utf8');
+      assert.ok(text.includes(`${expected}\n\n### Commits\n`), text);
+    }
+    assert.equal(
+      fs.readFileSync(path.join(f.root, 'CHANGELOG.md'), 'utf8').split('## [0.1.0]')[1],
+      historical,
+    );
+  });
 }
 
 test('preparation builds notes and checksum without consuming a remote version', (t) => {

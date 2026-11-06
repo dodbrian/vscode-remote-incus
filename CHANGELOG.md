@@ -6,6 +6,12 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [0.3.0] - 2026-11-06
 
+### Added
+
+- Guide first-time setup with a walkthrough and persistent Explorer setup view.
+  Enable proposed APIs with confirmation using the running VS Code or VSCodium
+  runtime configuration, preserving existing settings and comments.
+
 ### Fixed
 
 - Persist completed setup checkboxes after restart even when the native
@@ -17,12 +23,6 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 - Tailor setup walkthroughs to the running editor and resume at the next setup
   step after saving configuration and restarting.
-
-### Added
-
-- Guide first-time setup with a walkthrough and persistent Explorer setup view.
-  Enable proposed APIs with confirmation using the running VS Code or VSCodium
-  runtime configuration, preserving existing settings and comments.
 
 ### Commits
 

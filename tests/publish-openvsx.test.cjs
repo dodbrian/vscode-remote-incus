@@ -3,8 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const { test, before, after } = require('node:test');
 const { createHash } = require('node:crypto');
+const { execFileSync } = require('node:child_process');
 const { pipeline } = require('node:stream/promises');
 const { ZipFile } = require('yazl');
 const { fixture } = require('./support/package-fixture.cjs');
@@ -13,6 +14,36 @@ const {
   publishReleased,
   registryMatches,
 } = require('../scripts/publish-openvsx.cjs');
+
+// In-process automation tests must not append fixture messages to the CI job.
+const inheritedSummary = process.env.GITHUB_STEP_SUMMARY;
+let summaryDirectory;
+before(() => {
+  summaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'incus-test-summary-'));
+  process.env.GITHUB_STEP_SUMMARY = path.join(summaryDirectory, 'summary.md');
+});
+after(() => {
+  if (inheritedSummary === undefined) delete process.env.GITHUB_STEP_SUMMARY;
+  else process.env.GITHUB_STEP_SUMMARY = inheritedSummary;
+  fs.rmSync(summaryDirectory, { recursive: true, force: true });
+});
+
+test('automation tests leave the inherited Actions summary untouched', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'incus-parent-summary-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const summary = path.join(directory, 'summary.md');
+  const original = '## Real release summary\n';
+  fs.writeFileSync(summary, original);
+  const env = { ...process.env, GITHUB_STEP_SUMMARY: summary };
+  delete env.NODE_TEST_CONTEXT;
+  const output = execFileSync(
+    process.execPath,
+    ['--test', '--test-name-pattern=^accepted upload dispatches', __filename],
+    { encoding: 'utf8', env },
+  );
+  assert.match(output, /v0\.1\.0: Upload accepted/);
+  assert.equal(fs.readFileSync(summary, 'utf8'), original);
+});
 
 async function archive(t, publisher = 'dodbrian') {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'incus-publish-'));
@@ -412,7 +443,6 @@ test('delay environment cannot permit admin bypass or additional protection gate
 });
 
 test('CLI resumes a real verified archive through gh JSON boundaries without any upload or network', async (t) => {
-  const { execFileSync } = require('node:child_process');
   const directory = await archive(t);
   const bin = path.join(directory, 'bin');
   fs.mkdirSync(bin);
@@ -483,4 +513,7 @@ else throw new Error('Unexpected gh call: ' + args.join(' '));
   assert.equal(JSON.parse(fs.readFileSync(state)).length, 1);
   execFileSync(process.execPath, [script, 'verify', 'v0.1.0', '1'], { env });
   assert.equal(fs.readFileSync(log, 'utf8').split('/dispatches').length - 1, 1);
+  const summary = fs.readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8');
+  assert.match(summary, /v0\.1\.0: Automatic verification 2\/48 queued/);
+  assert.match(summary, /v0\.1\.0: Stale or out-of-order attempt 1; expected 2/);
 });
