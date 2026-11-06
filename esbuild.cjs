@@ -1,7 +1,7 @@
 // Build script (standard vscode extension esbuild pattern, adapted).
-//   node esbuild.js              development bundle + sourcemaps
-//   node esbuild.js --production minified, no sourcemaps (packaging)
-//   node esbuild.js --watch      incremental watch mode
+//   node esbuild.cjs              development bundle + sourcemaps
+//   node esbuild.cjs --production minified, no sourcemaps (packaging)
+//   node esbuild.cjs --watch      incremental watch mode
 const esbuild = require('esbuild');
 const fs = require('node:fs');
 

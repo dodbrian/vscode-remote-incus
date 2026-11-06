@@ -85,7 +85,7 @@ Module exports are enumerated at build time; calls route to fixture expectations
 rather than real implementations. Unexpected calls throw immediately and are
 recorded, so source catching the error cannot turn a fixture green. Unconsumed
 expectations also fail. Fetch never delegates to the host implementation.
-Production `esbuild.js` is unchanged and keeps `vscode` external. Test sources
+Production `esbuild.cjs` is unchanged and keeps `vscode` external. Test sources
 are excluded from VSIX packaging.
 
 ## Adding offline tests

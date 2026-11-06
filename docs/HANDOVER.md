@@ -1831,7 +1831,7 @@ docs/
   spike/                   Phase-0 verification guide
 .github/workflows/         offline-ci.yml (push gate) + release.yml (manual release)
 package.json               extension manifest (proposals, views, commands, settings)
-tsconfig.json / esbuild.js build config (bundle → dist/extension.js)
+tsconfig.json / esbuild.cjs build config (bundle → dist/extension.js)
 eslint.config.mjs          mandatory lint rules (strict typed linting; scoped carve-outs)
 src/
   extension.ts             activate: resolver + tree + commands wiring

@@ -5,11 +5,12 @@
 //
 // @ts-check
 import eslint from '@eslint/js';
+import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import prettierConfig from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: [
       'dist/**',
@@ -74,7 +75,7 @@ export default tseslint.config(
   // membership, so type-checked rules are disabled and Node globals/CJS are
   // enabled instead.
   {
-    files: ['esbuild.js', 'assets/*.js', 'scripts/*.js', '**/*.cjs'],
+    files: ['assets/*.js', 'scripts/*.js', '**/*.cjs'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       sourceType: 'commonjs',
