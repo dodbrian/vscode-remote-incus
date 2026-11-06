@@ -15,20 +15,11 @@ export function enableProposedApi(text: string, extensionId: string): string {
     throw new Error('enable-proposed-api must be an array of extension IDs.');
   }
   const ids = value?.children?.map((node) => node.value as string) ?? [];
-  // An empty list enables proposals for ALL extensions. Narrow it to this extension.
   if (ids.some((id) => id.toLowerCase() === extensionId.toLowerCase())) return text;
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
-  if (value && ids.length) {
-    return applyEdits(
-      text,
-      modify(text, ['enable-proposed-api', -1], extensionId, {
-        formattingOptions: { insertSpaces: true, tabSize: 2, eol },
-      }),
-    );
-  }
   return applyEdits(
     text,
-    modify(text, ['enable-proposed-api'], [...ids, extensionId], {
+    modify(text, ['enable-proposed-api', -1], extensionId, {
       formattingOptions: { insertSpaces: true, tabSize: 2, eol },
     }),
   );

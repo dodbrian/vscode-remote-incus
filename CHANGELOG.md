@@ -6,6 +6,10 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ### Fixed
 
+- Preserve comments inside empty runtime argument arrays. Keep extension commands
+  available if the setup walkthrough cannot open, and retry automatic opening
+  on a later startup.
+
 - Tailor setup walkthroughs to the running editor and resume at the next setup
   step after saving configuration and restarting.
 
