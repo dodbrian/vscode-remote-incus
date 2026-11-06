@@ -4,6 +4,8 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-06
+
 ### Fixed
 
 - Persist completed setup checkboxes after restart even when the native
@@ -21,6 +23,13 @@ Release versions follow the [release policy](docs/RELEASING.md).
 - Guide first-time setup with a walkthrough and persistent Explorer setup view.
   Enable proposed APIs with confirmation using the running VS Code or VSCodium
   runtime configuration, preserving existing settings and comments.
+
+### Commits
+
+- fix(onboarding): persist restart step completion (851c819)
+- fix(onboarding): keep setup failures recoverable (8bfd528)
+- fix(onboarding): resume setup in the running editor (db7e59b)
+- feat(onboarding): guide editor API setup (0bfc356)
 
 ## [0.2.3] - 2026-11-04
 
