@@ -361,3 +361,37 @@ test('unrelated resolver errors are not misreported as missing API permission', 
     });
     await assert.rejects(activate(context(f)), (error) => error === failure);
   }));
+
+for (const product of ['Visual Studio Code', 'VSCodium']) {
+  test(`${product}: readiness completes both native checkboxes even when context events are missed`, (t) =>
+    withFixture(t, async (f) => {
+      const ctx = context(f);
+      f.state.set('appName', product);
+      await ctx.globalState.update('setup.resumeAfterRestart', true);
+      const completed = new Set<string>();
+      const category = `offline#${product === 'VSCodium' ? 'setup-vscodium' : 'setup'}`;
+      f.routes.set('vscode.execute', (command, argument) => {
+        // Reproduce startup: setting context succeeds but does not complete
+        // steps whose native completion listeners were not registered yet.
+        if (command === 'welcome.markStepComplete') completed.add(argument);
+        if (command === 'workbench.action.openWalkthrough') {
+          assert.ok(completed.has(`${category}#enable`));
+          assert.ok(completed.has(`${category}#restart`));
+          assert.equal(argument.step, 'connect');
+        }
+      });
+      await registerOnboarding(ctx, true);
+      assert.deepEqual([...completed], [`${category}#enable`, `${category}#restart`]);
+    }));
+}
+
+test('native checkbox failure leaves extension commands available', (t) =>
+  withFixture(t, async (f) => {
+    f.routes.set('vscode.execute', (command) => {
+      if (command === 'welcome.markStepComplete')
+        return Promise.reject(new Error('Native progress unavailable'));
+      return Promise.resolve();
+    });
+    await registerOnboarding(context(f), true);
+    assert.ok(f.state.get('commands').has('remote-incus.openSetup'));
+  }));

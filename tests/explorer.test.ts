@@ -88,7 +88,7 @@ test('X1 X4: activation registers contributed view/resolver and records Incus wo
       else process.env.REMOTE_INCUS_DEBUG_LOG = debug;
     });
     f.routes.set('vscode.execute', (command) => {
-      assert.equal(command, 'setContext');
+      assert.ok(['setContext', 'welcome.markStepComplete'].includes(command));
     });
     await activate(ctx);
     assert.deepEqual(new FolderHistory(ctx).folders(authority), ['/workspace']);
