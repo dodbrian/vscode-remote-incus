@@ -87,6 +87,8 @@ test('X1 X4: activation registers contributed view/resolver and records Incus wo
       if (debug === undefined) delete process.env.REMOTE_INCUS_DEBUG_LOG;
       else process.env.REMOTE_INCUS_DEBUG_LOG = debug;
     });
+    f.expect('vscode.execute', () => undefined);
+    f.expect('vscode.execute', () => undefined);
     activate(ctx);
     assert.deepEqual(new FolderHistory(ctx).folders(authority), ['/workspace']);
     const manifest = JSON.parse(readFileSync('package.json', 'utf8'));

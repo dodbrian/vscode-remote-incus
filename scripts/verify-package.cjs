@@ -20,6 +20,10 @@ const required = [
   'assets/relay.js',
   'licenses/vscode-icons-CC-BY-4.0.txt',
   'docs/ThirdPartyNotices.md',
+  'licenses/jsonc-parser-MIT.txt',
+  'docs/walkthrough/enable.md',
+  'docs/walkthrough/restart.md',
+  'docs/walkthrough/connect.md',
   ...['light', 'dark'].flatMap((theme) =>
     ['folder.svg', 'folder-active.svg', 'vm-active.svg'].map((name) => `assets/${theme}/${name}`),
   ),

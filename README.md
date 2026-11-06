@@ -42,26 +42,28 @@ need `libstdc++` and `libgcc`. The rescue terminal requires util-linux `script`.
 
 1. Download the extension's VSIX from
    [Open VSX](https://open-vsx.org/extension/dodbrian/remote-incus).
-2. Run **Preferences: Configure Runtime Arguments** from the Command Palette.
-   Add the following entry to `argv.json`, preserving any existing settings:
+2. Open the Extensions view, select **… → Install from VSIX…**, and choose the
+   downloaded file. Alternatively, use `code --install-extension /path/to/extension.vsix`
+   for VS Code or `codium --install-extension /path/to/extension.vsix` for VSCodium.
+3. Follow **Get Started with Remote-Incus**. Choose **Enable Support…** and confirm
+   the change to your editor's `argv.json`. Existing settings and comments are
+   preserved. The running editor selects the file, including portable installs.
+4. Quit all editor windows and restart the application. **Reload Window** does
+   not apply runtime arguments.
 
-   ```json
-   {
-     "enable-proposed-api": ["dodbrian.remote-incus"]
-   }
-   ```
+If you close the walkthrough, open **Incus Setup** in the Explorer sidebar or run
+**Remote - Incus: Open Setup**. The setup view remains until editor support is
+available. VS Code and VSCodium need setup separately if you use both.
 
-3. Open the Extensions view, select **… → Install from VSIX…**, and choose the
-   downloaded file. Alternatively, install it from the command line:
+For manual configuration, run **Preferences: Configure Runtime Arguments** and
+add `"dodbrian.remote-incus"` to the `"enable-proposed-api"` array, preserving
+existing entries, then restart the editor:
 
-   ```sh
-   code --install-extension /path/to/downloaded-extension.vsix
-   ```
-
-   Replace the path with your downloaded VSIX file. For VSCodium, use `codium`
-   instead of `code`.
-
-4. Restart the editor.
+```json
+{
+  "enable-proposed-api": ["dodbrian.remote-incus"]
+}
+```
 
 To build the VSIX locally, see [Development](https://github.com/dodbrian/vscode-remote-incus/blob/main/README.md#development).
 

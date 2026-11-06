@@ -18,6 +18,8 @@ async function main() {
       entryPoints,
       bundle: true,
       platform: 'node',
+      // JSONC parser ships UMD and ESM; bundle ESM to resolve its internal imports.
+      mainFields: ['module', 'main'],
       target: 'node22',
       format: 'cjs',
       outdir: output,
