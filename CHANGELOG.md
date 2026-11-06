@@ -4,6 +4,11 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- Tailor setup walkthroughs to the running editor and resume at the next setup
+  step after saving configuration and restarting.
+
 ### Added
 
 - Guide first-time setup with a walkthrough and persistent Explorer setup view.
