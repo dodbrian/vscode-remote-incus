@@ -20,7 +20,43 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: release summary and changelog ordering (2026-11-06)
+## Current stopping point: confirm the release version before building (2026-11-06)
+
+After merging PR #10, the user requested a version confirmation pause within the
+existing Release workflow, rather than a standalone preview workflow. Work is on
+`feat/confirm-release-version`, based on merged `origin/main`.
+
+Release now runs preview → confirmation → build/test → GitHub release → Open VSX
+approval. The lightweight preview uses existing release preparation without
+dependency installation or packaging, saves its plan and metadata as an artifact,
+and shows the proposed version, source SHA and notes in the run summary. The next
+job is named `Confirm release vX.Y.Z` and waits on `release-confirmation`.
+The approval dialog's checkbox uses the fixed environment name; GitHub controls
+that dialog. Approving authorizes the build and subsequent GitHub release.
+
+The build restores the approved metadata, validating workflow run ID and source
+SHA, rather than recalculating the version after approval. Collection refreshes
+the metadata after formatting for the existing release-job handoff. Dry runs
+skip confirmation and continue to the build, but cannot release or publish.
+Real runs require main. The separate Open VSX approval remains in place.
+
+The `release-confirmation` environment has been configured and read back live:
+required reviewer is the repository owner, self-review is allowed, admin bypass
+is disabled, and its only deployment branch policy is branch `main`. The preview
+checks the reviewer configuration and fails if absent or weakened. No release
+run was started or approved as part of this implementation.
+
+Local validation: all 70 release/publishing tests pass, including a new regression
+for restoring approved metadata before any build without consuming a version,
+and rejecting metadata from another run. `npm run check` and whitespace checks
+pass. actionlint 1.7.12 passes with only its known unsupported `queue: max` key
+excluded. The actual confirmation UI and job scheduling remain unverified until
+the workflow is merged and exercised. See `RELEASING.md` for the updated user flow.
+
+Use a PR for this branch. Merging, confirming a release and publishing require
+the user's own decisions; implementation does not authorize those actions.
+
+## Previous stopping point: release summary and changelog ordering (2026-11-06)
 
 PR #9 was merged on 2026-11-06. The current work starts from the v0.3.0 release
 commit `ce23a61` on branch `fix/isolate-release-test-summary`.
