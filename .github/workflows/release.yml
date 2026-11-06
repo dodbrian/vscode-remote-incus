@@ -119,7 +119,9 @@ jobs:
           ARTIFACT: ${{ needs.plan.outputs.artifact }}
         run: gh run download "$GITHUB_RUN_ID" --name "$ARTIFACT" --dir "$RUNNER_TEMP/release"
       - name: Restore approved metadata without recalculating the version
-        run: node scripts/release.cjs restore "$RUNNER_TEMP/release"
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: node scripts/release.cjs restore "$RUNNER_TEMP/release" "$TAG"
       - name: Install locked dependencies
         run: npm ci --include=dev --no-audit --no-fund
       - name: Format generated metadata
@@ -179,8 +181,10 @@ jobs:
           ARTIFACT: ${{ needs.build.outputs.artifact }}
         run: gh run download "$GITHUB_RUN_ID" --name "$ARTIFACT" --dir "$RUNNER_TEMP/release"
       - name: Restore tested metadata and install validation tools
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
         run: |
-          node scripts/release.cjs restore "$RUNNER_TEMP/release"
+          node scripts/release.cjs restore "$RUNNER_TEMP/release" "$TAG"
           npm ci --include=dev --no-audit --no-fund
       - name: Revalidate the exact candidate
         env:

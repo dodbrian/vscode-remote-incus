@@ -76,6 +76,10 @@ release and publishing stages receive their tag and artifacts automatically
 through job outputs. No registry secret is passed to the build or GitHub release
 steps.
 
+Before restoring metadata, each handoff checks the source commit, workflow run,
+expected release tag, and consistency of all version metadata. Invalid candidates
+fail before changing the checkout.
+
 The `release-confirmation` environment requires the repository owner's review,
 self-review allowed, admin bypass disabled, and only the `main` branch allowed.
 The preview checks for the required reviewer gate before proposing a real release;

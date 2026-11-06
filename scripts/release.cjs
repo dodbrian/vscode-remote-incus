@@ -152,16 +152,19 @@ function collect(root, directory) {
   saveMetadata(root, directory);
 }
 
-function restore(root, directory) {
+function restore(root, directory, expectedTag) {
   const plan = JSON.parse(fs.readFileSync(path.join(directory, 'plan.json'), 'utf8'));
   if (plan.runId !== process.env.GITHUB_RUN_ID || plan.source !== process.env.GITHUB_SHA)
     throw new Error('Artifact does not belong to this workflow run.');
   if (run('git', ['rev-parse', 'HEAD'], root) !== plan.source)
     throw new Error('Checkout does not match the candidate source.');
-  for (const name of ['package.json', 'package-lock.json', 'CHANGELOG.md'])
-    fs.copyFileSync(path.join(directory, 'metadata', name), path.join(root, name));
-  if (verifyRelease(root, `refs/tags/${plan.tag}`) !== plan.version)
+  if (expectedTag !== undefined && plan.tag !== expectedTag)
+    throw new Error('Artifact does not match the approved release tag.');
+  const metadata = path.join(directory, 'metadata');
+  if (verifyRelease(metadata, `refs/tags/${plan.tag}`) !== plan.version)
     throw new Error('Artifact metadata does not match its release plan.');
+  for (const name of ['package.json', 'package-lock.json', 'CHANGELOG.md'])
+    fs.copyFileSync(path.join(metadata, name), path.join(root, name));
 }
 
 function publish(root, directory) {
@@ -266,9 +269,11 @@ function publish(root, directory) {
 if (require.main === module) {
   try {
     const root = path.join(__dirname, '..');
-    const [command, directory] = process.argv.slice(2);
+    const [command, directory, expectedTag] = process.argv.slice(2);
     if (!directory)
-      throw new Error('Usage: node scripts/release.cjs prepare|collect|publish OUTPUT_DIRECTORY');
+      throw new Error(
+        'Usage: node scripts/release.cjs prepare|collect|restore|publish OUTPUT_DIRECTORY [RESTORE_TAG]',
+      );
     if (command === 'prepare') {
       const plan = prepare(root, {
         directory,
@@ -281,7 +286,7 @@ if (require.main === module) {
       if (process.env.GITHUB_OUTPUT)
         fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=${plan.tag}\n`);
     } else if (command === 'collect') collect(root, directory);
-    else if (command === 'restore') restore(root, directory);
+    else if (command === 'restore') restore(root, directory, expectedTag);
     else if (command === 'publish') publish(root, directory);
     else throw new Error('Unknown release command.');
   } catch (error) {
