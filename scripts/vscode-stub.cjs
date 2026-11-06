@@ -1,5 +1,5 @@
 // Minimal vscode stub so pure modules (authority, incusCli, bootstrap helpers)
-// can be smoke-tested under plain node.
+// can be smoke-tested under plain Node.js.
 exports.workspace = {
   getConfiguration: () => ({
     get: (key, d) =>
