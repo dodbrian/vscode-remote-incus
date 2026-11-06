@@ -12,7 +12,7 @@ import { registerCommands } from './commands';
 import { initLogging, log } from './logging';
 import { registerOnboarding } from './onboarding';
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   initLogging(context);
   log(
     `activate: VS Code ${vscode.version}, extension ${context.extension.id} ${(context.extension.packageJSON as { version?: string } | undefined)?.version ?? 'unknown'}`,
@@ -37,11 +37,11 @@ export function activate(context: vscode.ExtensionContext): void {
       !/CANNOT use API proposal|proposed API|proposed api/i.test(error.message)
     )
       throw error;
-    registerOnboarding(context, false);
+    await registerOnboarding(context, false);
     log('Editor support unavailable; setup commands and Explorer view registered');
     return;
   }
-  registerOnboarding(context, true);
+  await registerOnboarding(context, true);
   // Record the current window's folder on every ext-host start of a window
   // already sitting on an incus authority — covers reloads, ext-host
   // restarts and opens that bypass our commands. At a FIRST connect the

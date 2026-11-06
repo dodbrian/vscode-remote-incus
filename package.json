@@ -153,7 +153,7 @@
       },
       {
         "command": "remote-incus.enableSupport",
-        "title": "Enable Editor Support\u2026",
+        "title": "Enable Editor Support…",
         "category": "Remote - Incus"
       }
     ],
@@ -325,13 +325,13 @@
     "walkthroughs": [
       {
         "id": "setup",
-        "title": "Get Started with Remote-Incus",
-        "description": "Connect VS Code or VSCodium to your Incus containers.",
+        "title": "Get Started with Remote-Incus in VS Code",
+        "description": "Connect VS Code to your Incus containers.",
         "steps": [
           {
             "id": "enable",
-            "title": "Enable editor support",
-            "description": "Remote-Incus needs proposed APIs for remote connections and Remote Explorer. Enable them for this extension only. You will be asked before the runtime configuration is saved.\n[Enable Support\u2026](command:remote-incus.enableSupport)",
+            "title": "Enable VS Code support",
+            "description": "Remote-Incus needs permission to use proposed APIs in VS Code for remote connections and Remote Explorer. Enable them for this extension only. You will be asked before the runtime configuration is saved.\n[Enable Support…](command:remote-incus.enableSupport)",
             "media": {
               "markdown": "docs/walkthrough/enable.md"
             },
@@ -342,8 +342,8 @@
           },
           {
             "id": "restart",
-            "title": "Restart your editor",
-            "description": "After enabling support, quit all editor windows and start the editor again. Reload Window does not apply runtime arguments. This step completes when the remote APIs are available.",
+            "title": "Restart VS Code",
+            "description": "After enabling support, quit all VS Code windows and start VS Code again. Reload Window does not apply runtime arguments. This step completes when the remote APIs are available.",
             "media": {
               "markdown": "docs/walkthrough/restart.md"
             },
@@ -354,7 +354,7 @@
           {
             "id": "connect",
             "title": "Connect to an Incus container",
-            "description": "Configure the Incus CLI on your computer, then open the Incus view in Remote Explorer.\n[Show Incus](command:remote-incus.showInstances)",
+            "description": "Configure the Incus CLI on your computer, then open the Incus view in VS Code Remote Explorer.\n[Show Incus](command:remote-incus.showInstances)",
             "media": {
               "markdown": "docs/walkthrough/connect.md"
             },
@@ -362,7 +362,50 @@
               "onView:remote-incus.instances"
             ]
           }
-        ]
+        ],
+        "when": "remote-incus.editor == vscode"
+      },
+      {
+        "id": "setup-vscodium",
+        "title": "Get Started with Remote-Incus in VSCodium",
+        "description": "Connect VSCodium to your Incus containers.",
+        "steps": [
+          {
+            "id": "enable",
+            "title": "Enable VSCodium support",
+            "description": "Remote-Incus needs permission to use proposed APIs in VSCodium for remote connections and Remote Explorer. Enable them for this extension only. You will be asked before the runtime configuration is saved.\n[Enable Support…](command:remote-incus.enableSupport)",
+            "media": {
+              "markdown": "docs/walkthrough/enable.md"
+            },
+            "completionEvents": [
+              "onContext:remote-incus.supportConfigured",
+              "onContext:remote-incus.supportReady"
+            ]
+          },
+          {
+            "id": "restart",
+            "title": "Restart VSCodium",
+            "description": "After enabling support, quit all VSCodium windows and start VSCodium again. Reload Window does not apply runtime arguments. This step completes when the remote APIs are available.",
+            "media": {
+              "markdown": "docs/walkthrough/restart.md"
+            },
+            "completionEvents": [
+              "onContext:remote-incus.supportReady"
+            ]
+          },
+          {
+            "id": "connect",
+            "title": "Connect to an Incus container",
+            "description": "Configure the Incus CLI on your computer, then open the Incus view in VSCodium Remote Explorer.\n[Show Incus](command:remote-incus.showInstances)",
+            "media": {
+              "markdown": "docs/walkthrough/connect.md"
+            },
+            "completionEvents": [
+              "onView:remote-incus.instances"
+            ]
+          }
+        ],
+        "when": "remote-incus.editor == vscodium"
       }
     ]
   },

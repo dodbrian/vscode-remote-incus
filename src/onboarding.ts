@@ -1,16 +1,34 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { enableProposedApi } from './runtimeArguments';
+import { isVSCodium } from './serverProvider';
 
-export function registerOnboarding(context: vscode.ExtensionContext, ready: boolean): void {
-  void vscode.commands.executeCommand('setContext', 'remote-incus.setupRequired', !ready);
-  void vscode.commands.executeCommand('setContext', 'remote-incus.supportReady', ready);
+export async function registerOnboarding(
+  context: vscode.ExtensionContext,
+  ready: boolean,
+): Promise<void> {
+  const walkthrough = `${context.extension.id}#${isVSCodium() ? 'setup-vscodium' : 'setup'}`;
+  const resume = context.globalState.get<boolean>('setup.resumeAfterRestart', false);
+  let configured = ready || resume;
+  await Promise.all([
+    vscode.commands.executeCommand('setContext', 'remote-incus.setupRequired', !ready),
+    vscode.commands.executeCommand('setContext', 'remote-incus.supportReady', ready),
+    vscode.commands.executeCommand('setContext', 'remote-incus.supportConfigured', configured),
+    vscode.commands.executeCommand(
+      'setContext',
+      'remote-incus.editor',
+      isVSCodium() ? 'vscodium' : 'vscode',
+    ),
+  ]);
   const openSetup = (): Thenable<unknown> =>
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
-      `${context.extension.id}#setup`,
+      { category: walkthrough, step: ready ? 'connect' : configured ? 'restart' : 'enable' },
       false,
     );
+  const autoOpen = vscode.workspace
+    .getConfiguration('workbench.welcomePage.walkthroughs')
+    .get<boolean>('openOnInstall', true);
   let editing = false;
   context.subscriptions.push(
     vscode.commands.registerCommand('remote-incus.openSetup', openSetup),
@@ -65,7 +83,10 @@ export function registerOnboarding(context: vscode.ExtensionContext, ready: bool
             throw new Error('Could not save argv.json. Review the open file before trying again.');
           }
         }
+        configured = true;
+        await context.globalState.update('setup.resumeAfterRestart', true);
         await vscode.commands.executeCommand('setContext', 'remote-incus.supportConfigured', true);
+        await openSetup();
         await vscode.window.showInformationMessage(
           `Support is configured. Quit all ${vscode.env.appName} windows and start the editor again to enable Remote-Incus.`,
         );
@@ -88,17 +109,17 @@ export function registerOnboarding(context: vscode.ExtensionContext, ready: bool
     // Existing installs can also need setup. Respect the editor's walkthrough
     // preference and show automatically at most once; the setup view persists.
     if (!context.globalState.get<boolean>('setup.offered')) {
-      void context.globalState.update('setup.offered', true);
-      if (
-        vscode.workspace
-          .getConfiguration('workbench.welcomePage.walkthroughs')
-          .get<boolean>('openOnInstall', true)
-      ) {
-        void openSetup();
-      }
+      await context.globalState.update('setup.offered', true);
+      if (autoOpen) await openSetup();
     }
     context.subscriptions.push(
       vscode.commands.registerCommand('remote-incus.showInstances', openSetup),
     );
+  }
+  if (ready && resume) {
+    // A restored Welcome editor retains its previously selected step. Explicitly
+    // select Connect once after our saved configuration takes effect.
+    if (autoOpen && !vscode.env.remoteAuthority?.startsWith('incus+')) await openSetup();
+    await context.globalState.update('setup.resumeAfterRestart', false);
   }
 }

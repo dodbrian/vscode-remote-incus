@@ -22,6 +22,30 @@ with a Docker container".
 
 ## Current stopping point: editor setup walkthrough (2026-11-06)
 
+The user accepted the complete onboarding flow in both VS Code 1.145.2 and
+VSCodium AppImage 1.143.17232 on 2026-11-06. Each editor was tested with the same
+rebuilt VSIX in a fresh isolated portable profile, with no proposed APIs enabled
+and no other user extensions installed. The tests covered editor-specific text,
+dismissing and reopening setup, confirming configuration, closing and restarting
+the editor, and advancing to Connect with Incus available in Remote Explorer.
+Normal editor profiles were left untouched. The user explicitly confirmed both
+editors work properly after these tests.
+
+The final implementation contributes separate VS Code and VSCodium walkthroughs,
+selected through the running editor identity. Shared Markdown does not mention
+the other editor. Setup selects Enable initially, Restart after successful
+configuration, and Connect once after restart grants API access. The pending
+restart marker is stored only after successful configuration; automatic resume
+respects the install-walkthrough preference and does not reopen setup repeatedly.
+The usage-data footer is supplied by the editor's built-in Welcome page, not by
+Remote-Incus; the extension does not send usage telemetry or change the editor's
+privacy settings.
+
+The feature is tracked by [PR #9](https://github.com/dodbrian/vscode-remote-incus/pull/9)
+against `main`, using `feat/setup-walkthrough`. Every separate branch push must
+have a pull request. This task authorizes committing and pushing the accepted
+refinements; merging or releasing has not been requested.
+
 First-time setup is implemented on `feat/setup-walkthrough`. The extension now
 activates at startup even when proposed API access has not been granted. It
 attempts the actual resolver registration permission check, since proposed API
@@ -57,7 +81,7 @@ README installation instructions and the Unreleased changelog describe setup.
 Validation completed for this implementation:
 
 - `npm test`: type, lint, format and release checks, release/publishing tests,
-  and all 247 offline regressions passed. New coverage includes both editor
+  and all 252 offline regressions passed. New coverage includes both editor
   identities, denied permission with exports present, JSONC preservation,
   cancellation, dirty/changed files, save failures and walkthrough visibility.
 - `npm run test:package` passed all three package test files.
@@ -65,21 +89,21 @@ Validation completed for this implementation:
   documentation links; archive policy reported no findings.
 - The production bundle loaded successfully with the editor module stubbed.
 - `npm run audit:privacy` reported zero findings across 127 files/objects,
-  including the final staged feature and handover changes.
+  including the accepted refinements and updated handover.
 - `git diff --check` passed. Some child-process fixtures required execution
   outside the sandbox after `EPERM`; the successful full run used that access.
 
 Source version remains `0.2.3`. The local `remote-incus.vsix` is validation
-output. No live installation, editor configuration update, release or registry
-publication was performed. Manual acceptance remains outstanding in BOTH
-standard VS Code and VSCodium: install without proposed APIs, dismiss and reopen
-setup, cancel/confirm the file update, quit all windows, restart, and verify the
-setup view disappears and Incus appears in Remote Explorer. Portable and
-Insiders installations use the editor-selected file but have not been manually
-validated. Hosted CI results for this feature push are not yet verified.
+output and was installed only into the isolated acceptance profiles. The setup
+button updated only those profiles' runtime arguments. No release or registry
+publication was performed. Insiders, Windows, macOS and non-isolated installation
+variants were not manually validated by this onboarding acceptance. It does not
+expand the existing remote-connection/server compatibility matrix.
 
-Resume with manual acceptance and hosted CI review. Earlier checkpoints below
-retain historical evidence and were not refreshed for this feature.
+Resume with hosted CI review for the pushed refinements in PR #9. Hosted results
+for that commit remain unverified until checked. Manual onboarding acceptance is
+complete for the two editor builds above. Earlier checkpoints retain historical
+evidence and were not refreshed for this feature.
 
 ## Previous checkpoint: VSCodium server compatibility (2026-11-04)
 

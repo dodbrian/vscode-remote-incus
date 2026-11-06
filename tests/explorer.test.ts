@@ -64,7 +64,7 @@ test('X4: history full authority isolation, cap, reorder, idempotence and remove
   }));
 
 test('X1 X4: activation registers contributed view/resolver and records Incus workspace only', (t) =>
-  withFixture(t, (f) => {
+  withFixture(t, async (f) => {
     const ctx = context(f);
     f.state.set('authority', authority);
     f.state.set('folders', [
@@ -89,7 +89,9 @@ test('X1 X4: activation registers contributed view/resolver and records Incus wo
     });
     f.expect('vscode.execute', () => undefined);
     f.expect('vscode.execute', () => undefined);
-    activate(ctx);
+    f.expect('vscode.execute', () => undefined);
+    f.expect('vscode.execute', () => undefined);
+    await activate(ctx);
     assert.deepEqual(new FolderHistory(ctx).folders(authority), ['/workspace']);
     const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
     assert.ok(manifest.extensionKind.includes('ui'));
