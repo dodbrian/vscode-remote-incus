@@ -5,12 +5,16 @@ repository root. See the [testing guide](tests/README.md) for the complete
 portable checks, packaging validation and manual integration procedures, and
 the [release guide](RELEASING.md) for publication.
 
-## Issue workflow
+## Change workflow
 
-Create a dedicated branch for each issue, commit the reviewed changes there,
-and open a pull request against `main`. Never push issue changes directly to
-`main`. Include the issue reference, validation results and any remaining
-verification limits in the PR description.
+The `main` branch is protected and does not accept direct pushes. Create a
+dedicated branch for every change, commit the reviewed work there, push that
+branch and open a pull request against `main`. The required `verify` status
+check must pass before the pull request can be merged.
+
+Include any issue reference, validation results and remaining verification
+limits in the pull request description. Do not bypass the branch protection or
+push changes directly to `main`.
 
 ## Quality gates
 

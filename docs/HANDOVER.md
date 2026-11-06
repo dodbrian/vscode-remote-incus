@@ -20,46 +20,32 @@ with a Docker container".
 3. [Alternatives](ALTERNATIVES.md) — related projects, sources, search limits, and
    Marketplace/VSIX/Open VSX distribution findings (2026-10-23).
 
-## Current stopping point: confirm the release version before building (2026-11-06)
+## Current stopping point: protected-main development workflow (2026-11-07)
 
-After merging PR #10, the user requested a version confirmation pause within the
-existing Release workflow, rather than a standalone preview workflow. Work is on
-`feat/confirm-release-version`, based on merged `origin/main`.
+Work is on `feat/setup-view-tooling` in
+[PR #12](https://github.com/dodbrian/vscode-remote-incus/pull/12) against `main`.
+The branch contains five reviewed commits that make the build and smoke-test
+module boundaries explicit, replace the deprecated ESLint configuration helper,
+align editor and command-line ambient types, expose editor diagnostics to Codex,
+and improve setup-view integration.
 
-Release now runs preview → confirmation → build/test → GitHub release → Open VSX
-approval. The lightweight preview uses existing release preparation without
-dependency installation or packaging, saves its plan and metadata as an artifact,
-and shows the proposed version, source SHA and notes in the run summary. The next
-job is named `Confirm release vX.Y.Z` and waits on `release-confirmation`.
-The approval dialog's checkbox uses the fixed environment name; GitHub controls
-that dialog. Approving authorizes the build and subsequent GitHub release.
+The full local suite passed outside the sandbox: all 75 release/publishing tests
+and 269 build/offline tests passed, including type checking, lint and formatting.
+The first sandboxed run failed only where child-process fixtures received
+`EPERM`; the unrestricted rerun confirmed that this was an execution restriction,
+not a code failure. `git diff --check` also passed.
 
-The build restores the approved metadata, validating workflow run ID, source
-SHA, the expected approved tag and metadata consistency before copying anything
-into the checkout, rather than recalculating the version after approval. Collection refreshes
-the metadata after formatting for the existing release-job handoff. Dry runs
-skip confirmation and continue to the build, but cannot release or publish.
-Real runs require main. The separate Open VSX approval remains in place.
+The repository now protects `main`. A direct push was rejected with GH013 because
+changes must arrive through a pull request and the required `verify` status check
+must pass. `docs/CONTRIBUTING.md` now applies this workflow to every change, not
+only issue work: create a dedicated branch, push it, open a PR against `main`, and
+wait for `verify`. Do not push directly to `main` or bypass its protection.
 
-The `release-confirmation` environment has been configured and read back live:
-required reviewer is the repository owner, self-review is allowed, admin bypass
-is disabled, and its only deployment branch policy is branch `main`. The preview
-checks the reviewer configuration and fails if absent or weakened. No real release
-was started or approved as part of this implementation.
-
-Local validation: all 75 release/publishing tests pass. Review added checks that
-wrong tags, sources, checkouts, plan versions and inconsistent metadata leave the
-checkout unchanged, and that rebuilding notes from restored metadata preserves
-the preview text. `npm run check` and whitespace checks
-pass. actionlint 1.7.12 passes with only its known unsupported `queue: max` key
-excluded. Hosted dry run [42293139753](https://github.com/dodbrian/vscode-remote-incus/actions/runs/42293139753)
-passed on the initial PR implementation: preview and build succeeded with v0.3.1;
-confirmation, GitHub release and Open VSX publication were skipped. The actual
-confirmation UI and rejection path remain unverified until a real main-branch
-run is exercised. See `RELEASING.md` for the updated user flow.
-
-Use a PR for this branch. Merging, confirming a release and publishing require
-the user's own decisions; implementation does not authorize those actions.
+Before this documentation update, both hosted `verify` runs, both CodeQL analyses
+and the additional CodeQL check passed for PR #12 at `16994c0`. This handover and
+the contributor-guidance update will add a documentation commit and trigger fresh
+hosted checks. Verify those new checks on PR #12 before considering it ready.
+Merging remains a separate user decision and is not authorized by this handover.
 
 ## Previous stopping point: release summary and changelog ordering (2026-11-06)
 
