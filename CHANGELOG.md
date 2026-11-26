@@ -4,6 +4,11 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [Unreleased]
 
+### Added
+
+- Show the color Remote-Incus logo in extension listings and provide an Open Setup
+  action in the Incus view toolbar with light and dark icons.
+
 ## [0.3.0] - 2026-11-06
 
 ### Added

@@ -2,6 +2,7 @@
   "name": "remote-incus",
   "displayName": "Remote - Incus",
   "description": "Connect to Incus containers as a first-class remote connection type (exec-stdio transport, no sshd).",
+  "icon": "assets/branding/remote-incus.png",
   "publisher": "dodbrian",
   "version": "0.3.0",
   "private": true,
@@ -45,7 +46,7 @@
         {
           "id": "remote-incus.setup",
           "name": "Incus Setup",
-          "icon": "$(tools)",
+          "icon": "assets/light/incus.svg",
           "when": "remote-incus.setupRequired"
         }
       ]
@@ -149,7 +150,11 @@
       {
         "command": "remote-incus.openSetup",
         "title": "Open Setup",
-        "category": "Remote - Incus"
+        "category": "Remote - Incus",
+        "icon": {
+          "light": "assets/light/incus.svg",
+          "dark": "assets/dark/incus.svg"
+        }
       },
       {
         "command": "remote-incus.enableSupport",
@@ -189,6 +194,11 @@
           "command": "remote-incus.refresh",
           "when": "view == remote-incus.instances",
           "group": "navigation"
+        },
+        {
+          "command": "remote-incus.openSetup",
+          "when": "view == remote-incus.instances",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
