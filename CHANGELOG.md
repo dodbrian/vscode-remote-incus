@@ -4,10 +4,32 @@ Release versions follow the [release policy](docs/RELEASING.md).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-26
+
 ### Added
 
 - Show the color Remote-Incus logo in extension listings and provide an Open Setup
   action in the Incus view toolbar with light and dark icons.
+
+### Commits
+
+- chore(release): automate protected-main releases (5723598)
+- chore(release): require a metadata pull request (3751e56)
+- fix(readme): remove the underline between badges (ef830b6)
+- docs(readme): show the latest published release (0056b4f)
+- fix(readme): keep the logo background transparent (1969197)
+- docs(readme): give Remote-Incus a branded header (90f66a2)
+- feat(branding): show the Remote-Incus identity (2b406de)
+- chore(branding): establish Remote-Incus icon assets (daa9e3b)
+- docs(workflow): require pull requests for all changes (c5648d9)
+- test(tooling): make stub module format explicit (7c910db)
+- fix(types): align editor and build environments (62f5006)
+- chore(dev): expose editor diagnostics to Codex (3e19523)
+- feat(ui): improve setup view integration (939d949)
+- build(tooling): make module boundaries explicit (8d4e7c3)
+- chore(release): validate approved metadata before restore (ac12cec)
+- chore(release): confirm the version before building (274549f)
+- fix(release): keep candidate summaries accurate (e5b9e86)
 
 ## [0.3.0] - 2026-11-06
 
