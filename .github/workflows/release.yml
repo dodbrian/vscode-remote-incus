@@ -3,10 +3,15 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      bump:
+        description: 'Optional bump override; normally inferred from commits'
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
       version:
-        description: 'Version already committed through the release PR (for example 0.4.0)'
+        description: 'Optional exact version override (blank means automatic)'
         type: string
-        required: true
+        default: ''
       dry_run:
         description: 'Build and verify only; do not release or request publishing approval'
         type: boolean
@@ -46,11 +51,12 @@ jobs:
             echo 'Configure release-confirmation with required reviewers, self-review allowed and admin bypass disabled.' >&2
             exit 1
           fi
-      - name: Read merged release version and changelog
+      - name: Prepare candidate version and changelog
         id: prepare
         env:
+          RELEASE_BUMP: ${{ inputs.bump || 'auto' }}
           RELEASE_VERSION: ${{ inputs.version }}
-        run: node scripts/release.cjs plan "$RUNNER_TEMP/release"
+        run: node scripts/release.cjs prepare "$RUNNER_TEMP/release"
       - name: Retain the version and metadata for approval
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -118,6 +124,8 @@ jobs:
         run: node scripts/release.cjs restore "$RUNNER_TEMP/release" "$TAG"
       - name: Install locked dependencies
         run: npm ci --include=dev --no-audit --no-fund
+      - name: Format generated metadata
+        run: npx --no-install prettier --write package.json CHANGELOG.md
       - name: Run all verification and build the VSIX
         run: |
           npm test
@@ -143,17 +151,18 @@ jobs:
           cat "$RUNNER_TEMP/release/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
 
   release:
-    name: Create GitHub release
+    name: Merge release PR and create GitHub release
     needs: build
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.dry_run }}
     concurrency:
       group: github-release
       cancel-in-progress: false
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 25
     permissions:
       contents: write
       actions: read
+      pull-requests: read
     outputs:
       tag: ${{ needs.build.outputs.tag }}
     steps:
@@ -183,12 +192,26 @@ jobs:
           RELEASE_VERIFY_ONLY: 'true'
           TAG: ${{ needs.build.outputs.tag }}
         run: node scripts/publish-openvsx.cjs "$RUNNER_TEMP/release" "$TAG"
-      - name: Tag the merged commit and create the GitHub release
+      - name: Create a repository-scoped release App token
+        id: release-app
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Open the release PR and enable auto-merge
+        id: release-pr
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.release-app.outputs.token }}
         run: |
           gh auth setup-git --hostname github.com
-          node scripts/release.cjs publish "$RUNNER_TEMP/release"
+          node scripts/release.cjs open-pr "$RUNNER_TEMP/release"
+      - name: Wait for the merge and publish the verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR: ${{ steps.release-pr.outputs.number }}
+        run: node scripts/release.cjs publish "$RUNNER_TEMP/release" "$RELEASE_PR"
 
   publish:
     name: Approve Open VSX publication
