@@ -4,7 +4,7 @@
   "description": "Connect to Incus containers as a first-class remote connection type (exec-stdio transport, no sshd).",
   "icon": "assets/branding/remote-incus.png",
   "publisher": "dodbrian",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "license": "MIT",
   "repository": {
