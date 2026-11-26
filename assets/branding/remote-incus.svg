@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Remote - Incus · Container Chevron</title>
+  <path fill="#74818C" d="M32 4 58 19 32 34 6 19Z"/>
+  <path fill="#46525E" d="M6 19 32 34V51L6 36Z"/>
+  <path fill="#63717D" d="M32 34 58 19V36L32 51Z"/>
+  <path fill="#E95B29" d="M6 40 32 55V62L6 47Z"/>
+  <path fill="#FF824A" d="M32 55 58 40V47L32 62Z"/>
+  <path fill="#FFF8EE" transform="matrix(.9 -.519 .95 .548 15.8 21.4)"
+    d="M0 0H6L15 8 6 16H0L9 8Z M15 11H24V16H15Z"/>
+</svg>
