@@ -8,10 +8,11 @@ const path = require('node:path');
 const cp = require('node:child_process');
 const { createHash } = require('node:crypto');
 
-// Visually reviewed README screenshots. Any byte change requires another review.
+// Visually reviewed images. Any byte change requires another review.
 const reviewedImages = new Set([
   '5fcfd8c9597a4f896fd9122e1ba991696d345d7a63af5eade52bc13fa1cd051e', // connected workspace
   '0be0112266a9e992ab521345ffb78a2f89a4945cdfa00fb676f6bd20e8e166ff', // Remote Explorer
+  '9fd41127ab6c0218c16049476b87a848c0c2cc1dda492acca0d759781f404450', // Remote-Incus icon
 ]);
 
 function isReviewedImage(data) {
