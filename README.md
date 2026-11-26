@@ -1,6 +1,14 @@
-# Remote - Incus
+<p align="center">
+  <img src="https://raw.githubusercontent.com/dodbrian/vscode-remote-incus/daa9e3b176adb1994da490aad8eba1f22f6d3dd7/assets/branding/remote-incus.png" alt="Remote - Incus logo" width="96" height="96">
+</p>
 
-[![Build and test](https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml/badge.svg)](https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml)
+<h1 align="center">Remote - Incus</h1>
+
+<p align="center">
+  <a href="https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml">
+    <img src="https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml/badge.svg" alt="Build and test">
+  </a>
+</p>
 
 Connect VS Code to [Incus](https://github.com/lxc/incus) system containers through
 Remote Explorer, using your existing Incus client configuration. No SSH server
