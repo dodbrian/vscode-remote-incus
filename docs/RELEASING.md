@@ -4,24 +4,36 @@ Normal pushes run **Actions → Build and test**. That workflow verifies the sou
 builds a VSIX, and finishes. It does not calculate a new version, create a release,
 or wait for an approval.
 
-When ready to release, open **Actions → Release → Run workflow** and select
-`main`. The workflow calculates the version first and waits for confirmation
-before starting the build. It shows five connected stages in one Actions graph:
+Start a release branch from current `main` with its tags fetched. Generate the
+version and changelog, then format the generated files.
 
-1. **Preview release version and notes** calculates the next version and prepares
-   the changelog without installing dependencies or building a package. Its run
-   summary shows the proposed version, source commit and release notes.
+```sh
+node scripts/release.cjs prepare "$(mktemp -d)"
+npx --no-install prettier --write package.json CHANGELOG.md
+```
+
+Commit `package.json`, `package-lock.json` and `CHANGELOG.md` and open a pull
+request against `main`. Review the proposed version and notes in the PR. Merge
+it after the required checks pass. The release build uses the committed
+metadata, so keep the release PR focused on those three files.
+
+After the merge, open **Actions → Release → Run workflow**, select `main`, and
+enter the merged version (for example, `0.4.0`). The workflow shows five stages.
+
+1. **Preview release version and notes** reads the merged version and
+   changelog without installing dependencies or building a package. Its run
+   summary shows the committed version, source commit and release notes.
 2. **Confirm release vX.Y.Z** waits for your approval of `release-confirmation`.
    Review the preview, choose **Review deployments**, select
    **release-confirmation**, then **Approve and deploy**. This authorizes the
-   build and GitHub release. Reject to stop; to change the version, start a new
-   run with a different bump or exact version override.
+   build and GitHub release. Reject to stop. To change the version, update the
+   metadata through a pull request before running Release again.
 3. **Build and test vX.Y.Z** restores the saved preview metadata without choosing
    another version, runs all checks, and retains the verified VSIX, checksum,
    release notes and exact version metadata as one artifact.
 4. **Create GitHub release** runs automatically after the build succeeds. It
-   uses that run's candidate to commit the version and changelog, push an
-   annotated tag, and create the GitHub release.
+   pushes an annotated tag for the verified commit on `main` and creates the
+   GitHub release from that run's candidate.
 5. **Approve Open VSX publication** waits for your approval of the `open-vsx`
    environment. In the run, choose **Review deployments**, select **open-vsx**,
    then **Approve and deploy**. It downloads the VSIX from this chain's GitHub
@@ -35,7 +47,7 @@ is inside the VSIX and source archives; release notes also link to its tagged co
 
 ## Automatic versions and optional overrides
 
-CI reads conventional commit subjects and breaking-change footers since the
+The preparation script reads conventional commit subjects and breaking-change footers since the
 current version's tag:
 
 | Changes                                                 | Before 1.0 | From 1.0 onward |
@@ -51,23 +63,14 @@ Place `### Added` before `### Fixed` whenever both sections are present. Release
 preparation enforces this order in the new changelog entry and release notes.
 Breaking changes should include migration instructions in those notes.
 
-Normally, leave version selection automatic. For an intentional override, use
-**Run workflow** on `main` and choose an optional **bump**, or enter an exact
-**version**. An exact version takes precedence and must increase. For example,
-explicitly choose `1.0.0` once the core connection workflow is dependable and you
-commit to configuration and behavior compatibility. CI does not infer readiness
-for 1.0 from a breaking change during the pre-1.0 period.
+Set `RELEASE_BUMP` to `patch`, `minor` or `major` before running `prepare` for a
+bump override. Set `RELEASE_VERSION` to choose an exact version. An exact
+version takes precedence and must increase.
 
-GitHub's **Run workflow** dialog cannot calculate or preview the automatic
-version. Its inputs are defined in the workflow file; the version is calculated
-after the run starts. The preview summary and pending confirmation job name show
-the calculated version before the build. GitHub controls the approval dialog;
-its checkbox is named `release-confirmation`, not the version number.
-
-To exercise the release build without creating a release or requesting either
-approval, select **dry_run**. The preview runs and the build proceeds without
-confirmation, but consumes no version. You can also run
-a dry run on a development branch. Real releases require `main`.
+The preview summary and pending confirmation job name show the committed
+version before the build. Select **dry_run** to build the version already
+committed on the selected branch without approvals or publication. This works
+on the release PR branch before merging. Real releases require `main`.
 
 ## Identity, failures and retries
 
@@ -92,11 +95,10 @@ The `open-vsx` environment requires the repository owner's review and allows onl
 publication manual. Merely naming an environment in YAML does not establish an
 approval requirement.
 
-A candidate version is consumed only when the GitHub release step atomically
-pushes its version commit and tag. If `main` changes during release verification,
-releasing that stale candidate fails without pushing either. Start a new Release
-run from current `main`. Build artifacts are retained for 30 days; after expiry,
-build a new candidate.
+The release step tags the same commit that the build verified. If `main`
+advances during verification, the release step rejects the stale candidate.
+Start a new Release run from current `main` with the same merged version.
+Build artifacts are retained for 30 days.
 
 Use **Re-run failed jobs** to recover the same chain. A failed GitHub upload
 recognizes the tag created by its own run and completes the release without
@@ -155,6 +157,5 @@ uploaded before this tracking was introduced are not automatically enrolled. Bot
 must be on `main` before using the new release flow.
 
 GitHub provides source ZIP and tar archives automatically. The release also
-contains the versioned VSIX, `SHA256SUMS` and changelog-based notes. `main` rules
-must permit the action's generated version commit. Open VSX publication requires
+contains the versioned VSIX, `SHA256SUMS` and changelog-based notes. Open VSX publication requires
 the existing `OVSX_PAT` repository secret.

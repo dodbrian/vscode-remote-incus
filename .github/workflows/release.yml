@@ -3,15 +3,10 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      bump:
-        description: 'Optional bump override; normally inferred from commits'
-        type: choice
-        options: [auto, patch, minor, major]
-        default: auto
       version:
-        description: 'Optional exact version override (blank means automatic)'
+        description: 'Version already committed through the release PR (for example 0.4.0)'
         type: string
-        default: ''
+        required: true
       dry_run:
         description: 'Build and verify only; do not release or request publishing approval'
         type: boolean
@@ -51,12 +46,11 @@ jobs:
             echo 'Configure release-confirmation with required reviewers, self-review allowed and admin bypass disabled.' >&2
             exit 1
           fi
-      - name: Prepare candidate version and changelog
+      - name: Read merged release version and changelog
         id: prepare
         env:
-          RELEASE_BUMP: ${{ inputs.bump || 'auto' }}
           RELEASE_VERSION: ${{ inputs.version }}
-        run: node scripts/release.cjs prepare "$RUNNER_TEMP/release"
+        run: node scripts/release.cjs plan "$RUNNER_TEMP/release"
       - name: Retain the version and metadata for approval
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -124,8 +118,6 @@ jobs:
         run: node scripts/release.cjs restore "$RUNNER_TEMP/release" "$TAG"
       - name: Install locked dependencies
         run: npm ci --include=dev --no-audit --no-fund
-      - name: Format generated metadata
-        run: npx --no-install prettier --write package.json CHANGELOG.md
       - name: Run all verification and build the VSIX
         run: |
           npm test
@@ -191,7 +183,7 @@ jobs:
           RELEASE_VERIFY_ONLY: 'true'
           TAG: ${{ needs.build.outputs.tag }}
         run: node scripts/publish-openvsx.cjs "$RUNNER_TEMP/release" "$TAG"
-      - name: Commit, tag and create the GitHub release
+      - name: Tag the merged commit and create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

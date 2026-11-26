@@ -12,6 +12,7 @@ const {
   inferBump,
   chooseVersion,
   prepare,
+  planMergedRelease,
   collect,
   restore,
   publish,
@@ -81,6 +82,16 @@ function fixture(t, notes = '### Fixed\n\n- Friendly summary.') {
   return { directory, root, remote, options };
 }
 
+function mergeReleaseMetadata(f) {
+  const { version } = prepare(f.root, f.options);
+  git(f.root, 'add', 'package.json', 'package-lock.json', 'CHANGELOG.md');
+  git(f.root, 'commit', '-m', `chore(release): prepare v${version}`);
+  git(f.root, 'push', 'origin', 'main');
+  f.options.source = git(f.root, 'rev-parse', 'HEAD');
+  f.options.version = version;
+  planMergedRelease(f.root, f.options);
+}
+
 function environment(t, values) {
   for (const [key, value] of Object.entries(values)) {
     const old = process.env[key];
@@ -97,8 +108,7 @@ function fakeGitHub(t, f) {
   const state = path.join(f.directory, 'github');
   fs.mkdirSync(bin);
   fs.mkdirSync(state);
-  // Only GitHub's boundary is faked. Version commits, annotated tags, atomic
-  // pushes, fresh checkouts and recovery use actual isolated Git repositories.
+  // GitHub API calls are faked. Commits, tags and pushes use isolated Git repositories.
   fs.writeFileSync(
     path.join(bin, 'gh'),
     `#!/usr/bin/env node
@@ -285,44 +295,65 @@ test('first tagged release can include existing history when no baseline tag exi
 test('preparation rejects a tag owned by another release', (t) => {
   const f = fixture(t);
   git(f.root, 'tag', 'v0.1.1');
-  assert.throws(() => prepare(f.root, f.options), /belongs to another release/);
+  assert.throws(() => prepare(f.root, f.options), /already exists/);
 });
 
 test('a failed upload resumes its own version and verifies already published assets', (t) => {
   const f = fixture(t);
+  mergeReleaseMetadata(f);
   const state = fakeGitHub(t, f);
   fs.writeFileSync(path.join(state, 'fail-once'), '');
-  prepare(f.root, f.options);
   fs.writeFileSync(path.join(f.root, 'remote-incus.vsix'), 'verified fixture archive');
   collect(f.root, f.options.directory);
   assert.throws(() => publish(f.root, f.options.directory));
   const releaseCommit = git(f.root, 'rev-parse', 'v0.1.1^{commit}');
-  assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/heads/main').split(/\s/)[0], releaseCommit);
+  assert.equal(releaseCommit, f.options.source);
+  assert.equal(
+    git(f.root, 'ls-remote', 'origin', 'refs/heads/main').split(/\s/)[0],
+    f.options.source,
+  );
   git(f.root, 'checkout', '--detach', f.options.source);
   restore(f.root, f.options.directory);
   assert.equal(JSON.parse(fs.readFileSync(path.join(f.root, 'package.json'))).version, '0.1.1');
   publish(f.root, f.options.directory);
   assert.equal(JSON.parse(fs.readFileSync(path.join(state, 'release.json'))).isDraft, false);
   publish(f.root, f.options.directory);
-  assert.equal(git(f.root, 'rev-list', '--count', `${f.options.source}..origin/main`), '1');
+  assert.equal(git(f.root, 'rev-list', '--count', `${f.options.source}..origin/main`), '0');
   assert.equal(git(f.root, 'tag', '--list', 'v0.1.2'), '');
   fs.writeFileSync(path.join(state, 'remote-incus-0.1.1.vsix'), 'corrupted');
   assert.throws(() => publish(f.root, f.options.directory), /differs from the verified build/);
 });
 
+test('release planning requires the requested version in the checkout', (t) => {
+  const f = fixture(t);
+  assert.throws(
+    () => planMergedRelease(f.root, { ...f.options, version: '0.1.1' }),
+    /Merge the release metadata PR/,
+  );
+});
+
+test('publication rejects metadata changed after the release PR', (t) => {
+  const f = fixture(t);
+  mergeReleaseMetadata(f);
+  fakeGitHub(t, f);
+  fs.appendFileSync(path.join(f.root, 'CHANGELOG.md'), '\n');
+  assert.throws(() => publish(f.root, f.options.directory), /match the committed release source/);
+  assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/tags/v0.1.1'), '');
+});
+
 test('publication rejects a development branch before pushing', (t) => {
   const f = fixture(t);
+  mergeReleaseMetadata(f);
   fakeGitHub(t, f);
-  prepare(f.root, f.options);
   process.env.GITHUB_REF = 'refs/heads/development';
   assert.throws(() => publish(f.root, f.options.directory), /must run from main/);
   assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/tags/v0.1.1'), '');
 });
 
-test('main changing during checks prevents a version commit and tag push', (t) => {
+test('main changing during checks prevents a tag push', (t) => {
   const f = fixture(t);
+  mergeReleaseMetadata(f);
   fakeGitHub(t, f);
-  prepare(f.root, f.options);
   const other = path.join(f.directory, 'other');
   git(f.directory, 'clone', '--branch', 'main', f.remote, other);
   identity(other);
@@ -350,10 +381,10 @@ test('no commits since the current release tag consumes no version', (t) => {
   assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/tags/v0.1.1'), '');
 });
 
-test('a competing tag causes the atomic push to leave remote main unchanged', (t) => {
+test('a competing tag leaves the remote tag and main unchanged', (t) => {
   const f = fixture(t);
+  mergeReleaseMetadata(f);
   fakeGitHub(t, f);
-  prepare(f.root, f.options);
   const other = path.join(f.directory, 'other');
   git(f.directory, 'clone', '--branch', 'main', f.remote, other);
   git(other, 'tag', 'v0.1.1');

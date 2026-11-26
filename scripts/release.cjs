@@ -93,42 +93,65 @@ function prepare(
   });
   if (exists.error || ![0, 1].includes(exists.status))
     throw new Error('Unable to check release tag.');
-  const resumed = exists.status === 0;
-  if (resumed) {
-    if (
-      git('log', '-1', '--format=%B', tag).split('\n').at(-1) !== `Release-Run: ${runId}` ||
-      git('rev-parse', `${tag}^`) !== source
-    )
-      throw new Error(`Tag ${tag} already exists and belongs to another release.`);
-    git('merge-base', '--is-ancestor', `${tag}^{commit}`, 'origin/main');
-    git('checkout', '--detach', tag);
-  } else {
-    const filename = path.join(root, 'CHANGELOG.md');
-    const changelog = fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n');
-    const sections = changelog.split(/^## /m);
-    const authored = orderChangelogSections(sections[1].slice('[Unreleased]'.length));
-    const commits = git('log', '--format=- %s (%h)', range);
-    if (!commits) throw new Error('There are no changes since the previous release.');
-    const notes = [authored, '### Commits\n\n' + commits].filter(Boolean).join('\n\n');
-    fs.writeFileSync(
-      filename,
-      `${sections[0]}## [Unreleased]\n\n## [${version}] - ${date}\n\n${notes}\n\n## ${sections.slice(2).join('## ')}`,
-    );
-    for (const name of ['package.json', 'package-lock.json']) {
-      const file = path.join(root, name);
-      const value = JSON.parse(fs.readFileSync(file, 'utf8'));
-      value.version = version;
-      if (name === 'package-lock.json') value.packages[''].version = version;
-      fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
-    }
+  if (exists.status === 0) throw new Error(`Tag ${tag} already exists.`);
+  const filename = path.join(root, 'CHANGELOG.md');
+  const changelog = fs.readFileSync(filename, 'utf8').replaceAll('\r\n', '\n');
+  const sections = changelog.split(/^## /m);
+  const authored = orderChangelogSections(sections[1].slice('[Unreleased]'.length));
+  const commits = git('log', '--format=- %s (%h)', range);
+  if (!commits) throw new Error('There are no changes since the previous release.');
+  const notes = [authored, '### Commits\n\n' + commits].filter(Boolean).join('\n\n');
+  fs.writeFileSync(
+    filename,
+    `${sections[0]}## [Unreleased]\n\n## [${version}] - ${date}\n\n${notes}\n\n## ${sections.slice(2).join('## ')}`,
+  );
+  for (const name of ['package.json', 'package-lock.json']) {
+    const file = path.join(root, name);
+    const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+    value.version = version;
+    if (name === 'package-lock.json') value.packages[''].version = version;
+    fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
   }
   verifyRelease(root, `refs/tags/${tag}`);
   fs.mkdirSync(directory, { recursive: true });
   writeNotes(root, directory, tag);
-  const plan = { version, tag, source, runId, resumed };
+  const plan = { version, tag, source, runId };
   fs.writeFileSync(path.join(directory, 'plan.json'), JSON.stringify(plan) + '\n');
   saveMetadata(root, directory);
   return plan;
+}
+
+function planMergedRelease(root, { directory, runId, source, version }) {
+  if (!/^\d+$/.test(runId) || !/^[a-f0-9]{40}$/.test(source))
+    throw new Error('A workflow run ID and source commit are required.');
+  const tag = `v${verifyRelease(root)}`;
+  if (tag !== `v${version}`)
+    throw new Error(`Merge the release metadata PR for v${version} before publishing.`);
+  verifyRelease(root, `refs/tags/${tag}`);
+  if (run('git', ['rev-parse', 'HEAD'], root) !== source)
+    throw new Error('Checkout does not match the requested source commit.');
+  if (run('git', ['status', '--porcelain'], root))
+    throw new Error('Release planning requires a clean checkout.');
+  checkTagOwner((...args) => run('git', args, root), tag, source, runId);
+  const plan = { version, tag, source, runId };
+  fs.mkdirSync(directory, { recursive: true });
+  writeNotes(root, directory, tag);
+  fs.writeFileSync(path.join(directory, 'plan.json'), JSON.stringify(plan) + '\n');
+  saveMetadata(root, directory);
+  return plan;
+}
+
+function checkTagOwner(git, tag, source, runId) {
+  const ref = `refs/tags/${tag}`;
+  const annotation = git('for-each-ref', '--format=%(objecttype)%0a%(contents)', ref);
+  if (!annotation) return false;
+  if (
+    !annotation.startsWith('tag\n') ||
+    annotation.split('\n').at(-1) !== `Release-Run: ${runId}` ||
+    git('rev-parse', `${ref}^{commit}`) !== source
+  )
+    throw new Error(`Tag ${tag} already exists and belongs to another release.`);
+  return true;
 }
 
 function saveMetadata(root, directory) {
@@ -168,7 +191,7 @@ function restore(root, directory, expectedTag) {
 }
 
 function publish(root, directory) {
-  const { version, tag, source, runId, resumed } = JSON.parse(
+  const { version, tag, source, runId } = JSON.parse(
     fs.readFileSync(path.join(directory, 'plan.json'), 'utf8'),
   );
   const git = (...args) => run('git', args, root);
@@ -179,40 +202,18 @@ function publish(root, directory) {
     throw new Error('Release plan does not belong to this workflow run.');
   if (verifyRelease(root, `refs/tags/${tag}`) !== version)
     throw new Error('Release plan version changed.');
-  const tagged = spawnSync('git', ['show-ref', '--verify', '--quiet', `refs/tags/${tag}`], {
-    cwd: root,
-  });
-  if (tagged.error || ![0, 1].includes(tagged.status))
-    throw new Error('Unable to check release tag.');
-  if (tagged.status === 0) {
-    if (
-      git('log', '-1', '--format=%B', tag).split('\n').at(-1) !== `Release-Run: ${runId}` ||
-      git('rev-parse', `${tag}^`) !== source
-    )
-      throw new Error('Existing tag belongs to another release.');
-    git('merge-base', '--is-ancestor', `${tag}^{commit}`, 'origin/main');
-    for (const name of ['package.json', 'package-lock.json', 'CHANGELOG.md']) {
-      if (git('show', `${tag}:${name}`) !== fs.readFileSync(path.join(root, name), 'utf8').trim())
-        throw new Error('Candidate metadata differs from the existing release tag.');
-    }
-  } else if (!resumed) {
+  if (git('rev-parse', 'HEAD') !== source || git('diff', 'HEAD', '--'))
+    throw new Error('Candidate must match the committed release source.');
+  if (!checkTagOwner(git, tag, source, runId)) {
     if (git('ls-remote', 'origin', 'refs/heads/main').split(/\s/)[0] !== source)
       throw new Error(
         'main changed during verification. Start a new release run from current main.',
       );
     git('config', 'user.name', 'github-actions[bot]');
     git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com');
-    git('add', 'package.json', 'package-lock.json', 'CHANGELOG.md');
-    git(
-      'commit',
-      '-m',
-      `chore(release): release ${tag}`,
-      '-m',
-      `Publish the verified extension and changelog.\n\nRelease-Run: ${runId}`,
-    );
-    git('tag', '-a', tag, '-m', `Remote - Incus ${version}`);
-    git('push', '--atomic', 'origin', 'HEAD:refs/heads/main', `refs/tags/${tag}`);
-  } else throw new Error('The release tag disappeared.');
+    git('tag', '-a', tag, source, '-m', `Remote - Incus ${version}\n\nRelease-Run: ${runId}`);
+    git('push', 'origin', `refs/tags/${tag}`);
+  }
   const assets = [`remote-incus-${version}.vsix`, 'SHA256SUMS'];
   const files = assets.map((name) => path.join(directory, name));
   const notes = path.join(directory, 'release-notes.md');
@@ -272,17 +273,24 @@ if (require.main === module) {
     const [command, directory, expectedTag] = process.argv.slice(2);
     if (!directory)
       throw new Error(
-        'Usage: node scripts/release.cjs prepare|collect|restore|publish OUTPUT_DIRECTORY [RESTORE_TAG]',
+        'Usage: node scripts/release.cjs prepare|plan|collect|restore|publish OUTPUT_DIRECTORY [RESTORE_TAG]',
       );
     if (command === 'prepare') {
       const plan = prepare(root, {
         directory,
         bump: process.env.RELEASE_BUMP,
         versionOverride: process.env.RELEASE_VERSION,
+        runId: process.env.GITHUB_RUN_ID || '0',
+        source: process.env.GITHUB_SHA || run('git', ['rev-parse', 'HEAD'], root),
+      });
+      console.log(`Prepared ${plan.tag}. Commit the metadata on your release PR branch.`);
+    } else if (command === 'plan') {
+      const plan = planMergedRelease(root, {
+        directory,
+        version: process.env.RELEASE_VERSION,
         runId: process.env.GITHUB_RUN_ID,
         source: process.env.GITHUB_SHA,
       });
-      console.log(`Prepared ${plan.tag}${plan.resumed ? ' (resuming this run)' : ''}`);
       if (process.env.GITHUB_OUTPUT)
         fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=${plan.tag}\n`);
     } else if (command === 'collect') collect(root, directory);
@@ -296,4 +304,13 @@ if (require.main === module) {
   }
 }
 
-module.exports = { nextVersion, inferBump, chooseVersion, prepare, collect, restore, publish };
+module.exports = {
+  nextVersion,
+  inferBump,
+  chooseVersion,
+  prepare,
+  planMergedRelease,
+  collect,
+  restore,
+  publish,
+};
