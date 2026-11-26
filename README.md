@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/dodbrian/vscode-remote-incus/daa9e3b176adb1994da490aad8eba1f22f6d3dd7/assets/branding/remote-incus.png" alt="Remote - Incus logo" width="96" height="96">
+  <img src="https://raw.githubusercontent.com/dodbrian/vscode-remote-incus/daa9e3b176adb1994da490aad8eba1f22f6d3dd7/assets/branding/remote-incus.png" alt="Remote - Incus logo" width="96">
 </p>
 
 <h1 align="center">Remote - Incus</h1>
