@@ -1,5 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { test } = require('node:test');
 const { inspectRecords, required, documentation } = require('../scripts/verify-package.cjs');
 
@@ -7,6 +9,42 @@ const { fixture } = require('./support/package-fixture.cjs');
 
 test('package policy accepts required runtime, licenses and documentation', () => {
   assert.deepEqual(inspectRecords(fixture()).errors, []);
+});
+
+test('new packages require reviewed branding and matching gallery metadata', () => {
+  const records = fixture();
+  const icon = 'assets/branding/remote-incus.png';
+  const iconPath = `extension/${icon}`;
+  assert.ok(
+    inspectRecords(records, { requireBranding: true }).errors.includes(
+      `Required archive file missing: ${iconPath}`,
+    ),
+  );
+
+  const manifestPath = 'extension/package.json';
+  const manifest = JSON.parse(records.get(manifestPath));
+  records.set(manifestPath, Buffer.from(JSON.stringify({ ...manifest, icon })));
+  for (const file of [icon, 'assets/light/incus.svg', 'assets/dark/incus.svg']) {
+    records.set(`extension/${file}`, fs.readFileSync(path.join(__dirname, '..', file)));
+  }
+  const metadataPath = 'extension.vsixmanifest';
+  const metadata = records
+    .get(metadataPath)
+    .toString()
+    .replace('</Metadata>', `<Icon>${iconPath}</Icon></Metadata>`);
+  records.set(metadataPath, Buffer.from(metadata));
+  assert.ok(inspectRecords(records).errors.includes('VSIX required asset is missing'));
+
+  const asset = `<Asset Type="Microsoft.VisualStudio.Services.Icons.Default" Path="${iconPath}"/>`;
+  records.set(metadataPath, Buffer.from(metadata.replace('</Assets>', `${asset}</Assets>`)));
+  assert.deepEqual(inspectRecords(records, { requireBranding: true }).errors, []);
+
+  records.delete('extension/assets/dark/incus.svg');
+  records.set(iconPath, Buffer.from('unreviewed'));
+  assert.deepEqual(inspectRecords(records).errors, [
+    `Unreviewed extension icon: ${iconPath}`,
+    'Required archive file missing: extension/assets/dark/incus.svg',
+  ]);
 });
 
 test('package policy rejects missing runtime and licenses', () => {

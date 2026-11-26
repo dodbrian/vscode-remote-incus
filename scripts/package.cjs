@@ -45,7 +45,7 @@ async function packageExtension(root = process.cwd(), build = runVsce) {
     await build(candidate, root);
     await finalizePackage(candidate);
     const records = await readArchive(candidate);
-    const { errors, links } = inspectRecords(records);
+    const { errors, links } = inspectRecords(records, { requireBranding: true });
     if (errors.length) throw new Error(errors.join('\n'));
     console.log(
       `Package policy: ${records.size} files, ${links} local documentation links, no findings.`,

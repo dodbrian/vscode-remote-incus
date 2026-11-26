@@ -7,11 +7,8 @@ esbuild.cjs
 .gitignore
 *.vsix
 tests/**
-# Approved icons awaiting UI integration.
+# Editable source for the packaged PNG.
 assets/branding/remote-incus.svg
-assets/branding/remote-incus.png
-assets/light/incus.svg
-assets/dark/incus.svg
 # Development configuration and private runtime material are never published.
 .githooks/**
 .vscode/**

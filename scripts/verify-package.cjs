@@ -9,7 +9,10 @@ const { crc32 } = require('node:zlib');
 const { Script } = require('node:vm');
 const { parseString } = require('xml2js');
 const sax = require('sax');
-const { findings } = require('./audit-privacy.cjs');
+const { findings, isReviewedImage } = require('./audit-privacy.cjs');
+
+const extensionIcon = 'assets/branding/remote-incus.png';
+const branding = [extensionIcon, 'assets/light/incus.svg', 'assets/dark/incus.svg'];
 
 const required = [
   'package.json',
@@ -52,7 +55,9 @@ const documentation = [
   'tests/README.md',
   'spike/README.md',
 ].map((name) => `docs/${name}`);
-const allowed = new Set([...required, ...documentation].map((name) => `extension/${name}`));
+const allowed = new Set(
+  [...required, ...documentation, ...branding].map((name) => `extension/${name}`),
+);
 const metadata = new Set(['[Content_Types].xml', 'extension.vsixmanifest']);
 const screenshots = new Set([
   'extension/docs/images/incus-connected-workspace.png',
@@ -88,7 +93,7 @@ function parseXml(bytes, root, namespace) {
   return parsed[root];
 }
 
-function inspectMetadata(records, manifest, errors) {
+function inspectMetadata(records, manifest, branded, errors) {
   try {
     const xml = parseXml(
       records.get('extension.vsixmanifest'),
@@ -117,6 +122,13 @@ function inspectMetadata(records, manifest, errors) {
       ['Microsoft.VisualStudio.Services.Content.Details', 'extension/readme.md'],
       ['Microsoft.VisualStudio.Services.Content.License', 'extension/LICENSE.txt'],
     ]);
+    if (branded) {
+      const iconPath = `extension/${extensionIcon}`;
+      expected.set('Microsoft.VisualStudio.Services.Icons.Default', iconPath);
+      if (xml.Metadata[0].Icon?.length !== 1 || xml.Metadata[0].Icon[0] !== iconPath) {
+        errors.push('VSIX icon metadata points to the wrong file');
+      }
+    }
     const seen = new Set();
     for (const asset of assets) {
       const attributes = asset.$;
@@ -181,7 +193,7 @@ function inspectMetadata(records, manifest, errors) {
   }
 }
 
-function inspectRecords(records) {
+function inspectRecords(records, { requireBranding = false } = {}) {
   const errors = [];
   for (const name of records.keys()) {
     if (!allowed.has(name) && !metadata.has(name)) errors.push(`Unexpected archive file: ${name}`);
@@ -191,6 +203,10 @@ function inspectRecords(records) {
       data.toString('utf8').includes('sourceMappingURL=')
     ) {
       errors.push('Production bundle contains a source map reference');
+    }
+    if (name === `extension/${extensionIcon}`) {
+      if (!isReviewedImage(data)) errors.push(`Unreviewed extension icon: ${name}`);
+      continue;
     }
     if (screenshots.has(name)) {
       if (!data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
@@ -202,11 +218,6 @@ function inspectRecords(records) {
     for (const { kind, line } of findings(data.toString('utf8'))) {
       errors.push(`${name}:${line}: ${kind} (value redacted)`);
     }
-  }
-  for (const name of [...required, ...documentation].map((file) => `extension/${file}`)) {
-    if (!records.has(name)) errors.push(`Required archive file missing: ${name}`);
-    else if (!records.get(name).toString('utf8').trim())
-      errors.push(`Required archive file empty: ${name}`);
   }
   for (const name of metadata) {
     if (!records.has(name)) errors.push(`Required VSIX metadata missing: ${name}`);
@@ -228,7 +239,23 @@ function inspectRecords(records) {
       errors.push('Invalid extension package.json');
     }
   }
-  inspectMetadata(records, manifest, errors);
+  // New builds must carry the branding. Previously released archives still
+  // need to pass verification when checked with current release tooling.
+  const branded =
+    requireBranding ||
+    manifest?.icon !== undefined ||
+    branding.some((file) => records.has(`extension/${file}`));
+  if (branded && manifest?.icon !== extensionIcon) errors.push('Unexpected extension icon path');
+  const requiredFiles = branded
+    ? [...required, ...documentation, ...branding]
+    : [...required, ...documentation];
+  for (const file of requiredFiles) {
+    const name = `extension/${file}`;
+    if (!records.has(name)) errors.push(`Required archive file missing: ${name}`);
+    else if (!records.get(name).toString('utf8').trim())
+      errors.push(`Required archive file empty: ${name}`);
+  }
+  inspectMetadata(records, manifest, branded, errors);
   for (const name of ['extension/dist/extension.js', 'extension/assets/relay.js']) {
     if (!records.has(name)) continue;
     try {
