@@ -5,12 +5,8 @@
 <h1 align="center">Remote - Incus</h1>
 
 <p align="center">
-  <a href="https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml">
-    <img src="https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml/badge.svg" alt="Build and test">
-  </a>
-  <a href="https://github.com/dodbrian/vscode-remote-incus/releases/latest">
-    <img src="https://img.shields.io/github/v/release/dodbrian/vscode-remote-incus?logo=github&amp;label=Release" alt="Latest GitHub release">
-  </a>
+  <a href="https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml"><img src="https://github.com/dodbrian/vscode-remote-incus/actions/workflows/offline-ci.yml/badge.svg" alt="Build and test"></a>
+  <a href="https://github.com/dodbrian/vscode-remote-incus/releases/latest"><img src="https://img.shields.io/github/v/release/dodbrian/vscode-remote-incus?logo=github&amp;label=Release" alt="Latest GitHub release"></a>
 </p>
 
 Connect VS Code to [Incus](https://github.com/lxc/incus) system containers through
