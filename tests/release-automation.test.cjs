@@ -12,9 +12,10 @@ const {
   inferBump,
   chooseVersion,
   prepare,
-  planMergedRelease,
   collect,
   restore,
+  ensureReleasePullRequest,
+  awaitReleaseMerge,
   publish,
 } = require('../scripts/release.cjs');
 
@@ -82,16 +83,6 @@ function fixture(t, notes = '### Fixed\n\n- Friendly summary.') {
   return { directory, root, remote, options };
 }
 
-function mergeReleaseMetadata(f) {
-  const { version } = prepare(f.root, f.options);
-  git(f.root, 'add', 'package.json', 'package-lock.json', 'CHANGELOG.md');
-  git(f.root, 'commit', '-m', `chore(release): prepare v${version}`);
-  git(f.root, 'push', 'origin', 'main');
-  f.options.source = git(f.root, 'rev-parse', 'HEAD');
-  f.options.version = version;
-  planMergedRelease(f.root, f.options);
-}
-
 function environment(t, values) {
   for (const [key, value] of Object.entries(values)) {
     const old = process.env[key];
@@ -108,19 +99,45 @@ function fakeGitHub(t, f) {
   const state = path.join(f.directory, 'github');
   fs.mkdirSync(bin);
   fs.mkdirSync(state);
-  // GitHub API calls are faked. Commits, tags and pushes use isolated Git repositories.
+  // GitHub API calls are faked. Branches, commits and tags use real, isolated Git repositories.
   fs.writeFileSync(
     path.join(bin, 'gh'),
     `#!/usr/bin/env node
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const [, command, tag, ...args] = process.argv.slice(2);
+const [group, command, tag, ...args] = process.argv.slice(2);
 const root = process.env.FAKE_GITHUB;
 const record = path.join(root, 'release.json');
 const read = () => JSON.parse(fs.readFileSync(record));
 const write = (value) => fs.writeFileSync(record, JSON.stringify(value));
 const upload = () => { for (const file of args) { if (file.startsWith('--')) break; fs.copyFileSync(file, path.join(root, path.basename(file))); } };
+const prFile = path.join(root, 'pr.json');
+const setPr = (pr) => fs.writeFileSync(prFile, JSON.stringify(pr));
+if (group === 'api') {
+  console.log(!fs.existsSync(path.join(root, 'disable-auto-merge')));
+  process.exit(0);
+}
+if (group === 'pr') {
+  const pr = fs.existsSync(prFile) ? JSON.parse(fs.readFileSync(prFile)) : null;
+  if (command === 'list') console.log(JSON.stringify(pr ? [pr] : []));
+  else if (command === 'create') {
+    if (fs.existsSync(path.join(root, 'fail-pr-create'))) process.exit(1);
+    const head = args[args.indexOf('--head') + 1];
+    const headRefOid = require('node:child_process').execFileSync(
+      'git', ['ls-remote', 'origin', 'refs/heads/' + head], { encoding: 'utf8' },
+    ).split(/\\s/)[0];
+    const url = 'https://example.invalid/pull/15';
+    setPr({ number: 15, url, state: 'OPEN', headRefOid });
+    console.log(url);
+  } else if (command === 'view' && pr) console.log(JSON.stringify(pr));
+  else if (command === 'merge' && pr?.state === 'OPEN') {
+    if (!args.includes('--auto') || !args.includes('--rebase') ||
+        args[args.indexOf('--match-head-commit') + 1] !== pr.headRefOid) process.exit(2);
+    setPr({ ...pr, autoMergeRequest: { enabledAt: 'now' } });
+  } else process.exit(2);
+  process.exit(0);
+}
 if (command === 'view') {
   if (!fs.existsSync(record)) process.exit(1);
   console.log(args.includes('--jq') ? 'https://example.invalid/releases/' + tag : JSON.stringify(read()));
@@ -295,81 +312,134 @@ test('first tagged release can include existing history when no baseline tag exi
 test('preparation rejects a tag owned by another release', (t) => {
   const f = fixture(t);
   git(f.root, 'tag', 'v0.1.1');
-  assert.throws(() => prepare(f.root, f.options), /already exists/);
+  assert.throws(() => prepare(f.root, f.options), /belongs to another release/);
 });
 
-test('a failed upload resumes its own version and verifies already published assets', (t) => {
-  const f = fixture(t);
-  mergeReleaseMetadata(f);
-  const state = fakeGitHub(t, f);
-  fs.writeFileSync(path.join(state, 'fail-once'), '');
+function verifiedCandidate(f) {
+  prepare(f.root, f.options);
   fs.writeFileSync(path.join(f.root, 'remote-incus.vsix'), 'verified fixture archive');
   collect(f.root, f.options.directory);
-  assert.throws(() => publish(f.root, f.options.directory));
-  const releaseCommit = git(f.root, 'rev-parse', 'v0.1.1^{commit}');
-  assert.equal(releaseCommit, f.options.source);
+}
+
+function simulateGitHubMerge(f, state, { extraChange = false } = {}) {
+  const filename = path.join(state, 'pr.json');
+  const pr = JSON.parse(fs.readFileSync(filename, 'utf8'));
+  assert.ok(pr.autoMergeRequest);
+  const other = path.join(f.directory, 'merge');
+  git(f.directory, 'clone', '--branch', 'main', f.remote, other);
+  identity(other);
+  git(other, 'cherry-pick', pr.headRefOid);
+  if (extraChange) {
+    fs.writeFileSync(path.join(other, 'new.txt'), 'concurrent change');
+    git(other, 'add', 'new.txt');
+  }
+  git(other, 'commit', '--amend', '--no-edit');
+  const merged = git(other, 'rev-parse', 'HEAD');
+  assert.notEqual(merged, pr.headRefOid);
+  git(other, 'push', 'origin', 'main');
+  fs.writeFileSync(
+    filename,
+    JSON.stringify({ ...pr, state: 'MERGED', mergeCommit: { oid: merged } }),
+  );
+  return merged;
+}
+
+test('release PR creation retries the same branch and waits for GitHub to merge', async (t) => {
+  const f = fixture(t);
+  const state = fakeGitHub(t, f);
+  verifiedCandidate(f);
+  const failure = path.join(state, 'fail-pr-create');
+  fs.writeFileSync(failure, '');
+  assert.throws(() => ensureReleasePullRequest(f.root, f.options.directory));
+  fs.unlinkSync(failure);
+  const branch = 'refs/heads/release/v0.1.1-12345';
+  const head = git(f.root, 'ls-remote', 'origin', branch).split(/\s/)[0];
+  const pr = ensureReleasePullRequest(f.root, f.options.directory);
+  assert.equal(pr.headRefOid, head);
+  assert.ok(ensureReleasePullRequest(f.root, f.options.directory).autoMergeRequest);
+  await assert.rejects(awaitReleaseMerge(f.root, String(pr.number), 0, 0), /still open/);
   assert.equal(
     git(f.root, 'ls-remote', 'origin', 'refs/heads/main').split(/\s/)[0],
     f.options.source,
   );
-  git(f.root, 'checkout', '--detach', f.options.source);
+  assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/tags/v0.1.1'), '');
+  const merged = simulateGitHubMerge(f, state);
+  assert.equal(await awaitReleaseMerge(f.root, String(pr.number)), merged);
+  assert.equal(ensureReleasePullRequest(f.root, f.options.directory).state, 'MERGED');
+});
+
+test('disabled auto-merge stops before creating a release branch', (t) => {
+  const f = fixture(t);
+  const state = fakeGitHub(t, f);
+  verifiedCandidate(f);
+  fs.writeFileSync(path.join(state, 'disable-auto-merge'), '');
+  assert.throws(
+    () => ensureReleasePullRequest(f.root, f.options.directory),
+    /Enable Allow auto-merge/,
+  );
+  assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/heads/release/*'), '');
+});
+
+test('a failed upload resumes the same rebased release and verifies published assets', async (t) => {
+  const f = fixture(t);
+  const state = fakeGitHub(t, f);
+  fs.writeFileSync(path.join(state, 'fail-once'), '');
+  verifiedCandidate(f);
+  const pr = ensureReleasePullRequest(f.root, f.options.directory);
+  const merged = simulateGitHubMerge(f, state);
+  assert.equal(await awaitReleaseMerge(f.root, String(pr.number)), merged);
+  assert.throws(() => publish(f.root, f.options.directory, merged));
+  assert.equal(git(f.root, 'rev-parse', 'v0.1.1^{commit}'), merged);
+  git(f.root, 'reset', '--hard', f.options.source);
   restore(f.root, f.options.directory);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(f.root, 'package.json'))).version, '0.1.1');
-  publish(f.root, f.options.directory);
+  publish(f.root, f.options.directory, merged);
   assert.equal(JSON.parse(fs.readFileSync(path.join(state, 'release.json'))).isDraft, false);
-  publish(f.root, f.options.directory);
-  assert.equal(git(f.root, 'rev-list', '--count', `${f.options.source}..origin/main`), '0');
+  publish(f.root, f.options.directory, merged);
+  assert.equal(git(f.root, 'rev-list', '--count', `${f.options.source}..origin/main`), '1');
   assert.equal(git(f.root, 'tag', '--list', 'v0.1.2'), '');
   fs.writeFileSync(path.join(state, 'remote-incus-0.1.1.vsix'), 'corrupted');
-  assert.throws(() => publish(f.root, f.options.directory), /differs from the verified build/);
-});
-
-test('release planning requires the requested version in the checkout', (t) => {
-  const f = fixture(t);
   assert.throws(
-    () => planMergedRelease(f.root, { ...f.options, version: '0.1.1' }),
-    /Merge the release metadata PR/,
+    () => publish(f.root, f.options.directory, merged),
+    /differs from the verified build/,
   );
+  git(f.root, 'reset', '--hard', f.options.source);
+  assert.equal(prepare(f.root, f.options).resumed, true);
 });
 
-test('publication rejects metadata changed after the release PR', (t) => {
+test('a merged PR with a changed tree is never tagged', (t) => {
   const f = fixture(t);
-  mergeReleaseMetadata(f);
-  fakeGitHub(t, f);
-  fs.appendFileSync(path.join(f.root, 'CHANGELOG.md'), '\n');
-  assert.throws(() => publish(f.root, f.options.directory), /match the committed release source/);
+  const state = fakeGitHub(t, f);
+  verifiedCandidate(f);
+  ensureReleasePullRequest(f.root, f.options.directory);
+  const merged = simulateGitHubMerge(f, state, { extraChange: true });
+  assert.throws(() => publish(f.root, f.options.directory, merged), /Merged release tree differs/);
   assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/tags/v0.1.1'), '');
 });
 
 test('publication rejects a development branch before pushing', (t) => {
   const f = fixture(t);
-  mergeReleaseMetadata(f);
   fakeGitHub(t, f);
+  verifiedCandidate(f);
   process.env.GITHUB_REF = 'refs/heads/development';
+  assert.throws(() => ensureReleasePullRequest(f.root, f.options.directory), /must run from main/);
   assert.throws(() => publish(f.root, f.options.directory), /must run from main/);
-  assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/tags/v0.1.1'), '');
+  assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/heads/release/*'), '');
 });
 
-test('main changing during checks prevents a tag push', (t) => {
+test('main changing during checks prevents creating a release PR', (t) => {
   const f = fixture(t);
-  mergeReleaseMetadata(f);
   fakeGitHub(t, f);
+  verifiedCandidate(f);
   const other = path.join(f.directory, 'other');
   git(f.directory, 'clone', '--branch', 'main', f.remote, other);
   identity(other);
-  fs.writeFileSync(path.join(other, 'new.txt'), 'concurrent change');
-  git(other, 'add', '.');
-  git(
-    other,
-    'commit',
-    '-m',
-    'test(release): simulate concurrent development',
-    '-m',
-    'Advance main during release validation.',
-  );
+  git(other, 'commit', '--allow-empty', '-m', 'test(release): simulate concurrent development');
   git(other, 'push', 'origin', 'main');
-  assert.throws(() => publish(f.root, f.options.directory), /main changed during verification/);
-  assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/tags/v0.1.1'), '');
+  assert.throws(
+    () => ensureReleasePullRequest(f.root, f.options.directory),
+    /main changed during verification/,
+  );
+  assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/heads/release/*'), '');
   assert.equal(git(f.root, 'rev-parse', 'HEAD'), f.options.source);
 });
 
@@ -381,17 +451,20 @@ test('no commits since the current release tag consumes no version', (t) => {
   assert.equal(git(f.root, 'ls-remote', 'origin', 'refs/tags/v0.1.1'), '');
 });
 
-test('a competing tag leaves the remote tag and main unchanged', (t) => {
+test('a competing tag is preserved after the release PR merges', (t) => {
   const f = fixture(t);
-  mergeReleaseMetadata(f);
-  fakeGitHub(t, f);
-  const other = path.join(f.directory, 'other');
-  git(f.directory, 'clone', '--branch', 'main', f.remote, other);
-  git(other, 'tag', 'v0.1.1');
-  git(other, 'push', 'origin', 'refs/tags/v0.1.1');
-  assert.throws(() => publish(f.root, f.options.directory));
+  const state = fakeGitHub(t, f);
+  verifiedCandidate(f);
+  ensureReleasePullRequest(f.root, f.options.directory);
+  const merged = simulateGitHubMerge(f, state);
+  git(f.root, 'tag', 'v0.1.1', f.options.source);
+  git(f.root, 'push', 'origin', 'refs/tags/v0.1.1');
+  assert.throws(
+    () => publish(f.root, f.options.directory, merged),
+    /Existing tag belongs to another release/,
+  );
   assert.equal(
-    git(f.root, 'ls-remote', 'origin', 'refs/heads/main').split(/\s/)[0],
+    git(f.root, 'ls-remote', 'origin', 'refs/tags/v0.1.1').split(/\s/)[0],
     f.options.source,
   );
 });
@@ -426,7 +499,16 @@ test('candidate metadata and pinned README survive the handoff to a separate rel
     fs.readFileSync(path.join(f.options.directory, 'release-notes.md'), 'utf8'),
     /fixture\/project\/blob\/v0\.1\.1\/README\.md/,
   );
-  git(f.root, 'restore', 'package.json', 'package-lock.json', 'CHANGELOG.md');
+  git(
+    f.root,
+    'restore',
+    '--source=HEAD',
+    '--staged',
+    '--worktree',
+    'package.json',
+    'package-lock.json',
+    'CHANGELOG.md',
+  );
   restore(f.root, f.options.directory);
   for (const name of ['package.json', 'package-lock.json', 'CHANGELOG.md'])
     assert.equal(
